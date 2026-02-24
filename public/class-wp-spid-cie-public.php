@@ -460,6 +460,10 @@ class WP_SPID_CIE_OIDC_Public {
 	}
 
 	private function apply_spid_metadata_signature(DOMDocument $doc, DOMElement $root, string $private_key, string $cert_base64): void {
+		if ($root->hasAttribute('ID')) {
+			$root->setIdAttribute('ID', true);
+		}
+
 		$dsig = new \RobRichards\XMLSecLibs\XMLSecurityDSig();
 		$dsig->setCanonicalMethod(\RobRichards\XMLSecLibs\XMLSecurityDSig::EXC_C14N);
 		$dsig->addReference(
@@ -596,21 +600,30 @@ class WP_SPID_CIE_OIDC_Public {
 		return new WP_SPID_CIE_OIDC_Saml_Service();
 	}
 
-	private function resolve_spid_saml_key_path(string $filename): string {
+	private function resolve_spid_saml_active_key_dir(): string {
 		$upload_dir = wp_upload_dir();
 		$base_dir = trailingslashit($upload_dir['basedir']);
 
 		$primary_dir = $base_dir . 'wp-spid-cie-keys';
 		$fallback_dir = $base_dir . 'spid-cie-oidc-keys';
+		$primary_private = trailingslashit($primary_dir) . 'private.key';
+		$primary_cert = trailingslashit($primary_dir) . 'public.crt';
+		$fallback_private = trailingslashit($fallback_dir) . 'private.key';
+		$fallback_cert = trailingslashit($fallback_dir) . 'public.crt';
 
-		$primary_path = trailingslashit($primary_dir) . ltrim($filename, '/');
-		$fallback_path = trailingslashit($fallback_dir) . ltrim($filename, '/');
-
-		if (file_exists($primary_path) && is_readable($primary_path)) {
-			return $primary_path;
+		if (file_exists($primary_private) && is_readable($primary_private) && file_exists($primary_cert) && is_readable($primary_cert)) {
+			return $primary_dir;
 		}
 
-		return $fallback_path;
+		if (file_exists($fallback_private) && is_readable($fallback_private) && file_exists($fallback_cert) && is_readable($fallback_cert)) {
+			return $fallback_dir;
+		}
+
+		return $primary_dir;
+	}
+
+	private function resolve_spid_saml_key_path(string $filename): string {
+		return trailingslashit($this->resolve_spid_saml_active_key_dir()) . ltrim($filename, '/');
 	}
 
 	private function get_saml_signing_cert(): string {
