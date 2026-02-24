@@ -11,11 +11,6 @@
     ],
     "require": {
         "italia/spid-cie-oidc-php": "^1.0",
-        "robrichards/xmlseclibs": "^3.1"
-    },
-    "autoload": {
-        "psr-4": {
-            "RobRichards\\XMLSecLibs\\": "vendor/robrichards/xmlseclibs/src/"
-        }
+        "robrichards/xmlseclibs": "^3.1.4"
     }
 }
