@@ -882,16 +882,14 @@ private function extract_jwt_payload($jwt) {
                                     <?php endif; ?>
                                 <?php endforeach; ?>
                             <?php endif; ?>
-                        </ul>
-                        <div class="spid-idp-button-support">
-                            <a class="spid-idp-support-link" href="https://www.spid.gov.it/" target="_blank" rel="noopener noreferrer">Maggiori informazioni</a>
-                            <a class="spid-idp-support-link" href="https://www.spid.gov.it/cos-e-spid/come-attivare-spid/" target="_blank" rel="noopener noreferrer">Non hai SPID?</a>
-                            <a class="spid-idp-support-link" href="https://helpdesk.spid.gov.it/" target="_blank" rel="noopener noreferrer">Serve aiuto?</a>
+                            <li><a class="idp-button-idp-logo spid-idp-support-link" href="https://www.spid.gov.it/" target="_blank" rel="noopener noreferrer"><span class="spid-idp-label">Maggiori informazioni</span></a></li>
+                            <li><a class="idp-button-idp-logo spid-idp-support-link" href="https://www.spid.gov.it/cos-e-spid/come-attivare-spid/" target="_blank" rel="noopener noreferrer"><span class="spid-idp-label">Non hai SPID?</span></a></li>
+                            <li><a class="idp-button-idp-logo spid-idp-support-link" href="https://helpdesk.spid.gov.it/" target="_blank" rel="noopener noreferrer"><span class="spid-idp-label">Serve aiuto?</span></a></li>
                             <?php if (!empty($options['spid_saml_validator_enabled']) && $options['spid_saml_validator_enabled'] === '1'): ?>
                                 <?php $validator_url = add_query_arg(['idp' => 'https://validator.spid.gov.it'], $saml_login_url); ?>
-                                <a class="spid-idp-support-link spid-validator-link" href="<?php echo esc_url($validator_url); ?>">SPID Validator</a>
+                                <li><a class="idp-button-idp-logo spid-idp-support-link spid-validator-link" href="<?php echo esc_url($validator_url); ?>"><span class="spid-idp-label">SPID Validator</span></a></li>
                             <?php endif; ?>
-                        </div>
+                        </ul>
                     </div>
                 </div>
             <?php endif; ?>
