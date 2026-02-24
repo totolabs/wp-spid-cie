@@ -57,7 +57,7 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
         }
 
         if (empty($normalized)) {
-            return new WP_Error('spid_registry_empty', __('Registry SPID vuoto.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_empty', __('Registry SPID vuoto.', 'wp-spid-cie'));
         }
 
         $lkg = get_transient(self::LIST_LKG_TRANSIENT);
@@ -96,7 +96,7 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
     public function get_idp_detail(string $entityId, string $registryLink = '', bool $force = false) {
         $entityId = trim($entityId);
         if ($entityId === '') {
-            return new WP_Error('spid_registry_missing_entity', __('IdP non selezionato.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_missing_entity', __('IdP non selezionato.', 'wp-spid-cie'));
         }
 
         $cacheKey = self::DETAIL_PREFIX . md5($entityId);
@@ -128,7 +128,7 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
             if (is_array($lkg) && !empty($lkg)) {
                 return $lkg;
             }
-            return new WP_Error('spid_registry_detail_incomplete', __('Dettaglio IdP incompleto.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_detail_incomplete', __('Dettaglio IdP incompleto.', 'wp-spid-cie'));
         }
 
         set_transient($cacheKey, $parsed, DAY_IN_SECONDS);
@@ -182,7 +182,7 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
     private function fetch_json_https(string $url) {
         $url = esc_url_raw($url);
         if ($url === '' || stripos($url, 'https://') !== 0) {
-            return new WP_Error('spid_registry_invalid_url', __('URL Registry non valido.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_invalid_url', __('URL Registry non valido.', 'wp-spid-cie'));
         }
 
         $resp = wp_remote_get($url, ['timeout' => 10, 'redirection' => 3, 'limit_response_size' => 1024 * 1024]);
@@ -191,11 +191,11 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
         }
         $code = (int) wp_remote_retrieve_response_code($resp);
         if ($code < 200 || $code > 299) {
-            return new WP_Error('spid_registry_http_error', __('Registry SPID non disponibile.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_http_error', __('Registry SPID non disponibile.', 'wp-spid-cie'));
         }
         $data = json_decode((string) wp_remote_retrieve_body($resp), true);
         if (!is_array($data)) {
-            return new WP_Error('spid_registry_json_error', __('Risposta Registry non valida.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_json_error', __('Risposta Registry non valida.', 'wp-spid-cie'));
         }
         return $data;
     }
@@ -293,7 +293,7 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
         }
 
         if (empty($rows)) {
-            return new WP_Error('spid_registry_empty', __('Registry SPID vuoto.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_empty', __('Registry SPID vuoto.', 'wp-spid-cie'));
         }
 
         return $rows;
@@ -312,7 +312,7 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
         $query = sprintf('//md:EntityDescriptor[@entityID=%s]', $this->xpath_literal($entityId));
         $entityNode = $xp->query($query)->item(0);
         if (!$entityNode instanceof DOMElement) {
-            return new WP_Error('spid_registry_entity_not_found', __('IdP non trovato nel Registry.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_entity_not_found', __('IdP non trovato nel Registry.', 'wp-spid-cie'));
         }
 
         $sso = '';
@@ -367,7 +367,7 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
     private function fetch_xml_https(string $url) {
         $url = esc_url_raw($url);
         if ($url === '' || stripos($url, 'https://') !== 0) {
-            return new WP_Error('spid_registry_invalid_url', __('URL Registry non valido.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_invalid_url', __('URL Registry non valido.', 'wp-spid-cie'));
         }
 
         $resp = wp_remote_get($url, ['timeout' => 12, 'redirection' => 3, 'limit_response_size' => 1024 * 1024]);
@@ -376,13 +376,13 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
         }
         $code = (int) wp_remote_retrieve_response_code($resp);
         if ($code < 200 || $code > 299) {
-            return new WP_Error('spid_registry_http_error', __('Registry SPID non disponibile.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_http_error', __('Registry SPID non disponibile.', 'wp-spid-cie'));
         }
 
         $xml = new DOMDocument();
         $ok = @$xml->loadXML((string) wp_remote_retrieve_body($resp), LIBXML_NONET | LIBXML_NOBLANKS | LIBXML_NOERROR | LIBXML_NOWARNING);
         if (!$ok) {
-            return new WP_Error('spid_registry_xml_invalid', __('Risposta Registry non valida.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_xml_invalid', __('Risposta Registry non valida.', 'wp-spid-cie'));
         }
 
         return $xml;

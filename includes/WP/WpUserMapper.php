@@ -59,7 +59,7 @@ class WP_SPID_CIE_OIDC_WpUserMapper {
                 'provider' => $normalized['provider'] ?? 'unknown',
                 'missing' => implode(',', $missing),
             ]);
-            return new WP_Error('oidc_missing_required_claims', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_missing_required_claims', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         return true;
