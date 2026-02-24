@@ -13,15 +13,15 @@
  * @package           WP_SPID_CIE_OIDC
  *
  * @wordpress-plugin
- * Plugin Name:       SPID & CIE OIDC Login per WordPress
- * Plugin URI:        https://github.com/totolabs/wp-spid-cie-oidc
+ * Plugin Name:       SPID & CIE Login per WordPress
+ * Plugin URI:        https://github.com/totolabs/wp-spid-cie
  * Description:       Abilita l'autenticazione tramite SPID e CIE con protocollo OpenID Connect per le Pubbliche Amministrazioni italiane. Conforme PNRR 1.4.4. Sviluppato da Totolabs Srl.
  * Version:           1.1.1
  * Author:            Totolabs Srl
  * Author URI:        https://totolabs.it
  * License:           GPL-2.0-or-later
  * License URI:       https://www.gnu.org/licenses/gpl-2.0.html
- * Text Domain:       wp-spid-cie-oidc
+ * Text Domain:       wp-spid-cie
  * Domain Path:       /languages
  * Requires at least: 6.0
  * Requires PHP:      7.4
@@ -42,7 +42,7 @@ if ( file_exists( plugin_dir_path( __FILE__ ) . 'vendor/autoload.php' ) ) {
 }
 
 // 2. Carica la nostra Factory (Gestione Configurazione e Chiavi)
-require_once plugin_dir_path( __FILE__ ) . 'includes/class-wp-spid-cie-oidc-factory.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-wp-spid-cie-factory.php';
 
 // 2.b Core OIDC runtime services (Milestone 1)
 require_once plugin_dir_path( __FILE__ ) . 'includes/Logging/Logger.php';
@@ -59,17 +59,17 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/WP/WpUserMapper.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/WP/WpAuthService.php';
 
 // 3. Carica le classi Admin e Public
-require_once plugin_dir_path( __FILE__ ) . 'admin/class-wp-spid-cie-oidc-admin.php';
-require_once plugin_dir_path( __FILE__ ) . 'public/class-wp-spid-cie-oidc-public.php';
+require_once plugin_dir_path( __FILE__ ) . 'admin/class-wp-spid-cie-admin.php';
+require_once plugin_dir_path( __FILE__ ) . 'public/class-wp-spid-cie-public.php';
 
 
 /**
  * Esegue il plugin.
  * Inizializza le classi Admin (se siamo nel backend) e Public (sempre).
  */
-function run_wp_spid_cie_oidc() {
+function run_wp_spid_cie() {
 
-    $plugin_name = 'wp-spid-cie-oidc';
+    $plugin_name = 'wp-spid-cie';
     $version = WP_SPID_CIE_OIDC_VERSION;
 
     // Avvia la parte Admin (solo se l'utente è amministratore o sta caricando /wp-admin/)
@@ -89,8 +89,8 @@ function run_wp_spid_cie_oidc() {
 /**
  * Imposta valori di default alla prima attivazione.
  */
-function wp_spid_cie_oidc_activate() {
-    $option_name = 'wp-spid-cie-oidc_options';
+function wp_spid_cie_activate() {
+    $option_name = 'wp-spid-cie_options';
     $options = get_option($option_name, []);
 
     // Imposta i default solo se il campo è vuoto/non esiste
@@ -113,12 +113,29 @@ function wp_spid_cie_oidc_activate() {
     }
 }
 
-register_activation_hook(__FILE__, 'wp_spid_cie_oidc_activate');
+register_activation_hook(__FILE__, 'wp_spid_cie_activate');
+
+/**
+ * Aggiunge il link "Settings" nella lista plugin di WordPress.
+ *
+ * @param array $links Action links correnti.
+ * @return array
+ */
+function wp_spid_cie_plugin_action_links( $links ) {
+	$settings_url = admin_url( 'options-general.php?page=wp-spid-cie' );
+	$settings_link = '<a href="' . esc_url( $settings_url ) . '">' . esc_html__( 'Settings', 'wp-spid-cie' ) . '</a>';
+
+	array_unshift( $links, $settings_link );
+
+	return $links;
+}
+
+add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'wp_spid_cie_plugin_action_links' );
 
 add_action('plugins_loaded', function () {
     // Imposta i default anche su installazioni già attive (upgrade-safe)
-    wp_spid_cie_oidc_activate();
+    wp_spid_cie_activate();
 });
 
 // Avvia tutto
-run_wp_spid_cie_oidc();
+run_wp_spid_cie();

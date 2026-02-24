@@ -80,13 +80,13 @@ class WP_SPID_CIE_OIDC_Saml_Service {
 
         $privateKey = @file_get_contents($sp['private_key_path']);
         if (!$privateKey) {
-            return new WP_Error('saml_missing_sp_private_key', __('Configurazione SPID SAML incompleta.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_missing_sp_private_key', __('Configurazione SPID SAML incompleta.', 'wp-spid-cie'));
         }
 
         $signedQuery = 'SAMLRequest=' . rawurlencode($params['SAMLRequest']) . '&RelayState=' . rawurlencode($params['RelayState']) . '&SigAlg=' . rawurlencode($params['SigAlg']);
         $ok = openssl_sign($signedQuery, $signature, $privateKey, OPENSSL_ALGO_SHA256);
         if (!$ok) {
-            return new WP_Error('saml_authn_sign_failed', __('Configurazione SPID SAML incompleta.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_authn_sign_failed', __('Configurazione SPID SAML incompleta.', 'wp-spid-cie'));
         }
 
         $params['Signature'] = base64_encode($signature);
@@ -129,18 +129,18 @@ class WP_SPID_CIE_OIDC_Saml_Service {
     public function parse_and_validate_response(string $samlResponseB64, array $sp, array $idp) {
         $xmlRaw = base64_decode($samlResponseB64, true);
         if ($xmlRaw === false || $xmlRaw === '') {
-            return new WP_Error('saml_invalid_payload', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_invalid_payload', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         if (strlen($xmlRaw) > 600000) {
-            return new WP_Error('saml_payload_too_large', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_payload_too_large', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         libxml_use_internal_errors(true);
         $dom = new DOMDocument();
         $ok = $dom->loadXML($xmlRaw, LIBXML_NONET | LIBXML_NOBLANKS | LIBXML_NOCDATA);
         if (!$ok) {
-            return new WP_Error('saml_invalid_xml', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_invalid_xml', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $xp = new DOMXPath($dom);
@@ -150,17 +150,17 @@ class WP_SPID_CIE_OIDC_Saml_Service {
 
         $root = $dom->documentElement;
         if (!$root || $root->localName !== 'Response') {
-            return new WP_Error('saml_invalid_root', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_invalid_root', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $responseId = (string) $root->getAttribute('ID');
         if ($responseId === '' || get_transient('spid_saml_resp_' . md5($responseId))) {
-            return new WP_Error('saml_replay_detected', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_replay_detected', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $destination = (string) $root->getAttribute('Destination');
         if ($destination !== '' && untrailingslashit($destination) !== untrailingslashit($sp['acs_url'])) {
-            return new WP_Error('saml_invalid_destination', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_invalid_destination', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $issuer = trim((string) $xp->evaluate('string(/samlp:Response/saml:Issuer)'));
@@ -170,7 +170,7 @@ class WP_SPID_CIE_OIDC_Saml_Service {
 
         $statusCode = trim((string) $xp->evaluate('string(/samlp:Response/samlp:Status/samlp:StatusCode/@Value)'));
         if ($statusCode !== 'urn:oasis:names:tc:SAML:2.0:status:Success') {
-            return new WP_Error('saml_status_not_success', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_status_not_success', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $inResponseTo = (string) $root->getAttribute('InResponseTo');
@@ -186,22 +186,22 @@ class WP_SPID_CIE_OIDC_Saml_Service {
             $expectedIssuer = (string) $idp['entity_id'];
         }
         if ($issuer === '' || ($expectedIssuer !== '' && !hash_equals($expectedIssuer, $issuer))) {
-            return new WP_Error('saml_invalid_issuer', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_invalid_issuer', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $audience = trim((string) $xp->evaluate('string(//saml:AudienceRestriction/saml:Audience)'));
         if ($audience !== '' && untrailingslashit($audience) !== untrailingslashit($sp['entity_id'])) {
-            return new WP_Error('saml_invalid_audience', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_invalid_audience', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $recipient = trim((string) $xp->evaluate('string(//saml:SubjectConfirmationData/@Recipient)'));
         if ($recipient !== '' && untrailingslashit($recipient) !== untrailingslashit($sp['acs_url'])) {
-            return new WP_Error('saml_invalid_recipient', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_invalid_recipient', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $subjectInResponseTo = trim((string) $xp->evaluate('string(//saml:SubjectConfirmationData/@InResponseTo)'));
         if ($subjectInResponseTo !== '' && !hash_equals($inResponseTo, $subjectInResponseTo)) {
-            return new WP_Error('saml_invalid_subject_inresponseto', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_invalid_subject_inresponseto', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $this->validate_time_window((string) $xp->evaluate('string(//saml:Conditions/@NotBefore)'), (string) $xp->evaluate('string(//saml:Conditions/@NotOnOrAfter)'), (int) $sp['clock_skew']);
@@ -209,11 +209,11 @@ class WP_SPID_CIE_OIDC_Saml_Service {
 
         $signatureNodes = $xp->query('//ds:Signature');
         if (!$signatureNodes || $signatureNodes->length !== 1) {
-            return new WP_Error('saml_signature_ambiguous', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_signature_ambiguous', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
         $sigNode = $signatureNodes->item(0);
         if (!$sigNode instanceof DOMElement) {
-            return new WP_Error('saml_missing_signature', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_missing_signature', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $certForValidation = !empty($ctx['idp_x509_cert']) ? (string) $ctx['idp_x509_cert'] : '';
@@ -222,7 +222,7 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         }
         $sigValid = $this->verify_signature_strict($dom, $sigNode, $certForValidation);
         if (!$sigValid) {
-            return new WP_Error('saml_signature_invalid', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_signature_invalid', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         set_transient('spid_saml_resp_' . md5($responseId), 1, self::RESP_TTL);
@@ -414,7 +414,7 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         libxml_use_internal_errors(true);
         $dom = new DOMDocument();
         if (!$dom->loadXML($xml, LIBXML_NONET | LIBXML_NOBLANKS | LIBXML_NOCDATA)) {
-            return new WP_Error('saml_metadata_invalid', __('Configurazione SPID SAML incompleta.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_metadata_invalid', __('Configurazione SPID SAML incompleta.', 'wp-spid-cie'));
         }
 
         $xp = new DOMXPath($dom);
@@ -461,13 +461,13 @@ class WP_SPID_CIE_OIDC_Saml_Service {
 
     public function consume_request_context(string $requestId) {
         if ($requestId === '') {
-            return new WP_Error('saml_missing_inresponseto', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_missing_inresponseto', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
         $key = 'spid_saml_req_' . md5($requestId);
         $ctx = get_transient($key);
         delete_transient($key);
         if (!is_array($ctx)) {
-            return new WP_Error('saml_request_context_not_found', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('saml_request_context_not_found', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
         return $ctx;
     }

@@ -20,7 +20,7 @@ class WP_SPID_CIE_OIDC_Factory {
     private static $provider_registry = null;
 
     public static function get_client() {
-        $options = get_option('wp-spid-cie-oidc_options');
+        $options = get_option('wp-spid-cie_options');
         
         $issuer_override = isset($options['issuer_override']) ? trim((string) $options['issuer_override']) : '';
         $base_source = $issuer_override !== '' ? $issuer_override : home_url();

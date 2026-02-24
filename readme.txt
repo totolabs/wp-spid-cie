@@ -1,4 +1,4 @@
-=== SPID & CIE OIDC Login per WordPress ===
+=== SPID & CIE Login per WordPress ===
 Contributors: totolabs
 Tags: spid, cie, oidc, login, pnrr, pa, openid connect, italia
 Requires at least: 6.0

@@ -1,4 +1,4 @@
-# wp-spid-cie-oidc
+# wp-spid-cie
 Plugin WordPress per l'autenticazione tramite SPID e CIE con protocollo OpenID Connect, dedicato alle Pubbliche Amministrazioni italiane.
 
 ## Collaudo SPID SAML Step 2

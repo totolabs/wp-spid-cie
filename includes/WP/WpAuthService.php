@@ -19,7 +19,7 @@ class WP_SPID_CIE_OIDC_WpAuthService {
                 'correlation_id' => $correlationId,
                 'provider' => $provider,
             ]);
-            return new WP_Error('oidc_identity_conflict', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_identity_conflict', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         if (count($byFiscal) > 1) {
@@ -27,7 +27,7 @@ class WP_SPID_CIE_OIDC_WpAuthService {
                 'correlation_id' => $correlationId,
                 'provider' => $provider,
             ]);
-            return new WP_Error('oidc_identity_conflict', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_identity_conflict', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $userFromSub = !empty($bySub) ? $bySub[0] : null;
@@ -40,7 +40,7 @@ class WP_SPID_CIE_OIDC_WpAuthService {
                 'sub_user_id' => $userFromSub->ID,
                 'fiscal_user_id' => $userFromFiscal->ID,
             ]);
-            return new WP_Error('oidc_identity_conflict', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_identity_conflict', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $user = $userFromSub ?: $userFromFiscal;
@@ -52,7 +52,7 @@ class WP_SPID_CIE_OIDC_WpAuthService {
                     'correlation_id' => $correlationId,
                     'provider' => $provider,
                 ]);
-                return new WP_Error('oidc_user_not_found', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+                return new WP_Error('oidc_user_not_found', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
             }
 
             $user = $this->provisionUser($identity, $options, $correlationId);
@@ -78,7 +78,7 @@ class WP_SPID_CIE_OIDC_WpAuthService {
 
         $email = $identity['email'];
         if (!is_email($email)) {
-            return new WP_Error('oidc_invalid_email', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_invalid_email', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $displayName = trim($identity['given_name'] . ' ' . $identity['family_name']);
@@ -99,7 +99,7 @@ class WP_SPID_CIE_OIDC_WpAuthService {
                 'provider' => $provider,
                 'error' => $userId->get_error_code(),
             ]);
-            return new WP_Error('oidc_user_provisioning_failed', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_user_provisioning_failed', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $this->logger->info('OIDC user auto-provisioned', [

@@ -36,7 +36,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
         wp_enqueue_style(
             $this->plugin_name . '-admin',
-            plugin_dir_url( __FILE__ ) . 'css/wp-spid-cie-oidc-admin.css',
+            plugin_dir_url( __FILE__ ) . 'css/wp-spid-cie-admin.css',
             array(),
             $this->version,
             'all'
@@ -58,7 +58,7 @@ class WP_SPID_CIE_OIDC_Admin {
         $tabs = $this->get_admin_tabs();
         ?>
         <div class="wrap">
-            <h1 class="wp-heading-inline">SPID & CIE OIDC Login (PNRR 1.4.4)</h1>
+            <h1 class="wp-heading-inline">SPID & CIE Login (PNRR 1.4.4)</h1>
             <hr class="wp-header-end">
             
             <?php settings_errors(); ?>
@@ -117,8 +117,8 @@ class WP_SPID_CIE_OIDC_Admin {
                             <div class="spid-side-content">
                                 <p>Questo plugin è sviluppato con filosofia <strong>Open Source</strong> per supportare la digitalizzazione della PA Italiana.</p>
                                 <ul>
-                                    <li><a href="https://github.com/totolabs/wp-spid-cie-oidc" target="_blank">Repository GitHub</a></li>
-                                    <li><a href="https://github.com/totolabs/wp-spid-cie-oidc/wiki" target="_blank">Manuale & Wiki</a></li>
+                                    <li><a href="https://github.com/totolabs/wp-spid-cie" target="_blank">Repository GitHub</a></li>
+                                    <li><a href="https://github.com/totolabs/wp-spid-cie/wiki" target="_blank">Manuale & Wiki</a></li>
                                     <li><a href="https://wordpress.org/plugins/" target="_blank">Pagina Plugin WordPress</a></li>
                                 </ul>
                                 <p>Hai trovato un bug? Vuoi contribuire? Apri una Issue su GitHub!</p>
@@ -415,7 +415,7 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '<ul class="spid-readonly-list">';
         echo '<li><strong>Entity Configuration URL:</strong> <code>' . esc_html(home_url('/.well-known/openid-federation')) . '</code></li>';
         echo '<li><strong>JWKS URL:</strong> <code>' . esc_html(home_url('/jwks.json')) . '</code></li>';
-        echo '<li><strong>JWKS URL (REST, compat):</strong> <code>' . esc_html(home_url('/?rest_route=/wp-spid-cie-oidc/v1/jwks')) . '</code></li>';
+        echo '<li><strong>JWKS URL (REST, compat):</strong> <code>' . esc_html(home_url('/?rest_route=/wp-spid-cie/v1/jwks')) . '</code></li>';
         echo '</ul>';
     }
 
@@ -539,7 +539,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
     private function get_registry_service() {
         if (!class_exists('WP_SPID_CIE_OIDC_Spid_Registry_Service')) {
-            require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-wp-spid-cie-oidc-spid-registry-service.php';
+            require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-wp-spid-cie-spid-registry-service.php';
         }
         return new WP_SPID_CIE_OIDC_Spid_Registry_Service();
     }
@@ -563,7 +563,7 @@ class WP_SPID_CIE_OIDC_Admin {
     private function fetch_json_https(string $url) {
         $url = esc_url_raw($url);
         if ($url === '' || stripos($url, 'https://') !== 0) {
-            return new WP_Error('spid_registry_invalid_url', __('URL Registry non valido.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_invalid_url', __('URL Registry non valido.', 'wp-spid-cie'));
         }
 
         $resp = wp_remote_get($url, ['timeout' => 10, 'redirection' => 3, 'limit_response_size' => 1024 * 1024]);
@@ -572,12 +572,12 @@ class WP_SPID_CIE_OIDC_Admin {
         }
         $code = (int) wp_remote_retrieve_response_code($resp);
         if ($code < 200 || $code > 299) {
-            return new WP_Error('spid_registry_http_error', __('Registry SPID non disponibile.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_http_error', __('Registry SPID non disponibile.', 'wp-spid-cie'));
         }
         $body = (string) wp_remote_retrieve_body($resp);
         $data = json_decode($body, true);
         if (!is_array($data)) {
-            return new WP_Error('spid_registry_json_error', __('Risposta Registry non valida.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_json_error', __('Risposta Registry non valida.', 'wp-spid-cie'));
         }
         return $data;
     }
@@ -601,7 +601,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
         $list = isset($data['items']) && is_array($data['items']) ? $data['items'] : $data;
         if (!is_array($list)) {
-            return new WP_Error('spid_registry_list_invalid', __('Lista IdP non valida.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_list_invalid', __('Lista IdP non valida.', 'wp-spid-cie'));
         }
 
         set_transient($cache_key, $list, DAY_IN_SECONDS);
@@ -618,7 +618,7 @@ class WP_SPID_CIE_OIDC_Admin {
     private function get_registry_detail_for_entity(string $entityId, string $registryLink = '', bool $force = false) {
         $entityId = trim($entityId);
         if ($entityId === '') {
-            return new WP_Error('spid_registry_entity_missing', __('EntityID IdP mancante.', 'wp-spid-cie-oidc'));
+            return new WP_Error('spid_registry_entity_missing', __('EntityID IdP mancante.', 'wp-spid-cie'));
         }
 
         $cache_key = 'spid_saml_registry_detail_' . md5($entityId);
@@ -748,7 +748,7 @@ class WP_SPID_CIE_OIDC_Admin {
         $link = isset($options['spid_saml_idp_registry_link']) ? (string) $options['spid_saml_idp_registry_link'] : '';
         $detail = $this->get_registry_detail_for_entity($selected, $link, $force);
         if (is_wp_error($detail)) {
-            add_settings_error($this->plugin_name . '_options', 'spid_saml_registry_fetch_failed', __('Impossibile aggiornare IdP dal Registry SPID. Mantengo i valori correnti.', 'wp-spid-cie-oidc'), 'error');
+            add_settings_error($this->plugin_name . '_options', 'spid_saml_registry_fetch_failed', __('Impossibile aggiornare IdP dal Registry SPID. Mantengo i valori correnti.', 'wp-spid-cie'), 'error');
             return $options;
         }
 
@@ -940,7 +940,7 @@ class WP_SPID_CIE_OIDC_Admin {
             if ( ! wp_verify_nonce( $_GET['_wpnonce'], 'generate_oidc_keys_nonce' ) ) { wp_die('Security check failed'); }
             
             if (!class_exists('WP_SPID_CIE_OIDC_Factory')) {
-                 require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-oidc-factory.php';
+                 require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-factory.php';
             }
             try {
                 $client = WP_SPID_CIE_OIDC_Factory::get_client();
@@ -1062,7 +1062,7 @@ class WP_SPID_CIE_OIDC_Admin {
 			return;
 		}
 
-		$id = 'wp_spid_cie_oidc_public_key_pem';
+		$id = 'wp_spid_cie_public_key_pem';
 
 		echo '<textarea id="'.esc_attr($id).'" class="large-text code" rows="8" readonly>'
 			. esc_textarea($public_pem)
@@ -1131,7 +1131,7 @@ class WP_SPID_CIE_OIDC_Admin {
 			  . '<br><strong>Nota:</strong> se rigeneri le chiavi, devi aggiornare anche questa chiave sul portale CIE.';
 
 		$this->render_copyable_textarea(
-			'wp_spid_cie_oidc_cert_pem',
+			'wp_spid_cie_cert_pem',
 			$cert_pem,
 			10,
 			$help
@@ -1156,7 +1156,7 @@ class WP_SPID_CIE_OIDC_Admin {
 		$help = 'Chiave pubblica “raw” (PEM). <em>Di solito NON va usata nel portale</em> (che preferisce il certificato X.509), ma è utile per debug o interoperabilità.';
 
 		$this->render_copyable_textarea(
-			'wp_spid_cie_oidc_public_key_raw',
+			'wp_spid_cie_public_key_raw',
 			$pub_pem,
 			8,
 			$help
