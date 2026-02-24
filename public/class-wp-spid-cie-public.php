@@ -364,57 +364,120 @@ class WP_SPID_CIE_OIDC_Public {
 		$ipa_code = isset($options['ipa_code']) ? sanitize_text_field((string) $options['ipa_code']) : '';
 		$fiscal_number = isset($options['fiscal_number']) ? sanitize_text_field((string) $options['fiscal_number']) : '';
 		$cert = $this->get_saml_signing_cert();
+		$private_key = $this->get_saml_private_key();
 		$authn_requests_signed = $cert !== '' ? 'true' : 'false';
+
+		$doc = new DOMDocument('1.0', 'UTF-8');
+		$doc->preserveWhiteSpace = false;
+		$doc->formatOutput = false;
+
+		$entity = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:EntityDescriptor');
+		$entity->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:ds', 'http://www.w3.org/2000/09/xmldsig#');
+		$entity->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:spid', 'https://spid.gov.it/saml-extensions');
+		$entity->setAttribute('entityID', $entity_id);
+		$entity->setAttribute('ID', 'spid-metadata');
+		$doc->appendChild($entity);
+
+		$spsso = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:SPSSODescriptor');
+		$spsso->setAttribute('protocolSupportEnumeration', 'urn:oasis:names:tc:SAML:2.0:protocol');
+		$spsso->setAttribute('AuthnRequestsSigned', $authn_requests_signed);
+		$spsso->setAttribute('WantAssertionsSigned', 'true');
+		if ($cert !== '') {
+			$keyDescriptor = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:KeyDescriptor');
+			$keyDescriptor->setAttribute('use', 'signing');
+			$keyInfo = $doc->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:KeyInfo');
+			$x509Data = $doc->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:X509Data');
+			$x509Cert = $doc->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:X509Certificate', $cert);
+			$x509Data->appendChild($x509Cert);
+			$keyInfo->appendChild($x509Data);
+			$keyDescriptor->appendChild($keyInfo);
+			$spsso->appendChild($keyDescriptor);
+		}
+		$spsso->appendChild($doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:NameIDFormat', 'urn:oasis:names:tc:SAML:2.0:nameid-format:transient'));
+
+		$acs = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:AssertionConsumerService');
+		$acs->setAttribute('Binding', 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST');
+		$acs->setAttribute('Location', $acs_url);
+		$acs->setAttribute('index', '0');
+		$acs->setAttribute('isDefault', 'true');
+		$spsso->appendChild($acs);
+
+		$sls = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:SingleLogoutService');
+		$sls->setAttribute('Binding', 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect');
+		$sls->setAttribute('Location', $sls_url);
+		$spsso->appendChild($sls);
+
+		$requested_attributes = $this->get_spid_saml_requested_attributes($options);
+		$attr_service = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:AttributeConsumingService');
+		$attr_service->setAttribute('index', '0');
+		$svcName = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:ServiceName', 'Set base SPID');
+		$svcName->setAttribute('xml:lang', 'it');
+		$attr_service->appendChild($svcName);
+		foreach ($requested_attributes as $attr_name) {
+			$req = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:RequestedAttribute');
+			$req->setAttribute('Name', $attr_name);
+			$attr_service->appendChild($req);
+		}
+		$spsso->appendChild($attr_service);
+		$entity->appendChild($spsso);
+
+		$org = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:Organization');
+		$orgName = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:OrganizationName', $organization_name);
+		$orgName->setAttribute('xml:lang', 'it');
+		$orgDisplay = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:OrganizationDisplayName', $organization_name);
+		$orgDisplay->setAttribute('xml:lang', 'it');
+		$orgUrl = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:OrganizationURL', home_url('/'));
+		$orgUrl->setAttribute('xml:lang', 'it');
+		$org->appendChild($orgName);
+		$org->appendChild($orgDisplay);
+		$org->appendChild($orgUrl);
+		$entity->appendChild($org);
+
+		$contact = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:ContactPerson');
+		$contact->setAttribute('contactType', 'other');
+		$extensions = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:Extensions');
+		if ($ipa_code !== '') {
+			$extensions->appendChild($doc->createElementNS('https://spid.gov.it/saml-extensions', 'spid:IPACode', $ipa_code));
+		}
+		$extensions->appendChild($doc->createElementNS('https://spid.gov.it/saml-extensions', 'spid:Public'));
+		if ($fiscal_number !== '') {
+			$extensions->appendChild($doc->createElementNS('https://spid.gov.it/saml-extensions', 'spid:FiscalCode', $fiscal_number));
+		}
+		$contact->appendChild($extensions);
+		if (is_email($contacts_email)) {
+			$contact->appendChild($doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:EmailAddress', $contacts_email));
+		}
+		$entity->appendChild($contact);
+
+		if ($cert !== '' && $private_key !== '') {
+			$this->apply_spid_metadata_signature($doc, $entity, $private_key, $cert);
+		}
 
 		status_header(200);
 		header('Content-Type: application/samlmetadata+xml; charset=utf-8');
-
-		echo '<?xml version="1.0" encoding="UTF-8"?>' . "
-";
-		echo '<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:spid="https://spid.gov.it/saml-extensions" entityID="' . esc_attr($entity_id) . '">' . "
-";
-		echo '  <md:SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol" AuthnRequestsSigned="' . esc_attr($authn_requests_signed) . '" WantAssertionsSigned="true">' . "
-";
-		if ($cert !== '') {
-			echo '    <md:KeyDescriptor use="signing">' . "
-";
-			echo '      <ds:KeyInfo>' . "
-";
-			echo '        <ds:X509Data><ds:X509Certificate>' . esc_html($cert) . '</ds:X509Certificate></ds:X509Data>' . "
-";
-			echo '      </ds:KeyInfo>' . "
-";
-			echo '    </md:KeyDescriptor>' . "
-";
-		}
-		echo '    <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:transient</md:NameIDFormat>' . "
-";
-		echo '    <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="' . esc_url($acs_url) . '" index="0" isDefault="true" />' . "
-";
-		echo '    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="' . esc_url($sls_url) . '" />' . "
-";
-		$requested_attributes = $this->get_spid_saml_requested_attributes($options);
-		echo '    <md:AttributeConsumingService index="0"><md:ServiceName xml:lang="it">Set base SPID</md:ServiceName>';
-		foreach ($requested_attributes as $attr_name) {
-			echo '<md:RequestedAttribute Name="' . esc_attr($attr_name) . '" />';
-		}
-		echo '</md:AttributeConsumingService>' . "
-";
-		echo '  </md:SPSSODescriptor>' . "
-";
-		echo '  <md:Organization><md:OrganizationName xml:lang="it">' . esc_html($organization_name) . '</md:OrganizationName><md:OrganizationDisplayName xml:lang="it">' . esc_html($organization_name) . '</md:OrganizationDisplayName><md:OrganizationURL xml:lang="it">' . esc_url(home_url('/')) . '</md:OrganizationURL></md:Organization>' . "
-";
-		echo '  <md:ContactPerson contactType="other"><md:Extensions>';
-		if ($ipa_code !== '') { echo '<spid:IPACode>' . esc_html($ipa_code) . '</spid:IPACode>'; }
-		echo '<spid:Public />';
-		if ($fiscal_number !== '') { echo '<spid:FiscalCode>' . esc_html($fiscal_number) . '</spid:FiscalCode>'; }
-		echo '</md:Extensions>';
-		if (is_email($contacts_email)) { echo '<md:EmailAddress>' . esc_html($contacts_email) . '</md:EmailAddress>'; }
-		echo '</md:ContactPerson>' . "
-";
-		echo '</md:EntityDescriptor>';
+		echo (string) $doc->saveXML();
 		exit;
 	}
+
+	private function apply_spid_metadata_signature(DOMDocument $doc, DOMElement $root, string $private_key, string $cert_base64): void {
+		$dsig = new \RobRichards\XMLSecLibs\XMLSecurityDSig();
+		$dsig->setCanonicalMethod(\RobRichards\XMLSecLibs\XMLSecurityDSig::EXC_C14N);
+		$dsig->addReference(
+			$root,
+			\RobRichards\XMLSecLibs\XMLSecurityDSig::SHA256,
+			[
+				'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
+				'http://www.w3.org/2001/10/xml-exc-c14n#',
+			],
+			['id_name' => 'ID', 'overwrite' => false, 'force_uri' => true]
+		);
+		$key = new \RobRichards\XMLSecLibs\XMLSecurityKey(\RobRichards\XMLSecLibs\XMLSecurityKey::RSA_SHA256, ['type' => 'private']);
+		$key->loadKey($private_key, false, false);
+		$dsig->sign($key);
+		$dsig->add509Cert($cert_base64, true, false, ['issuerSerial' => true]);
+		$dsig->appendSignature($root);
+	}
+
 
 	private function serve_spid_saml_login(array $options, bool $debug_enabled): void {
 		$svc = $this->get_saml_service();
@@ -533,9 +596,25 @@ class WP_SPID_CIE_OIDC_Public {
 		return new WP_SPID_CIE_OIDC_Saml_Service();
 	}
 
-	private function get_saml_signing_cert(): string {
+	private function resolve_spid_saml_key_path(string $filename): string {
 		$upload_dir = wp_upload_dir();
-		$cert_file = trailingslashit($upload_dir['basedir']) . 'spid-cie-oidc-keys/public.crt';
+		$base_dir = trailingslashit($upload_dir['basedir']);
+
+		$primary_dir = $base_dir . 'wp-spid-cie-keys';
+		$fallback_dir = $base_dir . 'spid-cie-oidc-keys';
+
+		$primary_path = trailingslashit($primary_dir) . ltrim($filename, '/');
+		$fallback_path = trailingslashit($fallback_dir) . ltrim($filename, '/');
+
+		if (file_exists($primary_path) && is_readable($primary_path)) {
+			return $primary_path;
+		}
+
+		return $fallback_path;
+	}
+
+	private function get_saml_signing_cert(): string {
+		$cert_file = $this->resolve_spid_saml_key_path('public.crt');
 		if (!file_exists($cert_file) || !is_readable($cert_file)) {
 			return '';
 		}
@@ -543,10 +622,18 @@ class WP_SPID_CIE_OIDC_Public {
 		if ($cert === '') {
 			return '';
 		}
-		$cert = str_replace(["
-", "
-", '-----BEGIN CERTIFICATE-----', '-----END CERTIFICATE-----'], '', $cert);
+		$cert = preg_replace('/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s+/', '', $cert);
 		return trim($cert);
+	}
+
+	private function get_saml_private_key(): string {
+		$key_file = $this->resolve_spid_saml_key_path('private.key');
+		if (!file_exists($key_file) || !is_readable($key_file)) {
+			return '';
+		}
+
+		$key = (string) file_get_contents($key_file);
+		return trim($key);
 	}
 
 private function extract_jwt_payload($jwt) {
