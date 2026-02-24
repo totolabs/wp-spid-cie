@@ -2353,6 +2353,35 @@
             ],
             "abandoned": "web-token/jwt-library",
             "time": "2021-01-21T19:18:03+00:00"
+        },
+        {
+            "name": "robrichards/xmlseclibs",
+            "version": "3.1.4",
+            "dist": {
+                "type": "zip",
+                "url": "https://api.github.com/repos/robrichards/xmlseclibs/zipball/2bdfd95e4a4b86006b5d44f5a0c2df499f2b6a58",
+                "reference": "2bdfd95e4a4b86006b5d44f5a0c2df499f2b6a58",
+                "shasum": ""
+            },
+            "type": "library",
+            "autoload": {
+                "psr-4": {
+                    "RobRichards\\XMLSecLibs\\": "src/"
+                }
+            },
+            "license": [
+                "BSD-3-Clause"
+            ],
+            "description": "XML Security Library",
+            "source": {
+                "type": "git",
+                "url": "https://github.com/robrichards/xmlseclibs.git",
+                "reference": "2bdfd95e4a4b86006b5d44f5a0c2df499f2b6a58"
+            },
+            "require": {
+                "ext-openssl": "*"
+            },
+            "time": "2024-06-03T12:00:00+00:00"
         }
     ],
     "packages-dev": [],
