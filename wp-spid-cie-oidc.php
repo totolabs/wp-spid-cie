@@ -115,6 +115,23 @@ function wp_spid_cie_oidc_activate() {
 
 register_activation_hook(__FILE__, 'wp_spid_cie_oidc_activate');
 
+/**
+ * Aggiunge il link "Settings" nella lista plugin di WordPress.
+ *
+ * @param array $links Action links correnti.
+ * @return array
+ */
+function wp_spid_cie_oidc_plugin_action_links( $links ) {
+	$settings_url = admin_url( 'options-general.php?page=wp-spid-cie-oidc' );
+	$settings_link = '<a href="' . esc_url( $settings_url ) . '">' . esc_html__( 'Settings', 'wp-spid-cie-oidc' ) . '</a>';
+
+	array_unshift( $links, $settings_link );
+
+	return $links;
+}
+
+add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'wp_spid_cie_oidc_plugin_action_links' );
+
 add_action('plugins_loaded', function () {
     // Imposta i default anche su installazioni già attive (upgrade-safe)
     wp_spid_cie_oidc_activate();
