@@ -104,23 +104,26 @@ class ComposerStaticInit14c93cb3f81112477cc1a0e5028ec5e9
     );
 
     public static $prefixLengthsPsr4 = array (
-        'p' => 
+        'p' =>
         array (
             'phpseclib3\\' => 11,
         ),
-        'S' => 
+        'S' =>
         array (
             'Symfony\\Polyfill\\Mbstring\\' => 26,
             'Safe\\' => 5,
-            'SPID_CIE_OIDC_PHP\\' => 18,
         ),
-        'P' => 
+        'R' =>
+        array (
+            'RobRichards\\XMLSecLibs\\' => 23,
+        ),
+        'P' =>
         array (
             'Psr\\Http\\Message\\' => 17,
             'Psr\\Http\\Client\\' => 16,
             'ParagonIE\\ConstantTime\\' => 23,
         ),
-        'J' => 
+        'J' =>
         array (
             'Jose\\Component\\Signature\\Algorithm\\' => 35,
             'Jose\\Component\\Signature\\' => 25,
@@ -130,118 +133,118 @@ class ComposerStaticInit14c93cb3f81112477cc1a0e5028ec5e9
             'Jose\\Component\\Encryption\\' => 26,
             'Jose\\Component\\Core\\' => 20,
         ),
-        'G' => 
+        'G' =>
         array (
             'GuzzleHttp\\Psr7\\' => 16,
             'GuzzleHttp\\Promise\\' => 19,
             'GuzzleHttp\\' => 11,
         ),
-        'F' => 
+        'F' =>
         array (
             'FG\\' => 3,
         ),
-        'B' => 
+        'B' =>
         array (
             'Brick\\Math\\' => 11,
             'Base64Url\\' => 10,
         ),
-        'A' => 
+        'A' =>
         array (
             'AESKW\\' => 6,
         ),
     );
 
     public static $prefixDirsPsr4 = array (
-        'phpseclib3\\' => 
+        'phpseclib3\\' =>
         array (
             0 => __DIR__ . '/..' . '/phpseclib/phpseclib/phpseclib',
         ),
-        'Symfony\\Polyfill\\Mbstring\\' => 
+        'Symfony\\Polyfill\\Mbstring\\' =>
         array (
             0 => __DIR__ . '/..' . '/symfony/polyfill-mbstring',
         ),
-        'Safe\\' => 
+        'Safe\\' =>
         array (
             0 => __DIR__ . '/..' . '/thecodingmachine/safe/lib',
             1 => __DIR__ . '/..' . '/thecodingmachine/safe/deprecated',
             2 => __DIR__ . '/..' . '/thecodingmachine/safe/generated',
         ),
-        'SPID_CIE_OIDC_PHP\\' => 
+        'RobRichards\\XMLSecLibs\\' =>
         array (
-            0 => __DIR__ . '/../..' . '/lib/spid-cie-oidc-php/lib',
+            0 => __DIR__ . '/..' . '/robrichards/xmlseclibs/src',
         ),
-        'Psr\\Http\\Message\\' => 
+        'Psr\\Http\\Message\\' =>
         array (
             0 => __DIR__ . '/..' . '/psr/http-factory/src',
             1 => __DIR__ . '/..' . '/psr/http-message/src',
         ),
-        'Psr\\Http\\Client\\' => 
+        'Psr\\Http\\Client\\' =>
         array (
             0 => __DIR__ . '/..' . '/psr/http-client/src',
         ),
-        'ParagonIE\\ConstantTime\\' => 
+        'ParagonIE\\ConstantTime\\' =>
         array (
             0 => __DIR__ . '/..' . '/paragonie/constant_time_encoding/src',
         ),
-        'Jose\\Component\\Signature\\Algorithm\\' => 
+        'Jose\\Component\\Signature\\Algorithm\\' =>
         array (
             0 => __DIR__ . '/..' . '/web-token/jwt-signature-algorithm-rsa',
             1 => __DIR__ . '/..' . '/web-token/jwt-signature-algorithm-hmac',
             2 => __DIR__ . '/..' . '/web-token/jwt-signature-algorithm-ecdsa',
         ),
-        'Jose\\Component\\Signature\\' => 
+        'Jose\\Component\\Signature\\' =>
         array (
             0 => __DIR__ . '/..' . '/web-token/jwt-signature',
         ),
-        'Jose\\Component\\KeyManagement\\' => 
+        'Jose\\Component\\KeyManagement\\' =>
         array (
             0 => __DIR__ . '/..' . '/web-token/jwt-key-mgmt',
         ),
-        'Jose\\Component\\Encryption\\Algorithm\\KeyEncryption\\' => 
+        'Jose\\Component\\Encryption\\Algorithm\\KeyEncryption\\' =>
         array (
             0 => __DIR__ . '/..' . '/web-token/jwt-encryption-algorithm-rsa',
             1 => __DIR__ . '/..' . '/web-token/jwt-encryption-algorithm-pbes2',
             2 => __DIR__ . '/..' . '/web-token/jwt-encryption-algorithm-aeskw',
             3 => __DIR__ . '/..' . '/web-token/jwt-encryption-algorithm-aesgcmkw',
         ),
-        'Jose\\Component\\Encryption\\Algorithm\\ContentEncryption\\' => 
+        'Jose\\Component\\Encryption\\Algorithm\\ContentEncryption\\' =>
         array (
             0 => __DIR__ . '/..' . '/web-token/jwt-encryption-algorithm-aesgcm',
             1 => __DIR__ . '/..' . '/web-token/jwt-encryption-algorithm-aescbc',
         ),
-        'Jose\\Component\\Encryption\\' => 
+        'Jose\\Component\\Encryption\\' =>
         array (
             0 => __DIR__ . '/..' . '/web-token/jwt-encryption',
         ),
-        'Jose\\Component\\Core\\' => 
+        'Jose\\Component\\Core\\' =>
         array (
             0 => __DIR__ . '/..' . '/web-token/jwt-core',
         ),
-        'GuzzleHttp\\Psr7\\' => 
+        'GuzzleHttp\\Psr7\\' =>
         array (
             0 => __DIR__ . '/..' . '/guzzlehttp/psr7/src',
         ),
-        'GuzzleHttp\\Promise\\' => 
+        'GuzzleHttp\\Promise\\' =>
         array (
             0 => __DIR__ . '/..' . '/guzzlehttp/promises/src',
         ),
-        'GuzzleHttp\\' => 
+        'GuzzleHttp\\' =>
         array (
             0 => __DIR__ . '/..' . '/guzzlehttp/guzzle/src',
         ),
-        'FG\\' => 
+        'FG\\' =>
         array (
             0 => __DIR__ . '/..' . '/fgrosse/phpasn1/lib',
         ),
-        'Brick\\Math\\' => 
+        'Brick\\Math\\' =>
         array (
             0 => __DIR__ . '/..' . '/brick/math/src',
         ),
-        'Base64Url\\' => 
+        'Base64Url\\' =>
         array (
             0 => __DIR__ . '/..' . '/spomky-labs/base64url/src',
         ),
-        'AESKW\\' => 
+        'AESKW\\' =>
         array (
             0 => __DIR__ . '/..' . '/spomky-labs/aes-key-wrap/src',
         ),

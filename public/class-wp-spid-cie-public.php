@@ -460,9 +460,6 @@ class WP_SPID_CIE_OIDC_Public {
 	}
 
 	private function apply_spid_metadata_signature(DOMDocument $doc, DOMElement $root, string $private_key, string $cert_base64): void {
-		if (!class_exists('RobRichards\XMLSecLibs\XMLSecurityDSig')) {
-			require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-wp-spid-cie-xmlseclibs.php';
-		}
 		$dsig = new \RobRichards\XMLSecLibs\XMLSecurityDSig();
 		$dsig->setCanonicalMethod(\RobRichards\XMLSecLibs\XMLSecurityDSig::EXC_C14N);
 		$dsig->addReference(
