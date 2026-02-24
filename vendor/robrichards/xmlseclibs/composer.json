@@ -1,0 +1,12 @@
+{
+    "name": "robrichards/xmlseclibs",
+    "description": "XML Security Library",
+    "type": "library",
+    "license": "BSD-3-Clause",
+    "autoload": {
+        "psr-4": {
+            "RobRichards\\XMLSecLibs\\": "src/"
+        }
+    },
+    "version": "3.1.3"
+}

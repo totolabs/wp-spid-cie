@@ -47,17 +47,40 @@ class WP_SPID_CIE_OIDC_Factory {
 			'cie_enabled'  => !empty($options['cie_enabled']) && $options['cie_enabled'] === '1'
         ];
 
-        $upload_dir = wp_upload_dir();
-        $keys_dir = trailingslashit($upload_dir['basedir']) . 'spid-cie-oidc-keys';
-        
-        if (!file_exists($keys_dir)) {
-            wp_mkdir_p($keys_dir);
-            file_put_contents($keys_dir . '/.htaccess', 'deny from all');
-        }
-
-        $config['key_dir'] = $keys_dir;
+        $config['key_dir'] = self::resolve_spid_key_dir();
 
         return new WP_SPID_CIE_OIDC_Wrapper($config);
+    }
+
+    public static function resolve_spid_key_dir(bool $for_generation = false): string {
+        $upload_dir = wp_upload_dir();
+        $base_dir = trailingslashit($upload_dir['basedir']);
+
+        $primary_dir = $base_dir . 'wp-spid-cie-keys';
+        $fallback_dir = $base_dir . 'spid-cie-oidc-keys';
+        $primary_private = trailingslashit($primary_dir) . 'private.key';
+        $primary_cert = trailingslashit($primary_dir) . 'public.crt';
+        $fallback_private = trailingslashit($fallback_dir) . 'private.key';
+        $fallback_cert = trailingslashit($fallback_dir) . 'public.crt';
+
+        if (file_exists($primary_private) && is_readable($primary_private) && file_exists($primary_cert) && is_readable($primary_cert)) {
+            return $primary_dir;
+        }
+
+        if (!$for_generation && file_exists($fallback_private) && is_readable($fallback_private) && file_exists($fallback_cert) && is_readable($fallback_cert)) {
+            return $fallback_dir;
+        }
+
+        if (!is_dir($primary_dir)) {
+            wp_mkdir_p($primary_dir);
+        }
+
+        $htaccess_file = trailingslashit($primary_dir) . '.htaccess';
+        if (!file_exists($htaccess_file)) {
+            @file_put_contents($htaccess_file, "Deny from all\n");
+        }
+
+        return $primary_dir;
     }
 
     /**
@@ -154,7 +177,8 @@ class WP_SPID_CIE_OIDC_Wrapper {
     }
 
 	public function generateKeys() {
-		$keyDir = $this->config['key_dir'];
+		$keyDir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir(true);
+		$this->config['key_dir'] = $keyDir;
 		$logFile = $keyDir . '/debug.txt';
 		$log = function(string $msg) use ($logFile) {
 			@file_put_contents($logFile, '[' . gmdate('c') . '] ' . $msg . PHP_EOL, FILE_APPEND);
@@ -197,10 +221,17 @@ class WP_SPID_CIE_OIDC_Wrapper {
 		$cn = trim($cnHost);
 		if (strlen($cn) > 60) { $cn = substr($cn, 0, 60); }
 
+		$ipa_code = isset($this->config['ipa_code']) ? sanitize_text_field((string) $this->config['ipa_code']) : '';
+		$org_identifier = 'PA:IT-' . ($ipa_code !== '' ? $ipa_code : 'unknown');
+		$uri_value = set_url_scheme((string) ($this->config['base_url'] ?? home_url('/')), 'https');
+		$uri_value = trailingslashit($uri_value);
+
 		$dn = [
-		  "countryName"      => "IT",
-		  "organizationName" => $org,
-		  "commonName"       => $cn,
+		  'countryName' => 'IT',
+		  'organizationName' => $org,
+		  'commonName' => $cn,
+		  'organizationIdentifier' => $org_identifier,
+		  'uri' => $uri_value,
 		];
 		
 		$certPem = null;
@@ -216,7 +247,28 @@ class WP_SPID_CIE_OIDC_Wrapper {
 		} else {
 			$log('OpenSSL: pkey_get_private OK');
 
-			$csr = openssl_csr_new($dn, $opensslPriv, ['digest_alg' => 'sha256']);
+			$openssl_conf = $keyDir . '/tmp-openssl.cnf';
+			$openssl_conf_content = "[ req ]\n" .
+				"default_bits = 2048\n" .
+				"prompt = no\n" .
+				"default_md = sha256\n" .
+				"distinguished_name = req_dn\n" .
+				"oid_section = custom_oids\n\n" .
+				"[ custom_oids ]\n" .
+				"organizationIdentifier = 2.5.4.97\n" .
+				"uri = 2.5.4.83\n\n" .
+				"[ req_dn ]\n" .
+				"C = IT\n" .
+				"O = " . addslashes($org) . "\n" .
+				"CN = " . addslashes($cn) . "\n" .
+				"organizationIdentifier = " . addslashes($org_identifier) . "\n" .
+				"uri = " . addslashes($uri_value) . "\n";
+			@file_put_contents($openssl_conf, $openssl_conf_content);
+
+			$csr = openssl_csr_new($dn, $opensslPriv, [
+				'digest_alg' => 'sha256',
+				'config' => $openssl_conf,
+			]);
 			if ($csr === false) {
 				$log('OpenSSL: csr_new FAILED');
 				while ($msg = openssl_error_string()) {
@@ -225,7 +277,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
 			} else {
 				$log('OpenSSL: csr_new OK');
 
-				$x509 = openssl_csr_sign($csr, null, $opensslPriv, 365, ['digest_alg' => 'sha256']);
+				$x509 = openssl_csr_sign($csr, null, $opensslPriv, 365, ['digest_alg' => 'sha256', 'config' => $openssl_conf]);
 				if ($x509 === false) {
 					$log('OpenSSL: csr_sign FAILED');
 					while ($msg = openssl_error_string()) {
@@ -242,10 +294,12 @@ class WP_SPID_CIE_OIDC_Wrapper {
 
 		if (empty($certPem)) {
 			$log('generateKeys: certPem EMPTY -> returning false');
+			@unlink($keyDir . '/tmp-openssl.cnf');
 			return false;
 		}
 
 		file_put_contents($keyDir . '/public.crt', $certPem);
+		@unlink($keyDir . '/tmp-openssl.cnf');
 		$log('generateKeys: wrote public.crt (CERTIFICATE)');
 		return true;
 	}
