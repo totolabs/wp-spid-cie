@@ -15,12 +15,12 @@ class WP_SPID_CIE_OIDC_ProviderRegistry {
 
     public function resolveConfig(string $provider, ?string $idp = null) {
         if (!isset($this->profiles[$provider])) {
-            return new WP_Error('oidc_provider_not_supported', __('Provider non supportato.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_provider_not_supported', __('Provider non supportato.', 'wp-spid-cie'));
         }
 
-        $options = get_option('wp-spid-cie-oidc_options', []);
+        $options = get_option('wp-spid-cie_options', []);
         if (!$this->isProviderEnabledByMode($provider, $options)) {
-            return new WP_Error('oidc_provider_disabled', __('Provider non abilitato dalla configurazione.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_provider_disabled', __('Provider non abilitato dalla configurazione.', 'wp-spid-cie'));
         }
 
         $issuerOverride = isset($options['issuer_override']) ? trim((string) $options['issuer_override']) : '';

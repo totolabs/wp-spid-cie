@@ -10,11 +10,11 @@ class WP_SPID_CIE_OIDC_DiscoveryResolver {
     public function resolveFromIssuer(string $issuer, string $correlationId) {
         $issuer = untrailingslashit(trim($issuer));
         if (empty($issuer)) {
-            return new WP_Error('oidc_discovery_empty_issuer', __('Issuer non configurato.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_discovery_empty_issuer', __('Issuer non configurato.', 'wp-spid-cie'));
         }
 
         if (!$this->isSafeIssuer($issuer)) {
-            return new WP_Error('oidc_discovery_unsafe_issuer', __('Issuer non valido per discovery.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_discovery_unsafe_issuer', __('Issuer non valido per discovery.', 'wp-spid-cie'));
         }
 
         $wellKnown = $issuer . '/.well-known/openid-configuration';
@@ -31,7 +31,7 @@ class WP_SPID_CIE_OIDC_DiscoveryResolver {
                 'issuer' => $issuer,
                 'error' => $response->get_error_message(),
             ]);
-            return new WP_Error('oidc_discovery_http_error', __('Impossibile recuperare la configurazione del provider.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_discovery_http_error', __('Impossibile recuperare la configurazione del provider.', 'wp-spid-cie'));
         }
 
         $status = wp_remote_retrieve_response_code($response);
@@ -44,13 +44,13 @@ class WP_SPID_CIE_OIDC_DiscoveryResolver {
                 'issuer' => $issuer,
                 'http_status' => $status,
             ]);
-            return new WP_Error('oidc_discovery_invalid_response', __('Configurazione provider non valida.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_discovery_invalid_response', __('Configurazione provider non valida.', 'wp-spid-cie'));
         }
 
         $required = ['issuer', 'authorization_endpoint', 'token_endpoint', 'jwks_uri'];
         foreach ($required as $field) {
             if (empty($json[$field])) {
-                return new WP_Error('oidc_discovery_missing_fields', __('Configurazione provider incompleta.', 'wp-spid-cie-oidc'));
+                return new WP_Error('oidc_discovery_missing_fields', __('Configurazione provider incompleta.', 'wp-spid-cie'));
             }
         }
 
