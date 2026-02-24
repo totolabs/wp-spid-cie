@@ -178,66 +178,31 @@ body.login .italia-it-button .italia-it-button-text {
   flex-direction: column;
 }
 
-.spid-idp-button-menu {
-  max-height: 360px;
-  overflow-y: auto;
-}
-
-.spid-idp-button-support {
-  border-top: 1px solid #ddd;
-  padding: 8px 12px;
-}
-
-.spid-idp-support-link {
-  display: block;
-  font-size: .9em;
-  margin: 4px 0;
-}
-
-/* ===== SPID DROPDOWN HOTFIX 1.1.1 ===== */
-
-/* Quando aperto: layout verticale */
 .spid-idp-button.spid-open {
-  display: flex;
-  flex-direction: column;
   max-height: 420px;
 }
 
-/* Lista scrollabile */
 .spid-idp-button-menu {
-  flex: 1 1 auto;
-  overflow-y: auto;
   max-height: 360px;
+  overflow-y: auto;
 }
 
-/* Footer sempre visibile */
-.spid-idp-button-support {
-  flex: 0 0 auto;
-  position: sticky;
-  bottom: 0;
-  background: #f5f5f5;
-  border-top: 1px solid #ddd;
-  padding: 10px 12px;
-  z-index: 2;
-}
-
-/* Evita che ultima voce venga coperta */
-.spid-idp-button-menu {
-  padding-bottom: 10px;
-}
-
-/* Uniforma dimensione loghi */
 .spid-idp-button-menu li img {
   max-height: 40px;
   width: auto;
   object-fit: contain;
 }
 
-/* Link supporto */
+.spid-idp-support-item {
+  background: #f5f5f5;
+  border-top: 1px solid #ddd;
+}
+
 .spid-idp-support-link {
   display: block;
   font-size: 0.9em;
-  margin: 4px 0;
+  margin: 0;
+  padding: 10px 12px;
 }
 
 /* Uniforma SPID e CIE */

@@ -35,7 +35,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
         ];
 
         if (!$this->stateStore->store($state, $ctx, 600)) {
-            return new WP_Error('oidc_state_store_fail', __('Errore temporaneo di sicurezza.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_state_store_fail', __('Errore temporaneo di sicurezza.', 'wp-spid-cie'));
         }
 
         $params = [
@@ -55,7 +55,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
 
         $authorizationEndpoint = $providerConfig['authorization_endpoint'] ?? '';
         if (!$authorizationEndpoint) {
-            return new WP_Error('oidc_no_auth_endpoint', __('Endpoint di autorizzazione non configurato.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_no_auth_endpoint', __('Endpoint di autorizzazione non configurato.', 'wp-spid-cie'));
         }
 
         return $authorizationEndpoint . '?' . http_build_query($params);
@@ -67,20 +67,20 @@ class WP_SPID_CIE_OIDC_OidcClient {
         if (!empty($request['error'])) {
             $code = sanitize_key($request['error']);
             $this->logger->warn('OIDC callback provider error', ['correlation_id' => $correlationId, 'code' => $code]);
-            return new WP_Error('oidc_provider_error', __('Accesso annullato o non autorizzato.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_provider_error', __('Accesso annullato o non autorizzato.', 'wp-spid-cie'));
         }
 
         $state = isset($request['state']) ? sanitize_text_field(wp_unslash($request['state'])) : '';
         $code = isset($request['code']) ? sanitize_text_field(wp_unslash($request['code'])) : '';
 
         if (empty($state) || empty($code)) {
-            return new WP_Error('oidc_missing_callback_params', __('Risposta di autenticazione non valida.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_missing_callback_params', __('Risposta di autenticazione non valida.', 'wp-spid-cie'));
         }
 
         $stateCtx = $this->stateStore->consume($state);
         if (!$stateCtx || !is_array($stateCtx)) {
             $this->logger->error('OIDC state mismatch/expired', ['correlation_id' => $correlationId]);
-            return new WP_Error('oidc_state_mismatch', __('Sessione di autenticazione non valida o scaduta.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_state_mismatch', __('Sessione di autenticazione non valida o scaduta.', 'wp-spid-cie'));
         }
 
         $tokenResponse = $this->exchangeCodeForTokens($code, $stateCtx['code_verifier'], $providerConfig, $correlationId);
@@ -90,7 +90,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
 
         $idToken = $tokenResponse['id_token'] ?? '';
         if (empty($idToken)) {
-            return new WP_Error('oidc_no_id_token', __('Token di identità assente nella risposta.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_no_id_token', __('Token di identità assente nella risposta.', 'wp-spid-cie'));
         }
 
         $payload = $this->tokenValidator->validateIdToken($idToken, $providerConfig, $stateCtx['nonce'], $correlationId);
@@ -112,7 +112,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
     private function exchangeCodeForTokens(string $code, string $codeVerifier, array $providerConfig, string $correlationId) {
         $tokenEndpoint = $providerConfig['token_endpoint'] ?? '';
         if (empty($tokenEndpoint)) {
-            return new WP_Error('oidc_no_token_endpoint', __('Endpoint token non configurato.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_no_token_endpoint', __('Endpoint token non configurato.', 'wp-spid-cie'));
         }
 
         $body = [
@@ -139,7 +139,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
                 'correlation_id' => $correlationId,
                 'error' => $response->get_error_message(),
             ]);
-            return new WP_Error('oidc_token_http_error', __('Errore di rete durante autenticazione.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_token_http_error', __('Errore di rete durante autenticazione.', 'wp-spid-cie'));
         }
 
         $status = wp_remote_retrieve_response_code($response);
@@ -151,7 +151,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
                 'correlation_id' => $correlationId,
                 'http_status' => $status,
             ]);
-            return new WP_Error('oidc_token_bad_response', __('Risposta non valida dal servizio di autenticazione.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_token_bad_response', __('Risposta non valida dal servizio di autenticazione.', 'wp-spid-cie'));
         }
 
         return $json;

@@ -50,7 +50,7 @@ class WP_SPID_CIE_OIDC_Public {
 
         wp_enqueue_style(
             $this->plugin_name,
-            plugin_dir_url( __FILE__ ) . 'css/wp-spid-cie-oidc-public.css',
+            plugin_dir_url( __FILE__ ) . 'css/wp-spid-cie-public.css',
             $public_style_deps,
             $this->version,
             'all'
@@ -172,7 +172,7 @@ class WP_SPID_CIE_OIDC_Public {
 		);
 
 		if ( ! class_exists('WP_SPID_CIE_OIDC_Factory') ) {
-			require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-oidc-factory.php';
+			require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-factory.php';
 		}
 
 		try {
@@ -180,7 +180,7 @@ class WP_SPID_CIE_OIDC_Public {
 			$entity_id = method_exists($client, 'getEntityId') ? (string) $client->getEntityId() : '';
 			$remote_ip = isset($_SERVER['REMOTE_ADDR']) ? (string) $_SERVER['REMOTE_ADDR'] : '';
 			$user_agent = isset($_SERVER['HTTP_USER_AGENT']) ? (string) $_SERVER['HTTP_USER_AGENT'] : '';
-			@error_log('[wp-spid-cie-oidc federation] action=' . $action . ' path=' . ($_SERVER['REQUEST_URI'] ?? '') . ' ip=' . $remote_ip . ' ua=' . $user_agent . ' entity_id=' . $entity_id);
+			@error_log('[wp-spid-cie federation] action=' . $action . ' path=' . ($_SERVER['REQUEST_URI'] ?? '') . ' ip=' . $remote_ip . ' ua=' . $user_agent . ' entity_id=' . $entity_id);
 
 			nocache_headers();
 			status_header(200);
@@ -197,7 +197,7 @@ class WP_SPID_CIE_OIDC_Public {
 				$jws = $client->getEntityStatement();
 				$payload = $this->extract_jwt_payload((string) $jws);
 				if (is_array($payload)) {
-					@error_log('[wp-spid-cie-oidc federation] entity-config iss=' . ($payload['iss'] ?? '') . ' sub=' . ($payload['sub'] ?? '') . ' client_id=' . ($payload['metadata']['openid_relying_party']['client_id'] ?? ''));
+					@error_log('[wp-spid-cie federation] entity-config iss=' . ($payload['iss'] ?? '') . ' sub=' . ($payload['sub'] ?? '') . ' client_id=' . ($payload['metadata']['openid_relying_party']['client_id'] ?? ''));
 				}
 
 				$debug_mode = isset($_GET['debug']) && $_GET['debug'] === '1';
@@ -283,7 +283,7 @@ class WP_SPID_CIE_OIDC_Public {
 		}
 
 		if ($debug_enabled) {
-			@error_log('[wp-spid-cie-oidc saml] route=' . $route . ' method=' . $method . ' content_length=' . $content_length);
+			@error_log('[wp-spid-cie saml] route=' . $route . ' method=' . $method . ' content_length=' . $content_length);
 		}
 
 		nocache_headers();
@@ -430,14 +430,14 @@ class WP_SPID_CIE_OIDC_Public {
 			$idp = $svc->read_idp_config($options);
 		}
 		if ($debug_enabled && defined('WP_DEBUG') && WP_DEBUG) {
-			@error_log('[wp-spid-cie-oidc saml] login_resolve idp=' . sanitize_text_field($idpEntity)
+			@error_log('[wp-spid-cie saml] login_resolve idp=' . sanitize_text_field($idpEntity)
 				. ' source=' . $resolve_source
 				. ' sso_host=' . $this->saml_debug_url_host((string) ($idp['sso_url'] ?? ''))
 				. ' entity=' . sanitize_text_field((string) ($idp['entity_id'] ?? '')));
 		}
 		if (!$svc->is_idp_config_complete($idp)) {
 			if ($debug_enabled && defined('WP_DEBUG') && WP_DEBUG) {
-				@error_log('[wp-spid-cie-oidc saml] login_resolve_failed idp=' . sanitize_text_field($idpEntity) . ' source=' . $resolve_source);
+				@error_log('[wp-spid-cie saml] login_resolve_failed idp=' . sanitize_text_field($idpEntity) . ' source=' . $resolve_source);
 			}
 			$this->redirect_to_login_error('saml_config_incomplete');
 		}
@@ -449,12 +449,12 @@ class WP_SPID_CIE_OIDC_Public {
 		$authUrl = $svc->build_authn_request_redirect($sp, $idp, $relay);
 		if (is_wp_error($authUrl)) {
 			if ($debug_enabled && defined('WP_DEBUG') && WP_DEBUG) {
-				@error_log('[wp-spid-cie-oidc saml] authn_build_failed code=' . $authUrl->get_error_code());
+				@error_log('[wp-spid-cie saml] authn_build_failed code=' . $authUrl->get_error_code());
 			}
 			$this->redirect_to_login_error($authUrl->get_error_code());
 		}
 		if ($debug_enabled && defined('WP_DEBUG') && WP_DEBUG) {
-			@error_log('[wp-spid-cie-oidc saml] authn_redirect target=' . $this->saml_debug_url_host((string) $authUrl));
+			@error_log('[wp-spid-cie saml] authn_redirect target=' . $this->saml_debug_url_host((string) $authUrl));
 		}
 		wp_redirect($authUrl);
 		exit;
@@ -463,7 +463,7 @@ class WP_SPID_CIE_OIDC_Public {
 
 	private function serve_spid_saml_acs(array $options, bool $debug_enabled): void {
 		if (!class_exists('WP_SPID_CIE_OIDC_Factory')) {
-			require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-oidc-factory.php';
+			require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-factory.php';
 		}
 		$runtime = WP_SPID_CIE_OIDC_Factory::get_runtime_services();
 		$logger = $runtime['logger'];
@@ -489,7 +489,7 @@ class WP_SPID_CIE_OIDC_Public {
 		}
 		$claims = $parsed['claims'];
 		$provider_config = ['provider' => 'spid', 'last_id_token_acr' => isset($claims['acr']) ? (string) $claims['acr'] : ''];
-		$pluginOptions = get_option('wp-spid-cie-oidc_options', []);
+		$pluginOptions = get_option('wp-spid-cie_options', []);
 		$pluginOptions['auto_provisioning'] = (!empty($options['user_provisioning_enabled']) && $options['user_provisioning_enabled'] === '1') ? '1' : '0';
 		$pluginOptions['default_role'] = isset($options['user_default_role']) ? sanitize_key((string) $options['user_default_role']) : get_option('default_role', 'subscriber');
 		$identity = ['provider' => 'spid','sub' => sanitize_text_field((string) ($claims['sub'] ?? '')),'email' => sanitize_email((string) ($claims['email'] ?? '')),'given_name' => sanitize_text_field((string) ($claims['given_name'] ?? '')),'family_name' => sanitize_text_field((string) ($claims['family_name'] ?? '')),'fiscal_code' => strtoupper(sanitize_text_field((string) ($claims['fiscal_code'] ?? ''))),'mobile' => sanitize_text_field((string) ($claims['mobile'] ?? ''))];
@@ -521,14 +521,14 @@ class WP_SPID_CIE_OIDC_Public {
 		if (is_user_logged_in()) { wp_logout(); }
 		$relay = isset($_REQUEST['RelayState']) ? (string) wp_unslash($_REQUEST['RelayState']) : '';
 		$target = $relay !== '' ? $this->sanitize_internal_redirect($relay) : home_url('/');
-		if ($debug_enabled) { @error_log('[wp-spid-cie-oidc saml] sls local logout completed'); }
+		if ($debug_enabled) { @error_log('[wp-spid-cie saml] sls local logout completed'); }
 		wp_safe_redirect($target);
 		exit;
 	}
 
 	private function get_saml_service(): WP_SPID_CIE_OIDC_Saml_Service {
 		if (!class_exists('WP_SPID_CIE_OIDC_Saml_Service')) {
-			require_once plugin_dir_path(dirname(__FILE__)) . 'includes/spid-saml-lib/class-wp-spid-cie-oidc-saml-service.php';
+			require_once plugin_dir_path(dirname(__FILE__)) . 'includes/spid-saml-lib/class-wp-spid-cie-saml-service.php';
 		}
 		return new WP_SPID_CIE_OIDC_Saml_Service();
 	}
@@ -576,7 +576,7 @@ private function extract_jwt_payload($jwt) {
         }
 
         if (!class_exists('WP_SPID_CIE_OIDC_Factory')) {
-            require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-oidc-factory.php';
+            require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-factory.php';
         }
 
         $runtime = WP_SPID_CIE_OIDC_Factory::get_runtime_services();
@@ -650,7 +650,7 @@ private function extract_jwt_payload($jwt) {
         }
 
         $provider_config['last_id_token_acr'] = isset($claims['acr']) ? (string) $claims['acr'] : '';
-        $pluginOptions = get_option('wp-spid-cie-oidc_options', []);
+        $pluginOptions = get_option('wp-spid-cie_options', []);
         $pluginOptions['auto_provisioning'] = (!empty($pluginOptions['user_provisioning_enabled']) && $pluginOptions['user_provisioning_enabled'] === '1') ? '1' : '0';
         $pluginOptions['default_role'] = isset($pluginOptions['user_default_role']) ? sanitize_key((string) $pluginOptions['user_default_role']) : get_option('default_role', 'subscriber');
         $user = $authService->resolveOrProvisionUser($normalized, $provider_config, $pluginOptions, $correlation_id);
@@ -739,7 +739,7 @@ private function extract_jwt_payload($jwt) {
 
         if (!empty($_GET['spid_cie_error'])) {
             $code = sanitize_key(wp_unslash($_GET['spid_cie_error']));
-            echo '<p class="message" style="border-left-color:#d63638;">' . esc_html__('Autenticazione SPID/CIE non completata. Riprova.', 'wp-spid-cie-oidc') . ' (' . esc_html($code) . ')</p>';
+            echo '<p class="message" style="border-left-color:#d63638;">' . esc_html__('Autenticazione SPID/CIE non completata. Riprova.', 'wp-spid-cie') . ' (' . esc_html($code) . ')</p>';
         }
 
         echo $this->render_login_buttons();
@@ -780,7 +780,7 @@ private function extract_jwt_payload($jwt) {
         $login_url_cie = add_query_arg(['oidc_action' => 'login', 'provider' => 'cie'], $base_url);
 
         if (!class_exists('WP_SPID_CIE_OIDC_Factory')) {
-            require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-oidc-factory.php';
+            require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-factory.php';
         }
         $client = WP_SPID_CIE_OIDC_Factory::get_client();
         $spid_idps = $client->getSpidProviders();
@@ -882,16 +882,14 @@ private function extract_jwt_payload($jwt) {
                                     <?php endif; ?>
                                 <?php endforeach; ?>
                             <?php endif; ?>
-                        </ul>
-                        <div class="spid-idp-button-support">
-                            <a class="spid-idp-support-link" href="https://www.spid.gov.it/" target="_blank" rel="noopener noreferrer">Maggiori informazioni</a>
-                            <a class="spid-idp-support-link" href="https://www.spid.gov.it/cos-e-spid/come-attivare-spid/" target="_blank" rel="noopener noreferrer">Non hai SPID?</a>
-                            <a class="spid-idp-support-link" href="https://helpdesk.spid.gov.it/" target="_blank" rel="noopener noreferrer">Serve aiuto?</a>
+                            <li class="spid-idp-support-item"><a class="spid-idp-support-link" href="https://www.spid.gov.it/" target="_blank" rel="noopener noreferrer">Maggiori informazioni</a></li>
+                            <li class="spid-idp-support-item"><a class="spid-idp-support-link" href="https://www.spid.gov.it/cos-e-spid/come-attivare-spid/" target="_blank" rel="noopener noreferrer">Non hai SPID?</a></li>
+                            <li class="spid-idp-support-item"><a class="spid-idp-support-link" href="https://helpdesk.spid.gov.it/" target="_blank" rel="noopener noreferrer">Serve aiuto?</a></li>
                             <?php if (!empty($options['spid_saml_validator_enabled']) && $options['spid_saml_validator_enabled'] === '1'): ?>
                                 <?php $validator_url = add_query_arg(['idp' => 'https://validator.spid.gov.it'], $saml_login_url); ?>
-                                <a class="spid-idp-support-link spid-validator-link" href="<?php echo esc_url($validator_url); ?>">SPID Validator</a>
+                                <li class="spid-idp-support-item"><a class="spid-idp-support-link spid-validator-link" href="<?php echo esc_url($validator_url); ?>">SPID Validator</a></li>
                             <?php endif; ?>
-                        </div>
+                        </ul>
                     </div>
                 </div>
             <?php endif; ?>
@@ -908,7 +906,7 @@ private function extract_jwt_payload($jwt) {
 
     private function get_registry_service() {
         if (!class_exists('WP_SPID_CIE_OIDC_Spid_Registry_Service')) {
-            require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-wp-spid-cie-oidc-spid-registry-service.php';
+            require_once plugin_dir_path(dirname(__FILE__)) . 'includes/class-wp-spid-cie-spid-registry-service.php';
         }
         return new WP_SPID_CIE_OIDC_Spid_Registry_Service();
     }
@@ -1016,7 +1014,7 @@ private function extract_jwt_payload($jwt) {
     }
 
     private function get_spid_saml_validator_cert(): string {
-        return trim((string) apply_filters('wp_spid_cie_oidc_validator_x509_cert', 'MIIEATCCAumgAwIBAgIUKnIX6ljIqVPkFQ8hJVj8KAYegBIwDQYJKoZIhvcNAQELBQAwgY8xCzAJBgNVBAYTAklUMQ0wCwYDVQQIDARSb21lMQ0wCwYDVQQHDARSb21lMQ0wCwYDVQQKDARBZ0lEMQ0wCwYDVQQLDARBZ0lEMR4wHAYDVQQDDBV2YWxpZGF0b3Iuc3BpZC5nb3YuaXQxJDAiBgkqhkiG9w0BCQEWFXNwaWQudGVjaEBhZ2lkLmdvdi5pdDAeFw0yMzEwMTgwNjI1MjVaFw0yNTEwMTcwNjI1MjVaMIGPMQswCQYDVQQGEwJJVDENMAsGA1UECAwEUm9tZTENMAsGA1UEBwwEUm9tZTENMAsGA1UECgwEQWdJRDENMAsGA1UECwwEQWdJRDEeMBwGA1UEAwwVdmFsaWRhdG9yLnNwaWQuZ292Lml0MSQwIgYJKoZIhvcNAQkBFhVzcGlkLnRlY2hAYWdpZC5nb3YuaXQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDrvNDIgz4davA/fTJEc10f6yptnLojSspzXgP61EAg4REGmwfhbEP8+2v5pN4mVeCdL3saFUiFbn3LZRDbHAwKkoE6Uzi+mD7cPGqj10jtHU9i82C5cv2hta7VmPZkm0DFWFcayMiqfCqG8u19ntL/PX5bUa3mUcDQ6LNG+0qM9JTeHpB3UjP1Dh881i3zdqbi1mBWtJYPDkdHerZwem0+E8cdv01d3P9593Ui8zQ6jnT3eRDRVH+yquy9sxEUuds4fcF95kJhXK7YOdZQyU2+xg0bLO35XajvCSBGIqVsTBbTd5M154EU/+dfklL9AeXBwF9NoGpa2gc+CJCOfgqvAgMBAAGjUzBRMB0GA1UdDgQWBBTqP5J762zVXV2hiVxZBqw1UGdFKjAfBgNVHSMEGDAWgBTqP5J762zVXV2hiVxZBqw1UGdFKjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQDRlOps/3rEXdEc2SAbFUjU6PmoD+ycpQvMvhn1fbrScLB4v4MnsaT5pCgLsxfglb+cDjgkRyEXhs1K6sTsJhTkJ9t9sYgwLVlxuqxKPPxOab0JUZ5/9UsxZ0eKnw0ZmW2VYFIZ6u3zm8RwWZXtpm97w0p43c31fQ0Dc0+KFTKjgQ5q7oG67fV1M0aQaC9wjnthtjCIkBXyK+T637INAoSN4SXIiaZR7OTSTKzJzSBfg+CHGvUTlYVZe9vUx+0filRd0NAv5eCdGPyVbLieCGxJgNnV970TE0olp2VOmAE6O6kvisIvf2Lf3kNtuDTcov+tnKsS3L1FanDUjjZnkTaO'));
+        return trim((string) apply_filters('wp_spid_cie_validator_x509_cert', 'MIIEATCCAumgAwIBAgIUKnIX6ljIqVPkFQ8hJVj8KAYegBIwDQYJKoZIhvcNAQELBQAwgY8xCzAJBgNVBAYTAklUMQ0wCwYDVQQIDARSb21lMQ0wCwYDVQQHDARSb21lMQ0wCwYDVQQKDARBZ0lEMQ0wCwYDVQQLDARBZ0lEMR4wHAYDVQQDDBV2YWxpZGF0b3Iuc3BpZC5nb3YuaXQxJDAiBgkqhkiG9w0BCQEWFXNwaWQudGVjaEBhZ2lkLmdvdi5pdDAeFw0yMzEwMTgwNjI1MjVaFw0yNTEwMTcwNjI1MjVaMIGPMQswCQYDVQQGEwJJVDENMAsGA1UECAwEUm9tZTENMAsGA1UEBwwEUm9tZTENMAsGA1UECgwEQWdJRDENMAsGA1UECwwEQWdJRDEeMBwGA1UEAwwVdmFsaWRhdG9yLnNwaWQuZ292Lml0MSQwIgYJKoZIhvcNAQkBFhVzcGlkLnRlY2hAYWdpZC5nb3YuaXQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDrvNDIgz4davA/fTJEc10f6yptnLojSspzXgP61EAg4REGmwfhbEP8+2v5pN4mVeCdL3saFUiFbn3LZRDbHAwKkoE6Uzi+mD7cPGqj10jtHU9i82C5cv2hta7VmPZkm0DFWFcayMiqfCqG8u19ntL/PX5bUa3mUcDQ6LNG+0qM9JTeHpB3UjP1Dh881i3zdqbi1mBWtJYPDkdHerZwem0+E8cdv01d3P9593Ui8zQ6jnT3eRDRVH+yquy9sxEUuds4fcF95kJhXK7YOdZQyU2+xg0bLO35XajvCSBGIqVsTBbTd5M154EU/+dfklL9AeXBwF9NoGpa2gc+CJCOfgqvAgMBAAGjUzBRMB0GA1UdDgQWBBTqP5J762zVXV2hiVxZBqw1UGdFKjAfBgNVHSMEGDAWgBTqP5J762zVXV2hiVxZBqw1UGdFKjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQDRlOps/3rEXdEc2SAbFUjU6PmoD+ycpQvMvhn1fbrScLB4v4MnsaT5pCgLsxfglb+cDjgkRyEXhs1K6sTsJhTkJ9t9sYgwLVlxuqxKPPxOab0JUZ5/9UsxZ0eKnw0ZmW2VYFIZ6u3zm8RwWZXtpm97w0p43c31fQ0Dc0+KFTKjgQ5q7oG67fV1M0aQaC9wjnthtjCIkBXyK+T637INAoSN4SXIiaZR7OTSTKzJzSBfg+CHGvUTlYVZe9vUx+0filRd0NAv5eCdGPyVbLieCGxJgNnV970TE0olp2VOmAE6O6kvisIvf2Lf3kNtuDTcov+tnKsS3L1FanDUjjZnkTaO'));
     }
 
     private function saml_debug_url_host(string $url): string {

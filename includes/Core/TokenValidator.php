@@ -10,7 +10,7 @@ class WP_SPID_CIE_OIDC_TokenValidator {
     public function validateIdToken(string $idToken, array $providerConfig, string $expectedNonce, string $correlationId) {
         $parts = explode('.', $idToken);
         if (count($parts) !== 3) {
-            return new WP_Error('oidc_invalid_token', __('Token di identità non valido.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_invalid_token', __('Token di identità non valido.', 'wp-spid-cie'));
         }
 
         $header = $this->decodePart($parts[0]);
@@ -18,42 +18,42 @@ class WP_SPID_CIE_OIDC_TokenValidator {
         $signature = $this->base64urlDecode($parts[2]);
 
         if (!is_array($header) || !is_array($payload) || $signature === false) {
-            return new WP_Error('oidc_invalid_token_format', __('Token di identità malformato.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_invalid_token_format', __('Token di identità malformato.', 'wp-spid-cie'));
         }
 
         $allowedAlgs = ['RS256', 'PS256'];
         $alg = $header['alg'] ?? '';
         if (!in_array($alg, $allowedAlgs, true)) {
-            return new WP_Error('oidc_alg_not_allowed', __('Algoritmo token non consentito.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_alg_not_allowed', __('Algoritmo token non consentito.', 'wp-spid-cie'));
         }
 
         $now = time();
         $skew = 60;
 
         if (($payload['iss'] ?? '') !== ($providerConfig['issuer'] ?? '')) {
-            return new WP_Error('oidc_iss_mismatch', __('Issuer non valido.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_iss_mismatch', __('Issuer non valido.', 'wp-spid-cie'));
         }
 
         $aud = $payload['aud'] ?? null;
         $clientId = (string) ($providerConfig['client_id'] ?? '');
         if (is_array($aud)) {
             if (!in_array($clientId, $aud, true)) {
-                return new WP_Error('oidc_aud_mismatch', __('Audience non valida.', 'wp-spid-cie-oidc'));
+                return new WP_Error('oidc_aud_mismatch', __('Audience non valida.', 'wp-spid-cie'));
             }
         } elseif ((string) $aud !== $clientId) {
-            return new WP_Error('oidc_aud_mismatch', __('Audience non valida.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_aud_mismatch', __('Audience non valida.', 'wp-spid-cie'));
         }
 
         if (empty($payload['exp']) || ($now - $skew) >= intval($payload['exp'])) {
-            return new WP_Error('oidc_expired', __('Token scaduto.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_expired', __('Token scaduto.', 'wp-spid-cie'));
         }
 
         if (empty($payload['iat']) || intval($payload['iat']) > ($now + $skew)) {
-            return new WP_Error('oidc_iat_invalid', __('Token con timestamp non valido.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_iat_invalid', __('Token con timestamp non valido.', 'wp-spid-cie'));
         }
 
         if (($payload['nonce'] ?? '') !== $expectedNonce) {
-            return new WP_Error('oidc_nonce_mismatch', __('Nonce non valido.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_nonce_mismatch', __('Nonce non valido.', 'wp-spid-cie'));
         }
 
         $acrCheck = $this->validateAcrPolicy($payload, $providerConfig);
@@ -64,7 +64,7 @@ class WP_SPID_CIE_OIDC_TokenValidator {
         $jwksUri = $providerConfig['jwks_uri'] ?? '';
         if (empty($jwksUri)) {
             // TODO Milestone 2/4: supportare trust chain e JWKS caching avanzato.
-            return new WP_Error('oidc_no_jwks', __('Impossibile verificare la firma del token.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_no_jwks', __('Impossibile verificare la firma del token.', 'wp-spid-cie'));
         }
 
         $jwks = $this->fetchJwks($jwksUri, $correlationId);
@@ -75,12 +75,12 @@ class WP_SPID_CIE_OIDC_TokenValidator {
         $kid = $header['kid'] ?? '';
         $jwk = $this->findJwk($jwks, $kid);
         if (!$jwk) {
-            return new WP_Error('oidc_kid_not_found', __('Chiave di firma non trovata.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_kid_not_found', __('Chiave di firma non trovata.', 'wp-spid-cie'));
         }
 
         $verify = $this->verifySignature($parts[0] . '.' . $parts[1], $signature, $jwk, $alg);
         if (!$verify) {
-            return new WP_Error('oidc_bad_signature', __('Firma token non valida.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_bad_signature', __('Firma token non valida.', 'wp-spid-cie'));
         }
 
         return $payload;
@@ -90,18 +90,18 @@ class WP_SPID_CIE_OIDC_TokenValidator {
         $response = wp_remote_get($jwksUri, ['timeout' => 10, 'redirection' => 2]);
         if (is_wp_error($response)) {
             $this->logger->error('JWKS fetch failed', ['correlation_id' => $correlationId, 'error' => $response->get_error_message()]);
-            return new WP_Error('oidc_jwks_fetch_fail', __('Errore rete durante verifica token.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_jwks_fetch_fail', __('Errore rete durante verifica token.', 'wp-spid-cie'));
         }
 
         $status = wp_remote_retrieve_response_code($response);
         $body = wp_remote_retrieve_body($response);
         if ($status !== 200 || empty($body)) {
-            return new WP_Error('oidc_jwks_http_fail', __('JWKS non disponibile.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_jwks_http_fail', __('JWKS non disponibile.', 'wp-spid-cie'));
         }
 
         $json = json_decode($body, true);
         if (!is_array($json) || empty($json['keys']) || !is_array($json['keys'])) {
-            return new WP_Error('oidc_jwks_invalid', __('JWKS non valido.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_jwks_invalid', __('JWKS non valido.', 'wp-spid-cie'));
         }
 
         return $json;
@@ -173,11 +173,11 @@ class WP_SPID_CIE_OIDC_TokenValidator {
             if ($allowMissing) {
                 return true;
             }
-            return new WP_Error('oidc_missing_acr', __('Livello di autenticazione non presente.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_missing_acr', __('Livello di autenticazione non presente.', 'wp-spid-cie'));
         }
 
         if (!$this->isAcrAtLeast($actualAcr, $minAcr)) {
-            return new WP_Error('oidc_acr_too_low', __('Livello di autenticazione insufficiente.', 'wp-spid-cie-oidc'));
+            return new WP_Error('oidc_acr_too_low', __('Livello di autenticazione insufficiente.', 'wp-spid-cie'));
         }
 
         return true;
