@@ -101,6 +101,10 @@ class WP_SPID_CIE_OIDC_Admin {
                             <div class="spid-card">
                                 <?php $this->render_cie_tab(); ?>
                             </div>
+                        <?php elseif ($current_tab === 'stato'): ?>
+                            <div class="spid-card">
+                                <?php $this->render_stato_tab(); ?>
+                            </div>
                         <?php else: ?>
                             <div class="spid-card">
                                 <?php $this->render_impostazioni_tab(); ?>
@@ -320,10 +324,11 @@ class WP_SPID_CIE_OIDC_Admin {
     private function get_admin_tabs(): array {
         return [
             'ente' => ['label' => '1. Ente', 'help' => 'Dati ente riusabili (denominazione, IPA, CF, contatti, issuer/entity_id).'],
-            'impostazioni' => ['label' => '2. Impostazioni', 'help' => 'Toggle pulsanti, metodo SPID (SAML/OIDC), disclaimer e dashboard stato.'],
-            'spid_oidc' => ['label' => '3. SPID OIDC', 'help' => 'Configurazione preliminare SPID OIDC (work in progress).'],
-            'spid_saml' => ['label' => '4. SPID SAML', 'help' => 'Configurazione operativa SPID SAML con metadata/endpoints e gestione IdP.'],
+            'impostazioni' => ['label' => '2. Impostazioni', 'help' => 'Toggle pulsanti, metodo SPID (SAML/OIDC), validator collaudo, provisioning e disclaimer.'],
+            'spid_oidc' => ['label' => '3. SPID OIDC', 'help' => 'Configurazione tecnica SPID OIDC (work in progress).'],
+            'spid_saml' => ['label' => '4. SPID SAML', 'help' => 'Configurazione tecnica e operativa SPID SAML.'],
             'cie' => ['label' => '5. CIE', 'help' => 'Configurazione CIE OIDC Federation, trust anchor/trust mark e output generati.'],
+            'stato' => ['label' => '6. Stato', 'help' => 'Dashboard stato, checklist rapida, Home SPID SAML e metadata SPID SAML.'],
         ];
     }
 
@@ -362,6 +367,13 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '<label><input type="radio" name="' . esc_attr($this->plugin_name . '_options[spid_auth_method]') . '" value="oidc" ' . checked($spid_method, 'oidc', false) . ' /> SPID OIDC (WIP)</label>';
         echo '<p class="description">Selezione mutuamente esclusiva: abilita un solo metodo SPID per volta.</p>';
         echo '</fieldset></td></tr>';
+        $this->render_checkbox_field(['id' => 'spid_saml_validator_enabled', 'desc' => 'Abilita SPID Validator (solo collaudo).']);
+        echo '</tbody></table>';
+    }
+
+    private function render_stato_operational_config(): void {
+        echo '<h2>Configurazioni operative</h2>';
+        echo '<table class="form-table" role="presentation"><tbody>';
         echo '<tr><th scope="row"><label for="user_provisioning_enabled">Provisioning automatico utenti</label></th><td>';
         $this->render_checkbox_field(['id' => 'user_provisioning_enabled', 'desc' => 'Crea utenti WordPress quando non esiste un match identità.']);
         echo '</td></tr>';
@@ -372,8 +384,6 @@ class WP_SPID_CIE_OIDC_Admin {
 
         do_settings_sections($this->plugin_name . '_disclaimer');
         $this->render_disclaimer_preview();
-        $this->render_status_dashboard();
-        $this->render_operational_help();
     }
 
 
@@ -405,7 +415,31 @@ class WP_SPID_CIE_OIDC_Admin {
 
     private function render_spid_oidc_tab(): void {
         echo '<div class="notice notice-warning inline"><p><strong>Work in progress:</strong> integrazione SPID OIDC non prioritaria finché non sarà stabile il profilo AgID.</p></div>';
-        do_settings_sections($this->plugin_name . '_providers');
+        echo '<h2>Configurazione tecnica SPID OIDC</h2>';
+        $this->render_select_field(['id' => 'discovery_mode', 'options' => ['auto' => 'Auto (OIDC Discovery)', 'manual' => 'Manuale'], 'default' => 'auto', 'desc' => 'In auto usiamo discovery; in manuale usa gli endpoint configurati sotto.']);
+        $this->render_select_field(['id' => 'min_loa', 'options' => ['SpidL1' => 'SpidL1', 'SpidL2' => 'SpidL2 (consigliato)', 'SpidL3' => 'SpidL3'], 'default' => 'SpidL2', 'desc' => 'Valore minimo accettato nel claim acr.']);
+        $this->render_text_field(['id' => 'spid_issuer', 'placeholder' => 'https://...', 'desc' => 'Issuer SPID (usato per discovery auto e validazione iss).']);
+        $this->render_text_field(['id' => 'spid_scope', 'placeholder' => 'openid profile', 'desc' => 'Scope base SPID.']);
+        $this->render_text_field(['id' => 'spid_acr_values', 'placeholder' => 'https://www.spid.gov.it/SpidL2', 'desc' => 'Override opzionale acr_values SPID.']);
+        echo '<h3>Endpoint SPID (modalità manuale)</h3>';
+        $this->render_text_field(['id' => 'spid_authorization_endpoint', 'placeholder' => 'https://...', 'desc' => 'Authorization endpoint.']);
+        $this->render_text_field(['id' => 'spid_token_endpoint', 'placeholder' => 'https://...', 'desc' => 'Token endpoint.']);
+        $this->render_text_field(['id' => 'spid_jwks_uri', 'placeholder' => 'https://...', 'desc' => 'JWKS URI.']);
+        $this->render_text_field(['id' => 'spid_userinfo_endpoint', 'placeholder' => 'https://...', 'desc' => 'UserInfo endpoint (opzionale).']);
+        $this->render_text_field(['id' => 'spid_end_session_endpoint', 'placeholder' => 'https://...', 'desc' => 'End Session endpoint (opzionale).']);
+    }
+
+
+    private function render_stato_tab(): void {
+        $this->render_stato_operational_config();
+        echo '<hr>';
+        echo '<h2>Diagnostica</h2>';
+        $this->render_status_dashboard();
+        $this->render_operational_help();
+        echo '<hr>';
+        $this->render_spid_saml_home();
+        echo '<hr>';
+        $this->render_spid_saml_metadata_subtab();
     }
 
     private function render_cie_tab(): void {
@@ -785,30 +819,11 @@ class WP_SPID_CIE_OIDC_Admin {
         $options['spid_saml_idp_last_sync'] = time();
         update_option($this->plugin_name . '_options', $options, false);
 
-        wp_safe_redirect(add_query_arg(['page' => $this->plugin_name, 'tab' => 'spid_saml', 'saml_subtab' => 'settings', 'registry_refreshed' => '1'], admin_url('options-general.php')));
+        wp_safe_redirect(add_query_arg(['page' => $this->plugin_name, 'tab' => 'spid_saml', 'registry_refreshed' => '1'], admin_url('options-general.php')));
         exit;
     }
 
     private function render_spid_saml_module(): void {
-        $sub = $this->get_spid_saml_subtab();
-        $base = admin_url('options-general.php?page=' . $this->plugin_name . '&tab=spid_saml');
-        $tabs = ['home' => 'Home', 'settings' => 'Impostazioni', 'metadata' => 'Metadata'];
-        echo '<nav class="nav-tab-wrapper" style="margin-bottom:12px;">';
-        foreach ($tabs as $key => $label) {
-            $url = add_query_arg(['saml_subtab' => $key], $base);
-            $active = $sub === $key ? 'nav-tab-active' : '';
-            echo '<a class="nav-tab ' . esc_attr($active) . '" href="' . esc_url($url) . '">' . esc_html($label) . '</a>';
-        }
-        echo '</nav>';
-
-        if ($sub === 'home') {
-            $this->render_spid_saml_home();
-            return;
-        }
-        if ($sub === 'metadata') {
-            $this->render_spid_saml_metadata_subtab();
-            return;
-        }
         $this->render_spid_saml_settings_subtab();
     }
 
@@ -857,9 +872,6 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '<h2>Impostazioni SPID SAML</h2>';
         echo '<p class="description">Se lasci vuoto, usiamo automaticamente i valori del tab A. Ente.</p>';
 
-        $this->render_checkbox_field(['id' => 'spid_saml_enabled', 'desc' => 'Abilita Login SPID (SAML)']);
-        $this->render_checkbox_field(['id' => 'spid_saml_validator_enabled', 'desc' => 'Abilita Validator (solo collaudo)']);
-
         $this->render_text_field(['id' => 'spid_saml_country_name', 'placeholder' => 'IT', 'desc' => 'countryName (esempio: IT)']);
         $this->render_text_field(['id' => 'spid_saml_state_or_province_name', 'placeholder' => 'Roma', 'desc' => 'stateOrProvinceName (esempio: Roma)']);
         $this->render_text_field(['id' => 'spid_saml_locality_name', 'placeholder' => 'Roma', 'desc' => 'localityName (esempio: Roma)']);
@@ -878,7 +890,7 @@ class WP_SPID_CIE_OIDC_Admin {
         if ($lastSync > 0) {
             echo '<p><strong>Ultimo aggiornamento registry:</strong> ' . esc_html(wp_date('d/m/Y H:i:s', $lastSync)) . '</p>';
         }
-        $refresh_url = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'spid_saml','saml_subtab'=>'settings','action'=>'spid_saml_refresh_registry'], admin_url('options-general.php')), 'spid_saml_refresh_registry');
+        $refresh_url = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'spid_saml','action'=>'spid_saml_refresh_registry'], admin_url('options-general.php')), 'spid_saml_refresh_registry');
         echo '<p><a class="button button-secondary" href="' . esc_url($refresh_url) . '">Aggiorna Registry IdP ora</a></p>';
 
         echo '<hr><h3>Opzioni avanzate</h3>';
@@ -925,11 +937,11 @@ class WP_SPID_CIE_OIDC_Admin {
         }
         $spUrl = add_query_arg('spid_metadata_token', rawurlencode($token), home_url('/spid/saml/metadata'));
         $aggUrl = add_query_arg('spid_metadata_token', rawurlencode($token), home_url('/spid/saml/metadata?aggregator=1'));
-        echo '<h2>Metadata</h2>';
+        echo '<h2>Metadata SPID SAML</h2>';
         echo '<p><strong>URL metadata SP:</strong> <code>' . esc_html($spUrl) . '</code></p>';
         echo '<p><strong>URL metadata Aggregator:</strong> <code>' . esc_html($aggUrl) . '</code></p>';
         echo '<p class="description">Conserva questi URL con cura. Non pubblicarli su forum o ticket pubblici.</p>';
-        $regen = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'spid_saml','saml_subtab'=>'metadata','regen_metadata_token'=>'1'], admin_url('options-general.php')), 'spid_saml_regen_token');
+        $regen = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'stato','regen_metadata_token'=>'1'], admin_url('options-general.php')), 'spid_saml_regen_token');
         echo '<p><a class="button button-secondary" onclick="return confirm(\'Rigenerare il token rendera invalidi i vecchi URL metadata.\');" href="' . esc_url($regen) . '">Rigenera URL metadata</a></p>';
     }
 
@@ -1183,13 +1195,12 @@ class WP_SPID_CIE_OIDC_Admin {
             'ente' => ['organization_name', 'ipa_code', 'fiscal_number', 'contacts_email', 'issuer_override', 'entity_id'],
             'cie' => ['cie_trust_anchor_preprod', 'cie_trust_anchor_prod', 'spid_trust_anchor', 'cie_trust_mark_preprod', 'cie_trust_mark_prod'],
             'spid_oidc' => [
-                'spid_enabled', 'cie_enabled', 'spid_test_env', 'provider_mode', 'discovery_mode', 'min_loa',
-                'spid_issuer', 'cie_issuer', 'spid_scope', 'cie_scope', 'spid_acr_values', 'cie_acr_values',
-                'spid_authorization_endpoint', 'spid_token_endpoint', 'spid_jwks_uri', 'spid_userinfo_endpoint', 'spid_end_session_endpoint',
-                'cie_authorization_endpoint', 'cie_token_endpoint', 'cie_jwks_uri', 'cie_userinfo_endpoint', 'cie_end_session_endpoint'
+                'discovery_mode', 'min_loa', 'spid_issuer', 'spid_scope', 'spid_acr_values',
+                'spid_authorization_endpoint', 'spid_token_endpoint', 'spid_jwks_uri', 'spid_userinfo_endpoint', 'spid_end_session_endpoint'
             ],
-            'impostazioni' => ['spid_enabled', 'cie_enabled', 'disclaimer_enabled', 'disclaimer_text', 'spid_auth_method', 'user_provisioning_enabled', 'user_default_role'],
-            'spid_saml' => ['spid_saml_enabled', 'spid_saml_validator_enabled', 'spid_saml_entity_id', 'spid_saml_debug', 'spid_saml_clock_skew', 'spid_saml_level', 'spid_saml_binding', 'spid_saml_idp_entity_id', 'spid_saml_idp_sso_url', 'spid_saml_idp_slo_url', 'spid_saml_idp_x509_cert', 'spid_saml_idp_metadata_xml', 'spid_saml_idp_cert', 'spid_saml_show_advanced', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'sp_org_name', 'sp_org_display_name', 'sp_contact_ipa_code', 'sp_contact_fiscal_code', 'sp_contact_email', 'sp_contact_phone', 'spid_saml_idp_mode', 'spid_saml_idp_registry_selected', 'spid_saml_idp_registry_link', 'spid_saml_idp_last_sync', 'spid_saml_metadata_token', 'spid_saml_requested_attributes'],
+            'impostazioni' => ['spid_enabled', 'cie_enabled', 'spid_auth_method', 'spid_saml_validator_enabled'],
+            'stato' => ['disclaimer_enabled', 'disclaimer_text', 'user_provisioning_enabled', 'user_default_role'],
+            'spid_saml' => ['spid_saml_entity_id', 'spid_saml_debug', 'spid_saml_clock_skew', 'spid_saml_level', 'spid_saml_binding', 'spid_saml_idp_entity_id', 'spid_saml_idp_sso_url', 'spid_saml_idp_slo_url', 'spid_saml_idp_x509_cert', 'spid_saml_idp_metadata_xml', 'spid_saml_idp_cert', 'spid_saml_show_advanced', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'sp_org_name', 'sp_org_display_name', 'sp_contact_ipa_code', 'sp_contact_fiscal_code', 'sp_contact_email', 'sp_contact_phone', 'spid_saml_idp_mode', 'spid_saml_idp_registry_selected', 'spid_saml_idp_registry_link', 'spid_saml_idp_last_sync', 'spid_saml_metadata_token', 'spid_saml_requested_attributes'],
         ];
 
         $new_input = $existing;
