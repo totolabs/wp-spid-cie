@@ -364,7 +364,8 @@ class WP_SPID_CIE_OIDC_Public {
 		$ipa_code = isset($options['ipa_code']) ? sanitize_text_field((string) $options['ipa_code']) : '';
 		$fiscal_number = isset($options['fiscal_number']) ? sanitize_text_field((string) $options['fiscal_number']) : '';
 		$cert = $this->get_saml_signing_cert();
-		$private_key = $this->get_saml_private_key();
+		$cert_pem = $this->get_saml_signing_cert_pem();
+		$private_key_path = $this->get_saml_private_key_path();
 		$authn_requests_signed = $cert !== '' ? 'true' : 'false';
 
 		$doc = new DOMDocument('1.0', 'UTF-8');
@@ -395,17 +396,17 @@ class WP_SPID_CIE_OIDC_Public {
 		}
 		$spsso->appendChild($doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:NameIDFormat', 'urn:oasis:names:tc:SAML:2.0:nameid-format:transient'));
 
+		$sls = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:SingleLogoutService');
+		$sls->setAttribute('Binding', 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect');
+		$sls->setAttribute('Location', $sls_url);
+		$spsso->appendChild($sls);
+
 		$acs = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:AssertionConsumerService');
 		$acs->setAttribute('Binding', 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST');
 		$acs->setAttribute('Location', $acs_url);
 		$acs->setAttribute('index', '0');
 		$acs->setAttribute('isDefault', 'true');
 		$spsso->appendChild($acs);
-
-		$sls = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:SingleLogoutService');
-		$sls->setAttribute('Binding', 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect');
-		$sls->setAttribute('Location', $sls_url);
-		$spsso->appendChild($sls);
 
 		$requested_attributes = $this->get_spid_saml_requested_attributes($options);
 		$attr_service = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:AttributeConsumingService');
@@ -449,8 +450,8 @@ class WP_SPID_CIE_OIDC_Public {
 		}
 		$entity->appendChild($contact);
 
-		if ($cert !== '' && $private_key !== '') {
-			$this->apply_spid_metadata_signature($doc, $entity, $private_key, $cert);
+		if ($cert_pem !== '' && $private_key_path !== '') {
+			$this->apply_spid_metadata_signature($doc, $entity, $private_key_path, $cert_pem);
 		}
 
 		status_header(200);
@@ -459,7 +460,7 @@ class WP_SPID_CIE_OIDC_Public {
 		exit;
 	}
 
-	private function apply_spid_metadata_signature(DOMDocument $doc, DOMElement $root, string $private_key, string $cert_base64): void {
+	private function apply_spid_metadata_signature(DOMDocument $doc, DOMElement $root, string $private_key_path, string $cert_pem): void {
 		if ($root->hasAttribute('ID')) {
 			$root->setIdAttribute('ID', true);
 		}
@@ -476,9 +477,9 @@ class WP_SPID_CIE_OIDC_Public {
 			['id_name' => 'ID', 'overwrite' => false, 'force_uri' => true]
 		);
 		$key = new \RobRichards\XMLSecLibs\XMLSecurityKey(\RobRichards\XMLSecLibs\XMLSecurityKey::RSA_SHA256, ['type' => 'private']);
-		$key->loadKey($private_key, false, false);
+		$key->loadKey($private_key_path, true, false);
 		$dsig->sign($key);
-		$dsig->add509Cert($cert_base64, true, false, ['issuerSerial' => true]);
+		$dsig->add509Cert($cert_pem, true, false, ['issuerSerial' => true]);
 		$dsig->appendSignature($root);
 	}
 
@@ -639,14 +640,23 @@ class WP_SPID_CIE_OIDC_Public {
 		return trim($cert);
 	}
 
-	private function get_saml_private_key(): string {
+	private function get_saml_signing_cert_pem(): string {
+		$cert_file = $this->resolve_spid_saml_key_path('public.crt');
+		if (!file_exists($cert_file) || !is_readable($cert_file)) {
+			return '';
+		}
+
+		$cert = (string) file_get_contents($cert_file);
+		return trim($cert);
+	}
+
+	private function get_saml_private_key_path(): string {
 		$key_file = $this->resolve_spid_saml_key_path('private.key');
 		if (!file_exists($key_file) || !is_readable($key_file)) {
 			return '';
 		}
 
-		$key = (string) file_get_contents($key_file);
-		return trim($key);
+		return $key_file;
 	}
 
 private function extract_jwt_payload($jwt) {

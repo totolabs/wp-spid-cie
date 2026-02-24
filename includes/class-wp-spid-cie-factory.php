@@ -35,6 +35,7 @@ class WP_SPID_CIE_OIDC_Factory {
             'ipa_code'          => $options['ipa_code'] ?? '',
             'fiscal_number'     => $options['fiscal_number'] ?? '',
             'contacts_email'    => $options['contacts_email'] ?? get_option('admin_email'),
+            'spid_saml_locality_name' => $options['spid_saml_locality_name'] ?? '',
             'base_url'          => $base_url,
             'entity_id'         => $entity_id,
             'test_env'          => isset($options['spid_test_env']) && $options['spid_test_env'] === '1',
@@ -223,13 +224,20 @@ class WP_SPID_CIE_OIDC_Wrapper {
 
 		$ipa_code = isset($this->config['ipa_code']) ? sanitize_text_field((string) $this->config['ipa_code']) : '';
 		$org_identifier = 'PA:IT-' . ($ipa_code !== '' ? $ipa_code : 'unknown');
-		$uri_value = set_url_scheme((string) ($this->config['base_url'] ?? home_url('/')), 'https');
-		$uri_value = trailingslashit($uri_value);
+		$entity_id_value = trim((string) ($this->config['entity_id'] ?? $this->config['base_url'] ?? home_url('/')));
+		$uri_value = untrailingslashit(set_url_scheme($entity_id_value, 'https'));
+		$locality_name = isset($this->config['spid_saml_locality_name']) ? sanitize_text_field((string) $this->config['spid_saml_locality_name']) : '';
+		$locality_name = trim($locality_name);
+		if ($locality_name === '') {
+			$log('generateKeys: missing spid_saml_locality_name -> refusing certificate generation');
+			return false;
+		}
 
 		$dn = [
 		  'countryName' => 'IT',
 		  'organizationName' => $org,
 		  'commonName' => $cn,
+		  'localityName' => $locality_name,
 		  'organizationIdentifier' => $org_identifier,
 		  'uri' => $uri_value,
 		];
@@ -253,16 +261,25 @@ class WP_SPID_CIE_OIDC_Wrapper {
 				"prompt = no\n" .
 				"default_md = sha256\n" .
 				"distinguished_name = req_dn\n" .
+				"x509_extensions = v3_req\n" .
 				"oid_section = custom_oids\n\n" .
 				"[ custom_oids ]\n" .
 				"organizationIdentifier = 2.5.4.97\n" .
-				"uri = 2.5.4.83\n\n" .
+				"uri = 2.5.4.83\n" .
+				"localityName = 2.5.4.7\n\n" .
 				"[ req_dn ]\n" .
 				"C = IT\n" .
 				"O = " . addslashes($org) . "\n" .
 				"CN = " . addslashes($cn) . "\n" .
+				"L = " . addslashes($locality_name) . "\n" .
 				"organizationIdentifier = " . addslashes($org_identifier) . "\n" .
-				"uri = " . addslashes($uri_value) . "\n";
+				"uri = " . addslashes($uri_value) . "\n\n" .
+				"[ v3_req ]\n" .
+				"basicConstraints = critical,CA:FALSE\n" .
+				"keyUsage = critical,digitalSignature,keyEncipherment\n" .
+				"certificatePolicies = @spid_policies\n\n" .
+				"[ spid_policies ]\n" .
+				"policyIdentifier = " . ($ipa_code !== '' ? '1.3.76.16.4.2.1' : '1.3.76.16.4.3.1') . "\n";
 			@file_put_contents($openssl_conf, $openssl_conf_content);
 
 			$csr = openssl_csr_new($dn, $opensslPriv, [
@@ -277,7 +294,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
 			} else {
 				$log('OpenSSL: csr_new OK');
 
-				$x509 = openssl_csr_sign($csr, null, $opensslPriv, 365, ['digest_alg' => 'sha256', 'config' => $openssl_conf]);
+				$x509 = openssl_csr_sign($csr, null, $opensslPriv, 365, ['digest_alg' => 'sha256', 'config' => $openssl_conf, 'x509_extensions' => 'v3_req']);
 				if ($x509 === false) {
 					$log('OpenSSL: csr_sign FAILED');
 					while ($msg = openssl_error_string()) {
