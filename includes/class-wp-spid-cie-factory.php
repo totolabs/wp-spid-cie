@@ -225,7 +225,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
 		$ipa_code = isset($this->config['ipa_code']) ? sanitize_text_field((string) $this->config['ipa_code']) : '';
 		$org_identifier = 'PA:IT-' . ($ipa_code !== '' ? $ipa_code : 'unknown');
 		$entity_id_value = trim((string) ($this->config['entity_id'] ?? $this->config['base_url'] ?? home_url('/')));
-		$uri_value = untrailingslashit(set_url_scheme($entity_id_value, 'https'));
+		$uri_value = untrailingslashit($entity_id_value);
 		$locality_name = isset($this->config['spid_saml_locality_name']) ? sanitize_text_field((string) $this->config['spid_saml_locality_name']) : '';
 		$locality_name = trim($locality_name);
 		if ($locality_name === '') {
@@ -239,7 +239,8 @@ class WP_SPID_CIE_OIDC_Wrapper {
 		  'commonName' => $cn,
 		  'localityName' => $locality_name,
 		  'organizationIdentifier' => $org_identifier,
-		  'uri' => $uri_value,
+		  'URI' => $uri_value,
+		  '2.5.4.83' => $uri_value,
 		];
 		
 		$certPem = null;
@@ -265,7 +266,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
 				"oid_section = custom_oids\n\n" .
 				"[ custom_oids ]\n" .
 				"organizationIdentifier = 2.5.4.97\n" .
-				"uri = 2.5.4.83\n" .
+				"URI = 2.5.4.83\n" .
 				"localityName = 2.5.4.7\n\n" .
 				"[ req_dn ]\n" .
 				"C = IT\n" .
@@ -273,7 +274,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
 				"CN = " . addslashes($cn) . "\n" .
 				"L = " . addslashes($locality_name) . "\n" .
 				"organizationIdentifier = " . addslashes($org_identifier) . "\n" .
-				"uri = " . addslashes($uri_value) . "\n" .
+				"URI = " . addslashes($uri_value) . "\n" .
 				"2.5.4.83 = " . addslashes($uri_value) . "\n\n" .
 				"[ v3_spid ]\n" .
 				"basicConstraints = CA:FALSE\n" .

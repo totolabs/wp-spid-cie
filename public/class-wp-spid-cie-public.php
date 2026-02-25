@@ -470,17 +470,13 @@ class WP_SPID_CIE_OIDC_Public {
 		$dsig->addReference(
 			$root,
 			\RobRichards\XMLSecLibs\XMLSecurityDSig::SHA256,
-			[
-				'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
-				'http://www.w3.org/2001/10/xml-exc-c14n#',
-			],
-			['id_name' => 'ID', 'overwrite' => false, 'force_uri' => true]
+			['http://www.w3.org/2000/09/xmldsig#enveloped-signature']
 		);
 		$key = new \RobRichards\XMLSecLibs\XMLSecurityKey(\RobRichards\XMLSecLibs\XMLSecurityKey::RSA_SHA256, ['type' => 'private']);
-		$key->loadKey($private_key_path, true, false);
+		$key->loadKey($private_key_path, true);
 		$dsig->sign($key);
 		$cert_pem = (string) file_get_contents($public_crt_path);
-		$dsig->add509Cert($cert_pem, true, false, ['issuerSerial' => true]);
+		$dsig->add509Cert($cert_pem);
 		$dsig->appendSignature($root);
 	}
 
