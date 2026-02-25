@@ -68,10 +68,7 @@ class WP_SPID_CIE_OIDC_Public {
         }
 
         $spid_enabled = !empty($options['spid_enabled']) && $options['spid_enabled'] === '1';
-        $spid_saml_enabled = !empty($options['spid_saml_enabled']) && $options['spid_saml_enabled'] === '1';
-        $spid_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : ($spid_saml_enabled ? 'saml' : 'oidc');
-
-        if ($spid_enabled && $spid_saml_enabled && $spid_method === 'saml') {
+        if ($spid_enabled && $this->is_spid_saml_effective_enabled($options)) {
             return true;
         }
 
@@ -263,9 +260,7 @@ class WP_SPID_CIE_OIDC_Public {
 	private function serve_spid_saml_route(string $route): void {
 		$options = get_option($this->plugin_name . '_options', []);
 		$spid_enabled = !empty($options['spid_enabled']) && $options['spid_enabled'] === '1';
-		$spid_saml_enabled = !empty($options['spid_saml_enabled']) && $options['spid_saml_enabled'] === '1';
-		$spid_auth_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : ($spid_saml_enabled ? 'saml' : 'oidc');
-		$enabled = $spid_enabled && $spid_saml_enabled && $spid_auth_method === 'saml';
+		$enabled = $spid_enabled && $this->is_spid_saml_effective_enabled(is_array($options) ? $options : []);
 		$debug_enabled = !empty($options['spid_saml_debug']) && $options['spid_saml_debug'] === '1';
 
 		if (!$enabled && $route !== 'metadata') {
@@ -974,14 +969,13 @@ private function extract_jwt_payload($jwt) {
         } elseif ($provider_mode === 'cie_only') {
             $spid_enabled = false;
         }
-        $spid_saml_enabled = isset($options['spid_saml_enabled']) && $options['spid_saml_enabled'] === '1';
-        $spid_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : ($spid_saml_enabled ? 'saml' : 'oidc');
+        $spid_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : 'oidc';
         if (!in_array($spid_method, ['saml', 'oidc'], true)) {
             $spid_method = 'oidc';
         }
         $spid_visible = $spid_enabled;
-        $show_spid_oidc = $spid_visible && $spid_method === 'oidc';
-        $show_spid_saml = $spid_visible && $spid_method === 'saml' && $spid_saml_enabled;
+        $show_spid_saml = $spid_visible && $this->is_spid_saml_effective_enabled($options);
+        $show_spid_oidc = $spid_visible && !$show_spid_saml && $spid_method === 'oidc';
         $saml_login_url = add_query_arg(['spid_saml_route' => 'login'], home_url('/'));
         
         // Gestione Disclaimer

@@ -388,6 +388,14 @@ class WP_SPID_CIE_OIDC_Admin {
     }
 
 
+
+    private function is_spid_saml_effective_enabled(array $options): bool {
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation')) {
+            require_once plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlActivation.php';
+        }
+        return WP_SPID_CIE_OIDC_Spid_Saml_Activation::is_effective_enabled($options);
+    }
+
     private function spid_saml_keys_exist(): bool {
         $keys_dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir();
         return file_exists($keys_dir . '/private.key') && file_exists($keys_dir . '/public.crt');
@@ -396,9 +404,9 @@ class WP_SPID_CIE_OIDC_Admin {
     private function render_status_dashboard(): void {
         $options = get_option($this->plugin_name . '_options', []);
         $spid_enabled = !empty($options['spid_enabled']) && $options['spid_enabled'] === '1';
-        $spid_saml_enabled = !empty($options['spid_saml_enabled']) && $options['spid_saml_enabled'] === '1';
-        $spid_auth_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : ($spid_saml_enabled ? 'saml' : 'oidc');
-        $spid_saml_effective_enabled = $spid_enabled && $spid_saml_enabled && $spid_auth_method === 'saml';
+        $spid_saml_enabled = isset($options['spid_saml_enabled']) ? (string) $options['spid_saml_enabled'] : '(unset)';
+        $spid_auth_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : 'oidc';
+        $spid_saml_effective_enabled = $this->is_spid_saml_effective_enabled(is_array($options) ? $options : []);
 
         $checks = [
             'Chiavi SP presenti' => $this->spid_saml_keys_exist(),
@@ -410,6 +418,12 @@ class WP_SPID_CIE_OIDC_Admin {
         foreach ($checks as $label => $ok) {
             echo '<li><strong>' . esc_html($label) . ':</strong> ' . ($ok ? '<span style="color:#0a7f37;">OK</span>' : '<span style="color:#b32d2e;">KO</span>') . '</li>';
         }
+        echo '</ul>';
+        echo '<h3>Diagnostica attivazione SPID SAML</h3><ul class="spid-readonly-list">';
+        echo '<li><strong>spid_enabled:</strong> <code>' . esc_html(isset($options['spid_enabled']) ? (string) $options['spid_enabled'] : '(unset)') . '</code></li>';
+        echo '<li><strong>spid_auth_method:</strong> <code>' . esc_html($spid_auth_method !== '' ? $spid_auth_method : '(unset)') . '</code></li>';
+        echo '<li><strong>spid_saml_enabled (legacy):</strong> <code>' . esc_html($spid_saml_enabled) . '</code></li>';
+        echo '<li><strong>effective_saml (computed):</strong> <code>' . ($spid_saml_effective_enabled ? 'true' : 'false') . '</code></li>';
         echo '</ul>';
     }
 
@@ -560,6 +574,14 @@ class WP_SPID_CIE_OIDC_Admin {
         }
         if (empty($options['spid_saml_requested_attributes']) || !is_array($options['spid_saml_requested_attributes'])) {
             $options['spid_saml_requested_attributes'] = ['name', 'familyName', 'fiscalNumber', 'email'];
+            $changed = true;
+        }
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation')) {
+            require_once plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlActivation.php';
+        }
+        $aligned_options = WP_SPID_CIE_OIDC_Spid_Saml_Activation::align_legacy_flag($options);
+        if (($options['spid_saml_enabled'] ?? '') !== ($aligned_options['spid_saml_enabled'] ?? '')) {
+            $options = $aligned_options;
             $changed = true;
         }
         if ($changed) {
@@ -865,7 +887,7 @@ class WP_SPID_CIE_OIDC_Admin {
             $o = [];
         }
 
-        $enabled = !empty($o['spid_saml_enabled']) && $o['spid_saml_enabled'] === '1';
+        $enabled = $this->is_spid_saml_effective_enabled($o);
         $ready = !empty($o['spid_saml_entity_id']) || !empty($o['issuer_override']);
         $keys_dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir();
         $cert_ok = file_exists($keys_dir . '/private.key') && file_exists($keys_dir . '/public.crt');
@@ -1291,30 +1313,16 @@ class WP_SPID_CIE_OIDC_Admin {
                 $new_input[$c] = (isset($input[$c]) && $input[$c] === '1') ? '1' : '0';
             }
         }
-
-
         if (in_array('spid_auth_method', $allowed, true)) {
-            $method = isset($input['spid_auth_method']) ? sanitize_key((string) $input['spid_auth_method']) : 'saml';
-            $new_input['spid_auth_method'] = in_array($method, ['saml', 'oidc'], true) ? $method : 'saml';
-
-            $current_saml_enabled = isset($existing['spid_saml_enabled']) ? (string) $existing['spid_saml_enabled'] : '1';
-            if (!empty($new_input['spid_saml_enabled'])) {
-                $current_saml_enabled = (string) $new_input['spid_saml_enabled'];
+            if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation')) {
+                require_once plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlActivation.php';
             }
-
-            if (empty($new_input['spid_enabled']) || $new_input['spid_enabled'] !== '1' || $new_input['spid_auth_method'] !== 'saml') {
-                $new_input['spid_saml_enabled_last'] = $current_saml_enabled;
-                $new_input['spid_saml_enabled'] = '0';
-            } else {
-                if (isset($existing['spid_saml_enabled_last']) && $existing['spid_saml_enabled_last'] !== '') {
-                    $new_input['spid_saml_enabled'] = (string) $existing['spid_saml_enabled_last'];
-                } elseif (isset($existing['spid_saml_enabled']) && $existing['spid_saml_enabled'] !== '') {
-                    $new_input['spid_saml_enabled'] = (string) $existing['spid_saml_enabled'];
-                } else {
-                    $new_input['spid_saml_enabled'] = '1';
-                }
-            }
+            $method = isset($input['spid_auth_method']) ? (string) $input['spid_auth_method'] : 'saml';
+            $new_input['spid_auth_method'] = WP_SPID_CIE_OIDC_Spid_Saml_Activation::sanitize_method($method);
+            $new_input['spid_saml_enabled'] = WP_SPID_CIE_OIDC_Spid_Saml_Activation::is_effective_enabled($new_input) ? '1' : '0';
         }
+
+
         if (in_array('disclaimer_text', $allowed, true) && isset($input['disclaimer_text'])) {
             $new_input['disclaimer_text'] = wp_kses_post($input['disclaimer_text']);
         }
