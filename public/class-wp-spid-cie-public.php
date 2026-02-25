@@ -369,7 +369,9 @@ class WP_SPID_CIE_OIDC_Public {
 		$authn_requests_signed = $cert !== '' ? 'true' : 'false';
 
 		$doc = new DOMDocument('1.0', 'UTF-8');
-		$doc->preserveWhiteSpace = false;
+		// Keep whitespace handling deterministic across signing/serialization phases:
+		// changing formatting after signature generation can invalidate SignedInfo.
+		$doc->preserveWhiteSpace = true;
 		$doc->formatOutput = false;
 
 		$entity = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:EntityDescriptor');
@@ -456,11 +458,17 @@ class WP_SPID_CIE_OIDC_Public {
 
 		status_header(200);
 		header('Content-Type: application/samlmetadata+xml; charset=utf-8');
+		// Serve the same DOM that has just been signed; avoid any post-processing.
 		echo (string) $doc->saveXML();
 		exit;
 	}
 
 	private function apply_spid_metadata_signature(DOMDocument $doc, DOMElement $root, string $private_key_path, string $public_crt_path): void {
+		// Guard deterministic XML output: SignedInfo must be generated and served
+		// from the exact same in-memory DOM without pretty-print rewrites.
+		$doc->preserveWhiteSpace = true;
+		$doc->formatOutput = false;
+
 		if ($root->hasAttribute('ID')) {
 			$root->setIdAttribute('ID', true);
 		}
