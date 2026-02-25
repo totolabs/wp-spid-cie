@@ -23,6 +23,7 @@ class WP_SPID_CIE_OIDC_Admin {
         add_action( 'admin_init', array( $this, 'handle_key_generation' ) );
         add_action( 'admin_init', array( $this, 'normalize_spid_saml_options' ) );
         add_action( 'admin_init', array( $this, 'handle_spid_saml_registry_refresh' ) );
+        add_action( 'admin_init', array( $this, 'handle_spid_saml_metadata_actions' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_styles' ) );
     }
 
@@ -809,6 +810,51 @@ class WP_SPID_CIE_OIDC_Admin {
         exit;
     }
 
+    public function handle_spid_saml_metadata_actions(): void {
+        if (!is_admin()) {
+            return;
+        }
+
+        $page = isset($_GET['page']) ? sanitize_key((string) wp_unslash($_GET['page'])) : '';
+        $tab = isset($_GET['tab']) ? sanitize_key((string) wp_unslash($_GET['tab'])) : '';
+        if ($page !== $this->plugin_name || $tab !== 'stato') {
+            return;
+        }
+
+        $options = get_option($this->plugin_name . '_options', []);
+        if (!is_array($options)) {
+            $options = [];
+        }
+
+        if (isset($_GET['toggle_metadata_token']) && check_admin_referer('spid_saml_toggle_metadata_token')) {
+            $enabled = !empty($options['spid_saml_metadata_require_token']) && $options['spid_saml_metadata_require_token'] === '1';
+            $options['spid_saml_metadata_require_token'] = $enabled ? '0' : '1';
+            if ($options['spid_saml_metadata_require_token'] === '1' && empty($options['spid_saml_metadata_token'])) {
+                $options['spid_saml_metadata_token'] = wp_generate_password(24, false, false);
+            }
+            update_option($this->plugin_name . '_options', $options, false);
+
+            wp_safe_redirect(add_query_arg([
+                'page' => $this->plugin_name,
+                'tab' => 'stato',
+                'metadata_token_notice' => 'toggle_ok',
+            ], admin_url('options-general.php')));
+            exit;
+        }
+
+        if (isset($_GET['regen_metadata_token']) && check_admin_referer('spid_saml_regen_token')) {
+            $options['spid_saml_metadata_token'] = wp_generate_password(24, false, false);
+            update_option($this->plugin_name . '_options', $options, false);
+
+            wp_safe_redirect(add_query_arg([
+                'page' => $this->plugin_name,
+                'tab' => 'stato',
+                'metadata_token_notice' => 'regen_ok',
+            ], admin_url('options-general.php')));
+            exit;
+        }
+    }
+
     private function render_spid_saml_module(): void {
         $this->render_spid_saml_settings_subtab();
     }
@@ -910,34 +956,6 @@ class WP_SPID_CIE_OIDC_Admin {
         $options = get_option($this->plugin_name . '_options', []);
         if (!is_array($options)) {
             $options = [];
-        }
-
-        if (isset($_GET['toggle_metadata_token']) && check_admin_referer('spid_saml_toggle_metadata_token')) {
-            $enabled = !empty($options['spid_saml_metadata_require_token']) && $options['spid_saml_metadata_require_token'] === '1';
-            $options['spid_saml_metadata_require_token'] = $enabled ? '0' : '1';
-            if ($options['spid_saml_metadata_require_token'] === '1' && empty($options['spid_saml_metadata_token'])) {
-                $options['spid_saml_metadata_token'] = wp_generate_password(24, false, false);
-            }
-            update_option($this->plugin_name . '_options', $options, false);
-
-            wp_safe_redirect(add_query_arg([
-                'page' => $this->plugin_name,
-                'tab' => 'stato',
-                'metadata_token_notice' => 'toggle_ok',
-            ], admin_url('options-general.php')));
-            exit;
-        }
-
-        if (isset($_GET['regen_metadata_token']) && check_admin_referer('spid_saml_regen_token')) {
-            $options['spid_saml_metadata_token'] = wp_generate_password(24, false, false);
-            update_option($this->plugin_name . '_options', $options, false);
-
-            wp_safe_redirect(add_query_arg([
-                'page' => $this->plugin_name,
-                'tab' => 'stato',
-                'metadata_token_notice' => 'regen_ok',
-            ], admin_url('options-general.php')));
-            exit;
         }
 
         if (isset($_GET['metadata_token_notice'])) {
