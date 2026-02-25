@@ -992,20 +992,21 @@ class WP_SPID_CIE_OIDC_Admin {
         $token = isset($options['spid_saml_metadata_token']) ? (string) $options['spid_saml_metadata_token'] : '';
         $token_required = !empty($options['spid_saml_metadata_require_token']) && $options['spid_saml_metadata_require_token'] === '1';
         $official_sp_url = home_url('/sp-metadata.xml');
-        $official_agg_url = home_url('/spid/saml/metadata?aggregator=1');
+        $official_agg_url = add_query_arg('aggregator', '1', home_url('/sp-metadata.xml'));
         $protected_sp_url = $token !== '' ? add_query_arg('spid_metadata_token', rawurlencode($token), home_url('/spid/saml/metadata')) : '';
         $protected_agg_url = $token !== '' ? add_query_arg('spid_metadata_token', rawurlencode($token), home_url('/spid/saml/metadata?aggregator=1')) : '';
 
         echo '<h2>Metadata SPID SAML</h2>';
         echo '<p><strong>URL metadata SP (ufficiale/stabile):</strong> <code>' . esc_html($official_sp_url) . '</code></p>';
-        echo '<p><strong>URL metadata Aggregator:</strong> <code>' . esc_html($official_agg_url) . '</code></p>';
-        echo '<p class="description">Questi URL sono stabili e possono essere pubblicati verso AgID/validator.</p>';
+        echo '<p><strong>URL metadata Aggregator (ufficiale/stabile):</strong> <code>' . esc_html($official_agg_url) . '</code></p>';
+        echo '<p class="description">Gli endpoint ufficiali /sp-metadata.xml e /sp-metadata.xml?aggregator=1 sono sempre pubblici/publishable.</p>';
+        echo '<p class="description">Gli URL legacy /spid/saml/metadata (anche con aggregator=1) possono richiedere token quando la protezione è attiva.</p>';
 
         echo '<h3>Protezione opzionale con token</h3>';
         echo '<p>Stato corrente: <strong>' . ($token_required ? 'ATTIVA' : 'DISATTIVA') . '</strong></p>';
         if ($protected_sp_url !== '') {
-            echo '<p><strong>URL protetta SP:</strong> <code>' . esc_html($protected_sp_url) . '</code></p>';
-            echo '<p><strong>URL protetta Aggregator:</strong> <code>' . esc_html($protected_agg_url) . '</code></p>';
+            echo '<p><strong>URL protetta SP (legacy):</strong> <code>' . esc_html($protected_sp_url) . '</code></p>';
+            echo '<p><strong>URL protetta Aggregator (legacy):</strong> <code>' . esc_html($protected_agg_url) . '</code></p>';
         }
 
         $toggle = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'stato','toggle_metadata_token'=>'1'], admin_url('options-general.php')), 'spid_saml_toggle_metadata_token');

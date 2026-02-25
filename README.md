@@ -19,6 +19,7 @@ Checklist operativa GO/NO-GO disponibile in `docs/spid-saml-step2-go-no-go-check
 - In **Impostazioni** è disponibile la selezione mutuamente esclusiva del metodo SPID (`SAML`/`OIDC`).
 - Endpoint metadata SPID SAML ufficiale e stabile: `https://<dominio>/sp-metadata.xml` (alias compatibile anche su `/spid/saml/metadata`).
 - Protezione metadata con token disponibile come opzione amministrativa: quando attiva, richiede `?spid_metadata_token=...` sull'endpoint legacy ma non cambia l'URL ufficiale pubblicabile.
+- URL Aggregator pubblicabile: `https://<dominio>/sp-metadata.xml?aggregator=1`; gli URL legacy `/spid/saml/metadata` (anche con `aggregator=1`) possono richiedere token quando la protezione è attiva.
 - Stato attivo SPID SAML: fonte di verità `effective_saml = (spid_enabled === '1') && (spid_auth_method === 'saml')`; la flag legacy `spid_saml_enabled` è mantenuta solo per compatibilità.
 
 ## Certificati SPID SAML one-click (SP pubblico)
