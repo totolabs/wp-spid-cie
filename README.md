@@ -17,7 +17,8 @@ Checklist operativa GO/NO-GO disponibile in `docs/spid-saml-step2-go-no-go-check
 
 - Nuova organizzazione backend in 5 tab principali: **Ente**, **Impostazioni**, **SPID OIDC**, **SPID SAML**, **CIE**.
 - In **Impostazioni** è disponibile la selezione mutuamente esclusiva del metodo SPID (`SAML`/`OIDC`).
-- Endpoint metadata SPID SAML protetto da token: usare l'URL con query string `?spid_metadata_token=...` generata nella sezione SPID SAML/Metadata.
+- Endpoint metadata SPID SAML ufficiale e stabile: `https://<dominio>/sp-metadata.xml` (alias compatibile anche su `/spid/saml/metadata`).
+- Protezione metadata con token disponibile come opzione amministrativa: quando attiva, richiede `?spid_metadata_token=...` sull'endpoint legacy ma non cambia l'URL ufficiale pubblicabile.
 
 ## Certificati SPID SAML one-click (SP pubblico)
 

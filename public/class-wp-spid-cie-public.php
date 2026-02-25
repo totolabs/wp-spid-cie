@@ -79,7 +79,8 @@ class WP_SPID_CIE_OIDC_Public {
         return $request_uri !== '' && strpos($request_uri, 'wp-login.php') !== false;
     }
 
-    public function setup_federation_endpoints() {
+	public function setup_federation_endpoints() {
+		add_rewrite_rule('^sp-metadata\.xml/?$',               'index.php?spid_saml_route=metadata', 'top');
 		add_rewrite_rule('^spid/saml/metadata/?$',              'index.php?spid_saml_route=metadata', 'top');
 		add_rewrite_rule('^spid/saml/login/?$',                 'index.php?spid_saml_route=login',    'top');
 		add_rewrite_rule('^spid/saml/acs/?$',                   'index.php?spid_saml_route=acs',      'top');
@@ -100,6 +101,7 @@ class WP_SPID_CIE_OIDC_Public {
     }
 	
 	public function disable_canonical_for_federation($redirect_url, $requested_url) {
+			if (strpos($requested_url, '/sp-metadata.xml') !== false) return false;
 			if (strpos($requested_url, '/spid/saml/metadata') !== false) return false;
 			if (strpos($requested_url, '/spid/saml/login') !== false) return false;
 			if (strpos($requested_url, '/spid/saml/acs') !== false) return false;
@@ -118,7 +120,7 @@ class WP_SPID_CIE_OIDC_Public {
 		if (!is_string($saml_route) || $saml_route === '') {
 			$path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 			$path = '/' . ltrim((string) $path, '/');
-			if ($path === '/spid/saml/metadata') {
+			if ($path === '/spid/saml/metadata' || $path === '/sp-metadata.xml') {
 				$saml_route = 'metadata';
 			} elseif ($path === '/spid/saml/login') {
 				$saml_route = 'login';
@@ -344,15 +346,25 @@ class WP_SPID_CIE_OIDC_Public {
 	}
 
 	private function serve_spid_saml_metadata(array $options): void {
+		$requires_token = !empty($options['spid_saml_metadata_require_token']) && $options['spid_saml_metadata_require_token'] === '1';
 		$expected_token = isset($options['spid_saml_metadata_token']) ? (string) $options['spid_saml_metadata_token'] : '';
 		$provided_token = isset($_GET['spid_metadata_token']) ? sanitize_text_field((string) wp_unslash($_GET['spid_metadata_token'])) : '';
-		if ($expected_token !== '' && ($provided_token === '' || !hash_equals($expected_token, $provided_token))) {
+		if ($requires_token && $expected_token !== '' && ($provided_token === '' || !hash_equals($expected_token, $provided_token))) {
 			status_header(403);
 			header('Content-Type: text/plain; charset=utf-8');
 			echo 'Forbidden';
 			exit;
 		}
 
+		$xml = $this->build_spid_saml_metadata_xml($options);
+
+		status_header(200);
+		header('Content-Type: application/samlmetadata+xml; charset=utf-8');
+		echo $xml;
+		exit;
+	}
+
+	public function build_spid_saml_metadata_xml(array $options): string {
 		$svc = $this->get_saml_service();
 		$sp = $svc->build_sp_config($options);
 
@@ -456,11 +468,8 @@ class WP_SPID_CIE_OIDC_Public {
 			$this->apply_spid_metadata_signature($doc, $entity, $private_key_path, $cert_path);
 		}
 
-		status_header(200);
-		header('Content-Type: application/samlmetadata+xml; charset=utf-8');
 		// Serve the same DOM that has just been signed; avoid any post-processing.
-		echo (string) $doc->saveXML();
-		exit;
+		return (string) $doc->saveXML();
 	}
 
 	private function apply_spid_metadata_signature(DOMDocument $doc, DOMElement $root, string $private_key_path, string $public_crt_path): void {

@@ -35,7 +35,7 @@ class WP_SPID_CIE_OIDC_Saml_Service {
             'acs_url' => home_url('/spid/saml/acs'),
             'sls_url' => home_url('/spid/saml/sls'),
             'login_url' => home_url('/spid/saml/login'),
-            'metadata_url' => home_url('/spid/saml/metadata'),
+            'metadata_url' => home_url('/sp-metadata.xml'),
             'private_key_path' => $keys_dir . '/private.key',
             'cert_path' => $keys_dir . '/public.crt',
             'clock_skew' => isset($options['spid_saml_clock_skew']) ? max(0, (int) $options['spid_saml_clock_skew']) : 120,
