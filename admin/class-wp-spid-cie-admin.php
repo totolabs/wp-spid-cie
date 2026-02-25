@@ -1355,6 +1355,10 @@ class WP_SPID_CIE_OIDC_Admin {
             $new_input = $this->sync_registry_selected_idp($new_input, false);
         }
 
+        if (isset($existing['spid_saml_metadata_token']) && $existing['spid_saml_metadata_token'] !== '') {
+            $new_input['spid_saml_metadata_token'] = (string) $existing['spid_saml_metadata_token'];
+        }
+
         return $new_input;
     }
 }
