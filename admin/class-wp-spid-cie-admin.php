@@ -388,8 +388,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
 
     private function spid_saml_keys_exist(): bool {
-        $upload_dir = wp_upload_dir();
-        $keys_dir = trailingslashit($upload_dir['basedir']) . 'spid-cie-oidc-keys';
+        $keys_dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir();
         return file_exists($keys_dir . '/private.key') && file_exists($keys_dir . '/public.crt');
     }
 
@@ -836,8 +835,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
         $enabled = !empty($o['spid_saml_enabled']) && $o['spid_saml_enabled'] === '1';
         $ready = !empty($o['spid_saml_entity_id']) || !empty($o['issuer_override']);
-        $upload_dir = wp_upload_dir();
-        $keys_dir = trailingslashit($upload_dir['basedir']) . 'spid-cie-oidc-keys';
+        $keys_dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir();
         $cert_ok = file_exists($keys_dir . '/private.key') && file_exists($keys_dir . '/public.crt');
         $metadata_ok = !empty($o['spid_saml_metadata_token']);
 
@@ -968,22 +966,36 @@ class WP_SPID_CIE_OIDC_Admin {
     }
 
     public function render_keys_manager() {
-        $keys_exist = false;
-        $upload_dir = wp_upload_dir();
-        $keys_dir = trailingslashit($upload_dir['basedir']) . 'spid-cie-oidc-keys';
-        if (file_exists($keys_dir . '/private.key') && file_exists($keys_dir . '/public.crt')) {
-            $keys_exist = true;
+        $options = get_option($this->plugin_name . '_options', []);
+        $status = WP_SPID_CIE_OIDC_Spid_Certificates::describe_status(is_array($options) ? $options : []);
+        $keys_exist = $status['present'];
+
+        if ($status['valid']) {
+            echo '<div class="spid-status-ok"><span class="dashicons dashicons-yes"></span> Chiavi crittografiche presenti e valide.</div>';
+        } elseif ($keys_exist) {
+            echo '<div class="spid-status-ko"><span class="dashicons dashicons-warning"></span> Certificato presente ma non conforme SPID: correggere i campi e rigenerare.</div>';
+        } else {
+            echo '<div class="spid-status-ko"><span class="dashicons dashicons-warning"></span> Certificati SPID non trovati. Generazione one-click richiesta.</div>';
         }
 
-        if ($keys_exist) {
-            echo '<div class="spid-status-ok"><span class="dashicons dashicons-yes"></span> Chiavi crittografiche presenti e valide.</div>';
-        } else {
-            echo '<div class="spid-status-ko"><span class="dashicons dashicons-warning"></span> Chiavi non trovate. È necessario generarle per attivare il servizio.</div>';
+        echo '<ul class="spid-readonly-list">';
+        echo '<li><strong>Percorso chiavi:</strong> <code>' . esc_html($status['key_dir']) . '</code></li>';
+        echo '<li><strong>Scadenza certificato:</strong> ' . esc_html($status['expiry'] !== '' ? $status['expiry'] : 'n/d') . '</li>';
+        echo '<li><strong>Subject:</strong> <code>' . esc_html($status['subject'] !== '' ? $status['subject'] : 'n/d') . '</code></li>';
+        echo '<li><strong>Modulus match chiave/cert:</strong> ' . ($status['modulus_match'] ? '<span style="color:#0a7f37;">OK</span>' : '<span style="color:#b32d2e;">KO</span>') . '</li>';
+        echo '</ul>';
+
+        if (!$status['valid'] && !empty($status['errors'])) {
+            echo '<ul style="color:#b32d2e;list-style:disc;padding-left:20px;">';
+            foreach ($status['errors'] as $err) {
+                echo '<li>' . esc_html($err) . '</li>';
+            }
+            echo '</ul>';
         }
 
         echo '<p style="margin: 15px 0;">';
         $generation_url = wp_nonce_url(admin_url('options-general.php?page=' . $this->plugin_name . '&action=generate_oidc_keys'), 'generate_oidc_keys_nonce');
-        echo '<a href="' . esc_url($generation_url) . '" class="button button-secondary" onclick="return confirm(\'Sei sicuro? Rigenerare le chiavi renderà invalidi i metadata attuali sui portali AgID/CIE.\');">'. ($keys_exist ? 'Rigenera Chiavi' : 'Genera Chiavi') .'</a>';
+        echo '<a href="' . esc_url($generation_url) . '" class="button button-secondary" onclick="return confirm(\'Rigenerare i certificati cambia la fingerprint e richiede l\'aggiornamento dei metadata pubblicati su AgID/CIE. Continuare?\');">'. ($keys_exist ? 'Genera/Rigenera certificati SPID' : 'Genera/Rigenera certificati SPID') .'</a>';
         echo '</p>';
 
         if ($keys_exist) {
@@ -999,12 +1011,12 @@ class WP_SPID_CIE_OIDC_Admin {
     }
 
     public function print_keys_section_info() {
-        if (isset($_GET['keys-generated'])) { echo '<div class="notice notice-success inline"><p>Chiavi generate con successo!</p></div>'; }
+        if (isset($_GET['keys-generated'])) { echo '<div class="notice notice-success inline"><p>Certificati SPID generati con successo.</p></div>'; }
         if (isset($_GET['keys-error'])) {
             $error = get_transient('spid_cie_oidc_error');
             echo '<div class="notice notice-error inline"><p>Errore: ' . esc_html($error) . '</p></div>';
         }
-        echo '<p>Il sistema gestisce automaticamente la creazione dei certificati crittografici richiesti dalla federazione.</p>';
+        echo '<p>Generazione one-click certificati SPID (profilo SP pubblico): RSA>=2048, SHA-256, Subject con OID 2.5.4.83 e 2.5.4.97, estensioni SPID-compliant.</p>';
     }
 
     public function render_text_field( $args ) {
@@ -1058,8 +1070,7 @@ class WP_SPID_CIE_OIDC_Admin {
     }
 
 	public function render_public_key_field() {
-		$upload_dir = wp_upload_dir();
-		$keys_dir = trailingslashit($upload_dir['basedir']) . 'spid-cie-oidc-keys';
+		$keys_dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir();
 
 		$public_file = $keys_dir . '/public.crt';
 
@@ -1070,7 +1081,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
 		$public_pem = file_get_contents($public_file);
 		if (!$public_pem) {
-			echo '<p style="color:#b32d2e;">Impossibile leggere la chiave pubblica. Verifica permessi in uploads/spid-cie-oidc-keys.</p>';
+			echo '<p style="color:#b32d2e;">Impossibile leggere la chiave pubblica. Verifica permessi in uploads/wp-spid-cie-keys.</p>';
 			return;
 		}
 
@@ -1102,8 +1113,7 @@ class WP_SPID_CIE_OIDC_Admin {
 	}
 
 	private function get_keys_dir_path(): string {
-		$upload_dir = wp_upload_dir();
-		return trailingslashit($upload_dir['basedir']) . 'spid-cie-oidc-keys';
+		return WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir();
 	}
 
 	private function render_copyable_textarea(string $id, string $value, int $rows = 8, string $help = ''): void {
@@ -1129,7 +1139,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
 		$cert_pem = file_get_contents($cert_file);
 		if (!$cert_pem) {
-			echo '<p style="color:#b32d2e;">Impossibile leggere il certificato. Verifica permessi in uploads/spid-cie-oidc-keys.</p>';
+			echo '<p style="color:#b32d2e;">Impossibile leggere il certificato. Verifica permessi in uploads/wp-spid-cie-keys.</p>';
 			return;
 		}
 
@@ -1161,7 +1171,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
 		$pub_pem = file_get_contents($pub_file);
 		if (!$pub_pem) {
-			echo '<p style="color:#b32d2e;">Impossibile leggere la public key. Verifica permessi in uploads/spid-cie-oidc-keys.</p>';
+			echo '<p style="color:#b32d2e;">Impossibile leggere la public key. Verifica permessi in uploads/wp-spid-cie-keys.</p>';
 			return;
 		}
 
@@ -1357,6 +1367,33 @@ class WP_SPID_CIE_OIDC_Admin {
 
         if (isset($existing['spid_saml_metadata_token']) && $existing['spid_saml_metadata_token'] !== '') {
             $new_input['spid_saml_metadata_token'] = (string) $existing['spid_saml_metadata_token'];
+        }
+
+        $auto_generate_tabs = ['spid_saml', 'ente', 'impostazioni'];
+        if (in_array($current_tab, $auto_generate_tabs, true)) {
+            $key_dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir();
+            $private_path = trailingslashit($key_dir) . 'private.key';
+            $cert_path = trailingslashit($key_dir) . 'public.crt';
+            $must_generate = !file_exists($private_path) || !file_exists($cert_path);
+
+            if ($must_generate) {
+                $generation = WP_SPID_CIE_OIDC_Spid_Certificates::generate($new_input, false);
+                if (!$generation['success']) {
+                    add_settings_error(
+                        $this->plugin_name . '_options',
+                        'spid_saml_cert_autogen_error',
+                        'Salvataggio completato, ma non è stato possibile generare automaticamente i certificati SPID: ' . implode(' ', $generation['errors']),
+                        'error'
+                    );
+                } else {
+                    add_settings_error(
+                        $this->plugin_name . '_options',
+                        'spid_saml_cert_autogen_ok',
+                        'Certificati SPID generati automaticamente in uploads/wp-spid-cie-keys.',
+                        'updated'
+                    );
+                }
+            }
         }
 
         return $new_input;
