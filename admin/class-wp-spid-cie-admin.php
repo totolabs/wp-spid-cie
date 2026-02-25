@@ -23,6 +23,7 @@ class WP_SPID_CIE_OIDC_Admin {
         add_action( 'admin_init', array( $this, 'handle_key_generation' ) );
         add_action( 'admin_init', array( $this, 'normalize_spid_saml_options' ) );
         add_action( 'admin_init', array( $this, 'handle_spid_saml_registry_refresh' ) );
+        add_action( 'admin_init', array( $this, 'handle_spid_saml_metadata_actions' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_styles' ) );
     }
 
@@ -387,6 +388,14 @@ class WP_SPID_CIE_OIDC_Admin {
     }
 
 
+
+    private function is_spid_saml_effective_enabled(array $options): bool {
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation')) {
+            require_once plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlActivation.php';
+        }
+        return WP_SPID_CIE_OIDC_Spid_Saml_Activation::is_effective_enabled($options);
+    }
+
     private function spid_saml_keys_exist(): bool {
         $keys_dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir();
         return file_exists($keys_dir . '/private.key') && file_exists($keys_dir . '/public.crt');
@@ -395,13 +404,13 @@ class WP_SPID_CIE_OIDC_Admin {
     private function render_status_dashboard(): void {
         $options = get_option($this->plugin_name . '_options', []);
         $spid_enabled = !empty($options['spid_enabled']) && $options['spid_enabled'] === '1';
-        $spid_saml_enabled = !empty($options['spid_saml_enabled']) && $options['spid_saml_enabled'] === '1';
-        $spid_auth_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : ($spid_saml_enabled ? 'saml' : 'oidc');
-        $spid_saml_effective_enabled = $spid_enabled && $spid_saml_enabled && $spid_auth_method === 'saml';
+        $spid_saml_enabled = isset($options['spid_saml_enabled']) ? (string) $options['spid_saml_enabled'] : '(unset)';
+        $spid_auth_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : 'oidc';
+        $spid_saml_effective_enabled = $this->is_spid_saml_effective_enabled(is_array($options) ? $options : []);
 
         $checks = [
             'Chiavi SP presenti' => $this->spid_saml_keys_exist(),
-            'Metadata token configurato' => !empty($options['spid_saml_metadata_token']),
+            'Metadata URL ufficiale stabile' => true,
             'Registry IdP selezionato' => !empty($options['spid_saml_idp_registry_selected']) || !empty($options['spid_saml_idp_entity_id']),
             'SPID SAML enabled (effective)' => $spid_saml_effective_enabled,
         ];
@@ -409,6 +418,12 @@ class WP_SPID_CIE_OIDC_Admin {
         foreach ($checks as $label => $ok) {
             echo '<li><strong>' . esc_html($label) . ':</strong> ' . ($ok ? '<span style="color:#0a7f37;">OK</span>' : '<span style="color:#b32d2e;">KO</span>') . '</li>';
         }
+        echo '</ul>';
+        echo '<h3>Diagnostica attivazione SPID SAML</h3><ul class="spid-readonly-list">';
+        echo '<li><strong>spid_enabled:</strong> <code>' . esc_html(isset($options['spid_enabled']) ? (string) $options['spid_enabled'] : '(unset)') . '</code></li>';
+        echo '<li><strong>spid_auth_method:</strong> <code>' . esc_html($spid_auth_method !== '' ? $spid_auth_method : '(unset)') . '</code></li>';
+        echo '<li><strong>spid_saml_enabled (legacy):</strong> <code>' . esc_html($spid_saml_enabled) . '</code></li>';
+        echo '<li><strong>effective_saml (computed):</strong> <code>' . ($spid_saml_effective_enabled ? 'true' : 'false') . '</code></li>';
         echo '</ul>';
     }
 
@@ -475,12 +490,12 @@ class WP_SPID_CIE_OIDC_Admin {
     }
 
     public function render_spid_saml_endpoints_preview() {
-        $metadata = home_url('/spid/saml/metadata');
+        $metadata = home_url('/sp-metadata.xml');
         $acs = home_url('/spid/saml/acs');
         $sls = home_url('/spid/saml/sls');
 
         echo '<ul class="spid-readonly-list">';
-        echo '<li><strong>Metadata:</strong> <code>' . esc_html($metadata) . '</code></li>';
+        echo '<li><strong>Metadata (ufficiale):</strong> <code>' . esc_html($metadata) . '</code></li>';
         echo '<li><strong>Login:</strong> <code>' . esc_html(home_url('/spid/saml/login')) . '</code></li>';
         echo '<li><strong>ACS:</strong> <code>' . esc_html($acs) . '</code></li>';
         echo '<li><strong>SLS:</strong> <code>' . esc_html($sls) . '</code></li>';
@@ -557,12 +572,16 @@ class WP_SPID_CIE_OIDC_Admin {
             $options['spid_saml_idp_mode'] = 'auto';
             $changed = true;
         }
-        if (empty($options['spid_saml_metadata_token'])) {
-            $options['spid_saml_metadata_token'] = wp_generate_password(24, false, false);
-            $changed = true;
-        }
         if (empty($options['spid_saml_requested_attributes']) || !is_array($options['spid_saml_requested_attributes'])) {
             $options['spid_saml_requested_attributes'] = ['name', 'familyName', 'fiscalNumber', 'email'];
+            $changed = true;
+        }
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation')) {
+            require_once plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlActivation.php';
+        }
+        $aligned_options = WP_SPID_CIE_OIDC_Spid_Saml_Activation::align_legacy_flag($options);
+        if (($options['spid_saml_enabled'] ?? '') !== ($aligned_options['spid_saml_enabled'] ?? '')) {
+            $options = $aligned_options;
             $changed = true;
         }
         if ($changed) {
@@ -576,15 +595,6 @@ class WP_SPID_CIE_OIDC_Admin {
         }
         return new WP_SPID_CIE_OIDC_Spid_Registry_Service();
     }
-
-    private function ensure_spid_saml_metadata_token(array $options): array {
-        if (empty($options['spid_saml_metadata_token'])) {
-            $options['spid_saml_metadata_token'] = wp_generate_password(24, false, false);
-            update_option($this->plugin_name . '_options', $options, false);
-        }
-        return $options;
-    }
-
     private function get_registry_list_url(): string {
         return 'https://registry.spid.gov.it/entities-idp?output=json';
     }
@@ -822,6 +832,54 @@ class WP_SPID_CIE_OIDC_Admin {
         exit;
     }
 
+    public function handle_spid_saml_metadata_actions(): void {
+        if (!is_admin()) {
+            return;
+        }
+
+        $page = isset($_GET['page']) ? sanitize_key((string) wp_unslash($_GET['page'])) : '';
+        $tab = isset($_GET['tab']) ? sanitize_key((string) wp_unslash($_GET['tab'])) : '';
+        if ($page !== $this->plugin_name || $tab !== 'stato') {
+            return;
+        }
+
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        $options = get_option($this->plugin_name . '_options', []);
+        if (!is_array($options)) {
+            $options = [];
+        }
+
+        if (isset($_GET['toggle_metadata_token']) && check_admin_referer('spid_saml_toggle_metadata_token')) {
+            if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection')) {
+                require_once plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlMetadataProtection.php';
+            }
+            $options = WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection::toggle($options);
+            update_option($this->plugin_name . '_options', $options, false);
+
+            wp_safe_redirect(add_query_arg([
+                'page' => $this->plugin_name,
+                'tab' => 'stato',
+                'metadata_token_notice' => 'toggle_ok',
+            ], admin_url('options-general.php')));
+            exit;
+        }
+
+        if (isset($_GET['regen_metadata_token']) && check_admin_referer('spid_saml_regen_token')) {
+            $options['spid_saml_metadata_token'] = wp_generate_password(24, false, false);
+            update_option($this->plugin_name . '_options', $options, false);
+
+            wp_safe_redirect(add_query_arg([
+                'page' => $this->plugin_name,
+                'tab' => 'stato',
+                'metadata_token_notice' => 'regen_ok',
+            ], admin_url('options-general.php')));
+            exit;
+        }
+    }
+
     private function render_spid_saml_module(): void {
         $this->render_spid_saml_settings_subtab();
     }
@@ -831,13 +889,12 @@ class WP_SPID_CIE_OIDC_Admin {
         if (!is_array($o)) {
             $o = [];
         }
-        $o = $this->ensure_spid_saml_metadata_token($o);
 
-        $enabled = !empty($o['spid_saml_enabled']) && $o['spid_saml_enabled'] === '1';
+        $enabled = $this->is_spid_saml_effective_enabled($o);
         $ready = !empty($o['spid_saml_entity_id']) || !empty($o['issuer_override']);
         $keys_dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir();
         $cert_ok = file_exists($keys_dir . '/private.key') && file_exists($keys_dir . '/public.crt');
-        $metadata_ok = !empty($o['spid_saml_metadata_token']);
+        $metadata_ok = true;
 
         $registry = $this->get_registry_service();
         $list = $registry->get_idp_list(false);
@@ -920,27 +977,58 @@ class WP_SPID_CIE_OIDC_Admin {
         $this->render_spid_saml_test_config();
     }
 
+
+    private function mask_metadata_token(string $token): string {
+        $token = trim($token);
+        if ($token === '') {
+            return '(vuoto)';
+        }
+        if (strlen($token) <= 10) {
+            return str_repeat('*', strlen($token));
+        }
+        return substr($token, 0, 6) . str_repeat('*', max(0, strlen($token) - 10)) . substr($token, -4);
+    }
+
     private function render_spid_saml_metadata_subtab(): void {
         $options = get_option($this->plugin_name . '_options', []);
         if (!is_array($options)) {
             $options = [];
         }
-        $options = $this->ensure_spid_saml_metadata_token($options);
-        $token = isset($options['spid_saml_metadata_token']) ? (string) $options['spid_saml_metadata_token'] : '';
-        if (isset($_GET['regen_metadata_token']) && check_admin_referer('spid_saml_regen_token')) {
-            $token = wp_generate_password(24, false, false);
-            $options['spid_saml_metadata_token'] = $token;
-            update_option($this->plugin_name . '_options', $options, false);
-            echo '<div class="notice notice-success inline"><p>Token metadata rigenerato.</p></div>';
+
+        if (isset($_GET['metadata_token_notice'])) {
+            $notice = sanitize_key((string) wp_unslash($_GET['metadata_token_notice']));
+            if ($notice === 'toggle_ok') {
+                echo '<div class="notice notice-success inline"><p>Protezione token metadata aggiornata.</p></div>';
+            } elseif ($notice === 'regen_ok') {
+                echo '<div class="notice notice-success inline"><p>Token metadata rigenerato.</p></div>';
+            }
         }
-        $spUrl = add_query_arg('spid_metadata_token', rawurlencode($token), home_url('/spid/saml/metadata'));
-        $aggUrl = add_query_arg('spid_metadata_token', rawurlencode($token), home_url('/spid/saml/metadata?aggregator=1'));
+
+        $token = isset($options['spid_saml_metadata_token']) ? (string) $options['spid_saml_metadata_token'] : '';
+        $token_required = !empty($options['spid_saml_metadata_require_token']) && $options['spid_saml_metadata_require_token'] === '1';
+        $official_sp_url = home_url('/sp-metadata.xml');
+        $official_agg_url = home_url('/spid/saml/metadata?aggregator=1');
+        $protected_sp_url = $token !== '' ? add_query_arg('spid_metadata_token', rawurlencode($token), home_url('/spid/saml/metadata')) : '';
+        $protected_agg_url = $token !== '' ? add_query_arg('spid_metadata_token', rawurlencode($token), home_url('/spid/saml/metadata?aggregator=1')) : '';
+
         echo '<h2>Metadata SPID SAML</h2>';
-        echo '<p><strong>URL metadata SP:</strong> <code>' . esc_html($spUrl) . '</code></p>';
-        echo '<p><strong>URL metadata Aggregator:</strong> <code>' . esc_html($aggUrl) . '</code></p>';
-        echo '<p class="description">Conserva questi URL con cura. Non pubblicarli su forum o ticket pubblici.</p>';
+        echo '<p><strong>URL metadata SP (ufficiale/stabile):</strong> <code>' . esc_html($official_sp_url) . '</code></p>';
+        echo '<p><strong>URL metadata Aggregator:</strong> <code>' . esc_html($official_agg_url) . '</code></p>';
+        echo '<p class="description">Questi URL sono stabili e possono essere pubblicati verso AgID/validator. La protezione token (se attiva) si applica solo all\'endpoint legacy <code>/spid/saml/metadata</code>.</p>';
+
+        echo '<h3>Protezione opzionale con token</h3>';
+        echo '<p>Stato corrente: <strong>' . ($token_required ? 'ATTIVA' : 'DISATTIVA') . '</strong></p>';
+        echo '<p class="description">Valori raw opzioni: <code>spid_saml_metadata_require_token=' . esc_html(isset($options['spid_saml_metadata_require_token']) ? (string) $options['spid_saml_metadata_require_token'] : '(unset)') . '</code>, <code>spid_saml_metadata_token=' . esc_html($this->mask_metadata_token($token)) . '</code></p>';
+        if ($protected_sp_url !== '') {
+            echo '<p><strong>URL protetta SP:</strong> <code>' . esc_html($protected_sp_url) . '</code></p>';
+            echo '<p><strong>URL protetta Aggregator:</strong> <code>' . esc_html($protected_agg_url) . '</code></p>';
+        }
+
+        $toggle = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'stato','toggle_metadata_token'=>'1'], admin_url('options-general.php')), 'spid_saml_toggle_metadata_token');
+        echo '<p><a class="button button-secondary" href="' . esc_url($toggle) . '">' . ($token_required ? 'Disattiva protezione token' : 'Attiva protezione token') . '</a></p>';
+
         $regen = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'stato','regen_metadata_token'=>'1'], admin_url('options-general.php')), 'spid_saml_regen_token');
-        echo '<p><a class="button button-secondary" onclick="return confirm(\'Rigenerare il token rendera invalidi i vecchi URL metadata.\');" href="' . esc_url($regen) . '">Rigenera URL metadata</a></p>';
+        echo '<p><a class="button button-secondary" onclick="return confirm(\'Rigenerare il token rendera invalidi i vecchi URL protetti.\');" href="' . esc_url($regen) . '">Rigenera token metadata</a></p>';
     }
 
     // --- CALLBACK RENDERING ---
@@ -1241,30 +1329,16 @@ class WP_SPID_CIE_OIDC_Admin {
                 $new_input[$c] = (isset($input[$c]) && $input[$c] === '1') ? '1' : '0';
             }
         }
-
-
         if (in_array('spid_auth_method', $allowed, true)) {
-            $method = isset($input['spid_auth_method']) ? sanitize_key((string) $input['spid_auth_method']) : 'saml';
-            $new_input['spid_auth_method'] = in_array($method, ['saml', 'oidc'], true) ? $method : 'saml';
-
-            $current_saml_enabled = isset($existing['spid_saml_enabled']) ? (string) $existing['spid_saml_enabled'] : '1';
-            if (!empty($new_input['spid_saml_enabled'])) {
-                $current_saml_enabled = (string) $new_input['spid_saml_enabled'];
+            if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation')) {
+                require_once plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlActivation.php';
             }
-
-            if (empty($new_input['spid_enabled']) || $new_input['spid_enabled'] !== '1' || $new_input['spid_auth_method'] !== 'saml') {
-                $new_input['spid_saml_enabled_last'] = $current_saml_enabled;
-                $new_input['spid_saml_enabled'] = '0';
-            } else {
-                if (isset($existing['spid_saml_enabled_last']) && $existing['spid_saml_enabled_last'] !== '') {
-                    $new_input['spid_saml_enabled'] = (string) $existing['spid_saml_enabled_last'];
-                } elseif (isset($existing['spid_saml_enabled']) && $existing['spid_saml_enabled'] !== '') {
-                    $new_input['spid_saml_enabled'] = (string) $existing['spid_saml_enabled'];
-                } else {
-                    $new_input['spid_saml_enabled'] = '1';
-                }
-            }
+            $method = isset($input['spid_auth_method']) ? (string) $input['spid_auth_method'] : 'saml';
+            $new_input['spid_auth_method'] = WP_SPID_CIE_OIDC_Spid_Saml_Activation::sanitize_method($method);
+            $new_input['spid_saml_enabled'] = WP_SPID_CIE_OIDC_Spid_Saml_Activation::is_effective_enabled($new_input) ? '1' : '0';
         }
+
+
         if (in_array('disclaimer_text', $allowed, true) && isset($input['disclaimer_text'])) {
             $new_input['disclaimer_text'] = wp_kses_post($input['disclaimer_text']);
         }

@@ -68,10 +68,7 @@ class WP_SPID_CIE_OIDC_Public {
         }
 
         $spid_enabled = !empty($options['spid_enabled']) && $options['spid_enabled'] === '1';
-        $spid_saml_enabled = !empty($options['spid_saml_enabled']) && $options['spid_saml_enabled'] === '1';
-        $spid_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : ($spid_saml_enabled ? 'saml' : 'oidc');
-
-        if ($spid_enabled && $spid_saml_enabled && $spid_method === 'saml') {
+        if ($spid_enabled && $this->is_spid_saml_effective_enabled($options)) {
             return true;
         }
 
@@ -79,7 +76,22 @@ class WP_SPID_CIE_OIDC_Public {
         return $request_uri !== '' && strpos($request_uri, 'wp-login.php') !== false;
     }
 
-    public function setup_federation_endpoints() {
+
+    private function is_spid_saml_effective_enabled(array $options): bool {
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation')) {
+            require_once plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlActivation.php';
+        }
+        return WP_SPID_CIE_OIDC_Spid_Saml_Activation::is_effective_enabled($options);
+    }
+
+    private function is_official_sp_metadata_request(): bool {
+        $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+        $path = '/' . ltrim((string) $path, '/');
+        return $path === '/sp-metadata.xml';
+    }
+
+	public function setup_federation_endpoints() {
+		add_rewrite_rule('^sp-metadata\.xml/?$',               'index.php?spid_saml_route=metadata', 'top');
 		add_rewrite_rule('^spid/saml/metadata/?$',              'index.php?spid_saml_route=metadata', 'top');
 		add_rewrite_rule('^spid/saml/login/?$',                 'index.php?spid_saml_route=login',    'top');
 		add_rewrite_rule('^spid/saml/acs/?$',                   'index.php?spid_saml_route=acs',      'top');
@@ -100,6 +112,7 @@ class WP_SPID_CIE_OIDC_Public {
     }
 	
 	public function disable_canonical_for_federation($redirect_url, $requested_url) {
+			if (strpos($requested_url, '/sp-metadata.xml') !== false) return false;
 			if (strpos($requested_url, '/spid/saml/metadata') !== false) return false;
 			if (strpos($requested_url, '/spid/saml/login') !== false) return false;
 			if (strpos($requested_url, '/spid/saml/acs') !== false) return false;
@@ -118,7 +131,7 @@ class WP_SPID_CIE_OIDC_Public {
 		if (!is_string($saml_route) || $saml_route === '') {
 			$path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 			$path = '/' . ltrim((string) $path, '/');
-			if ($path === '/spid/saml/metadata') {
+			if ($path === '/spid/saml/metadata' || $path === '/sp-metadata.xml') {
 				$saml_route = 'metadata';
 			} elseif ($path === '/spid/saml/login') {
 				$saml_route = 'login';
@@ -261,9 +274,7 @@ class WP_SPID_CIE_OIDC_Public {
 	private function serve_spid_saml_route(string $route): void {
 		$options = get_option($this->plugin_name . '_options', []);
 		$spid_enabled = !empty($options['spid_enabled']) && $options['spid_enabled'] === '1';
-		$spid_saml_enabled = !empty($options['spid_saml_enabled']) && $options['spid_saml_enabled'] === '1';
-		$spid_auth_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : ($spid_saml_enabled ? 'saml' : 'oidc');
-		$enabled = $spid_enabled && $spid_saml_enabled && $spid_auth_method === 'saml';
+		$enabled = $spid_enabled && $this->is_spid_saml_effective_enabled(is_array($options) ? $options : []);
 		$debug_enabled = !empty($options['spid_saml_debug']) && $options['spid_saml_debug'] === '1';
 
 		if (!$enabled && $route !== 'metadata') {
@@ -344,15 +355,26 @@ class WP_SPID_CIE_OIDC_Public {
 	}
 
 	private function serve_spid_saml_metadata(array $options): void {
+		$requires_token = !empty($options['spid_saml_metadata_require_token']) && $options['spid_saml_metadata_require_token'] === '1';
+		$must_check_token = $requires_token && !$this->is_official_sp_metadata_request();
 		$expected_token = isset($options['spid_saml_metadata_token']) ? (string) $options['spid_saml_metadata_token'] : '';
 		$provided_token = isset($_GET['spid_metadata_token']) ? sanitize_text_field((string) wp_unslash($_GET['spid_metadata_token'])) : '';
-		if ($expected_token !== '' && ($provided_token === '' || !hash_equals($expected_token, $provided_token))) {
+		if ($must_check_token && $expected_token !== '' && ($provided_token === '' || !hash_equals($expected_token, $provided_token))) {
 			status_header(403);
 			header('Content-Type: text/plain; charset=utf-8');
 			echo 'Forbidden';
 			exit;
 		}
 
+		$xml = $this->build_spid_saml_metadata_xml($options);
+
+		status_header(200);
+		header('Content-Type: application/samlmetadata+xml; charset=utf-8');
+		echo $xml;
+		exit;
+	}
+
+	public function build_spid_saml_metadata_xml(array $options): string {
 		$svc = $this->get_saml_service();
 		$sp = $svc->build_sp_config($options);
 
@@ -456,11 +478,8 @@ class WP_SPID_CIE_OIDC_Public {
 			$this->apply_spid_metadata_signature($doc, $entity, $private_key_path, $cert_path);
 		}
 
-		status_header(200);
-		header('Content-Type: application/samlmetadata+xml; charset=utf-8');
 		// Serve the same DOM that has just been signed; avoid any post-processing.
-		echo (string) $doc->saveXML();
-		exit;
+		return (string) $doc->saveXML();
 	}
 
 	private function apply_spid_metadata_signature(DOMDocument $doc, DOMElement $root, string $private_key_path, string $public_crt_path): void {
@@ -965,14 +984,13 @@ private function extract_jwt_payload($jwt) {
         } elseif ($provider_mode === 'cie_only') {
             $spid_enabled = false;
         }
-        $spid_saml_enabled = isset($options['spid_saml_enabled']) && $options['spid_saml_enabled'] === '1';
-        $spid_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : ($spid_saml_enabled ? 'saml' : 'oidc');
+        $spid_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : 'oidc';
         if (!in_array($spid_method, ['saml', 'oidc'], true)) {
             $spid_method = 'oidc';
         }
         $spid_visible = $spid_enabled;
-        $show_spid_oidc = $spid_visible && $spid_method === 'oidc';
-        $show_spid_saml = $spid_visible && $spid_method === 'saml' && $spid_saml_enabled;
+        $show_spid_saml = $spid_visible && $this->is_spid_saml_effective_enabled($options);
+        $show_spid_oidc = $spid_visible && !$show_spid_saml && $spid_method === 'oidc';
         $saml_login_url = add_query_arg(['spid_saml_route' => 'login'], home_url('/'));
         
         // Gestione Disclaimer
