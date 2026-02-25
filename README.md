@@ -22,7 +22,7 @@ Checklist operativa GO/NO-GO disponibile in `docs/spid-saml-step2-go-no-go-check
 ## Certificati SPID SAML one-click (SP pubblico)
 
 - Il plugin genera automaticamente `private.key` + `public.crt` self-signed in `wp-content/uploads/wp-spid-cie-keys/` (più `csr.pem` opzionale) usando solo estensione OpenSSL PHP.
-- Requisiti minimi implementati: RSA 2048 (default), digest SHA-256, Subject con `C=IT`, `L`, `O`, `CN`, OID `2.5.4.83` (URI=EntityID) e OID `2.5.4.97` (`PA:IT-<codice IPA>`).
+- Requisiti minimi implementati: RSA 2048 (default), digest SHA-256, Subject con `C=IT`, `L`, `O`, `CN`, OID `2.5.4.83` (URI=EntityID, presente nel SubjectDN come attributo custom) e OID `2.5.4.97` (`PA:IT-<codice IPA>`).
 - Estensioni certificate SPID: `keyUsage` critical (`digitalSignature`, `nonRepudiation/contentCommitment`), `basicConstraints=CA:FALSE`, `certificatePolicies` con OID richiesti dal profilo SP pubblico.
 - In area admin è disponibile il bottone **“Genera/Rigenera certificati SPID”** con warning: la rigenerazione cambia fingerprint e richiede aggiornamento metadata su AgID/CIE.
 - Stato mostrato in UI: presenza certificato, scadenza, subject e verifica modulus match chiave/certificato.

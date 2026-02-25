@@ -1,5 +1,9 @@
 <?php
 
+use phpseclib3\Crypt\PublicKeyLoader;
+use phpseclib3\Crypt\RSA;
+use phpseclib3\File\X509;
+
 class WP_SPID_CIE_OIDC_Spid_Certificates {
     public static function generate(array $options = [], bool $force = false): array {
         $key_dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir(true);
@@ -97,6 +101,13 @@ class WP_SPID_CIE_OIDC_Spid_Certificates {
             @unlink($config_path);
             return ['success' => false, 'errors' => [self::collect_openssl_errors('Export certificato X509 fallito')]];
         }
+
+        $subject_with_custom_oid = self::inject_custom_subject_oid($cert_pem, $private_pem, $dn, $entity_id);
+        if (is_wp_error($subject_with_custom_oid)) {
+            @unlink($config_path);
+            return ['success' => false, 'errors' => [$subject_with_custom_oid->get_error_message()]];
+        }
+        $cert_pem = $subject_with_custom_oid;
 
         $csr_pem = '';
         openssl_csr_export($csr, $csr_pem);
@@ -301,6 +312,51 @@ class WP_SPID_CIE_OIDC_Spid_Certificates {
         }
 
         return $config_path;
+    }
+
+    private static function inject_custom_subject_oid(string $cert_pem, string $private_pem, array $dn, string $entity_id) {
+        if (!class_exists('phpseclib3\\File\\X509') || !class_exists('phpseclib3\\Crypt\\PublicKeyLoader')) {
+            return new WP_Error('spid_phpseclib_missing', 'Libreria phpseclib non disponibile per inserire OID 2.5.4.83 nel SubjectDN.');
+        }
+
+        try {
+            $private_key = PublicKeyLoader::loadPrivateKey($private_pem)->withPadding(RSA::SIGNATURE_PKCS1);
+        } catch (\Throwable $e) {
+            return new WP_Error('spid_private_key_load', 'Impossibile caricare la chiave privata per rifirma certificato: ' . $e->getMessage());
+        }
+
+        $subject_dn = ['rdnSequence' => [
+            [['type' => 'id-at-countryName', 'value' => ['printableString' => (string) ($dn['countryName'] ?? 'IT')]]],
+            [['type' => 'id-at-localityName', 'value' => ['utf8String' => (string) ($dn['localityName'] ?? '')]]],
+            [['type' => 'id-at-organizationName', 'value' => ['utf8String' => (string) ($dn['organizationName'] ?? '')]]],
+            [['type' => 'id-at-commonName', 'value' => ['utf8String' => (string) ($dn['commonName'] ?? '')]]],
+            [['type' => '2.5.4.97', 'value' => ['utf8String' => (string) ($dn['organizationIdentifier'] ?? '')]]],
+            [['type' => '2.5.4.83', 'value' => ['utf8String' => $entity_id]]],
+        ]];
+
+        $subject = new X509();
+        if ($subject->loadX509($cert_pem) === false) {
+            return new WP_Error('spid_x509_load_failed', 'Impossibile rileggere il certificato OpenSSL per inserire OID 2.5.4.83.');
+        }
+        $subject->setDN($subject_dn);
+        $subject->setPublicKey($private_key->getPublicKey());
+
+        $issuer = new X509();
+        $issuer->setPrivateKey($private_key);
+        $issuer->setDN($subject_dn);
+
+        $x509 = new X509();
+        $signed = $x509->sign($issuer, $subject);
+        if ($signed === false) {
+            return new WP_Error('spid_x509_resign_failed', 'Impossibile rifirmare il certificato con SubjectDN esteso (OID 2.5.4.83).');
+        }
+
+        $resigned_pem = $x509->saveX509($signed);
+        if (!is_string($resigned_pem) || trim($resigned_pem) === '') {
+            return new WP_Error('spid_x509_resign_export_failed', 'Export certificato rifirmato fallito.');
+        }
+
+        return $resigned_pem;
     }
 
 
