@@ -13,6 +13,7 @@ class XMLSecurityDSig {
     private $sigNode;
     private $signedInfoNode;
     private $canonicalMethod = self::EXC_C14N;
+    private $referenceNode;
 
     public function setCanonicalMethod($method): void {
         $this->canonicalMethod = (string) $method;
@@ -59,12 +60,21 @@ class XMLSecurityDSig {
 
         $this->signedInfoNode->appendChild($reference);
         $this->sigNode->appendChild($this->signedInfoNode);
+        $this->referenceNode = $node;
     }
 
     public function sign(XMLSecurityKey $objKey): void {
         if (!$this->signedInfoNode instanceof DOMElement || !$this->sigNode instanceof DOMElement) {
             return;
         }
+
+        // Canonicalize SignedInfo in the final document context.
+        // If Signature is detached here, inherited namespace nodes may differ
+        // from the served XML and break signature verification.
+        if (!$this->sigNode->parentNode && $this->referenceNode instanceof DOMElement) {
+            $this->referenceNode->insertBefore($this->sigNode, $this->referenceNode->firstChild);
+        }
+
         $signedInfoC14n = $this->signedInfoNode->C14N(true, false);
         if ($signedInfoC14n === false) {
             return;
@@ -105,12 +115,15 @@ class XMLSecurityDSig {
         if (!$this->sigNode instanceof DOMElement) {
             return;
         }
+        if ($this->sigNode->parentNode === $node) {
+            return;
+        }
         $node->insertBefore($this->sigNode, $node->firstChild);
     }
 
     private function calculateDigest(DOMElement $node): string {
         $doc = new DOMDocument('1.0', 'UTF-8');
-        $doc->preserveWhiteSpace = false;
+        $doc->preserveWhiteSpace = true;
         $doc->formatOutput = false;
         $imported = $doc->importNode($node, true);
         $doc->appendChild($imported);
