@@ -919,13 +919,34 @@ class WP_SPID_CIE_OIDC_Admin {
                 $options['spid_saml_metadata_token'] = wp_generate_password(24, false, false);
             }
             update_option($this->plugin_name . '_options', $options, false);
-            echo '<div class="notice notice-success inline"><p>Protezione token metadata aggiornata.</p></div>';
+
+            wp_safe_redirect(add_query_arg([
+                'page' => $this->plugin_name,
+                'tab' => 'stato',
+                'metadata_token_notice' => 'toggle_ok',
+            ], admin_url('options-general.php')));
+            exit;
         }
 
         if (isset($_GET['regen_metadata_token']) && check_admin_referer('spid_saml_regen_token')) {
             $options['spid_saml_metadata_token'] = wp_generate_password(24, false, false);
             update_option($this->plugin_name . '_options', $options, false);
-            echo '<div class="notice notice-success inline"><p>Token metadata rigenerato.</p></div>';
+
+            wp_safe_redirect(add_query_arg([
+                'page' => $this->plugin_name,
+                'tab' => 'stato',
+                'metadata_token_notice' => 'regen_ok',
+            ], admin_url('options-general.php')));
+            exit;
+        }
+
+        if (isset($_GET['metadata_token_notice'])) {
+            $notice = sanitize_key((string) wp_unslash($_GET['metadata_token_notice']));
+            if ($notice === 'toggle_ok') {
+                echo '<div class="notice notice-success inline"><p>Protezione token metadata aggiornata.</p></div>';
+            } elseif ($notice === 'regen_ok') {
+                echo '<div class="notice notice-success inline"><p>Token metadata rigenerato.</p></div>';
+            }
         }
 
         $token = isset($options['spid_saml_metadata_token']) ? (string) $options['spid_saml_metadata_token'] : '';
