@@ -43,6 +43,7 @@ if ( file_exists( plugin_dir_path( __FILE__ ) . 'vendor/autoload.php' ) ) {
 
 // 2. Carica la nostra Factory (Gestione Configurazione e Chiavi)
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-wp-spid-cie-factory.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-wp-spid-cie-spid-certificates.php';
 
 // 2.b Core OIDC runtime services (Milestone 1)
 require_once plugin_dir_path( __FILE__ ) . 'includes/Logging/Logger.php';
