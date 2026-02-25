@@ -40,6 +40,8 @@ class WP_Error {
     }
 }
 
+require_once __DIR__ . '/../vendor/autoload.php';
+
 class WP_SPID_CIE_OIDC_Factory {
     public static function resolve_spid_key_dir(bool $for_generation = false): string {
         return __DIR__ . '/tmp-keys';
