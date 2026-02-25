@@ -78,18 +78,24 @@ class WP_SPID_CIE_OIDC_Public {
 
 
     private function is_spid_saml_effective_enabled(array $options): bool {
-        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation')) {
-            require_once plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlActivation.php';
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation') && !$this->load_spid_saml_activation_helper()) {
+            return false;
         }
         return WP_SPID_CIE_OIDC_Spid_Saml_Activation::is_effective_enabled($options);
     }
 
-    private function is_official_sp_metadata_request(): bool {
-        $path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
-        $path = '/' . ltrim((string) $path, '/');
-        return $path === '/sp-metadata.xml';
-    }
+    private function load_spid_saml_activation_helper(): bool {
+        $activation_file = plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlActivation.php';
+        if (!file_exists($activation_file)) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[wp-spid-cie] Missing file: ' . $activation_file);
+            }
+            return false;
+        }
 
+        require_once $activation_file;
+        return class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation');
+    }
 	public function setup_federation_endpoints() {
 		add_rewrite_rule('^sp-metadata\.xml/?$',               'index.php?spid_saml_route=metadata', 'top');
 		add_rewrite_rule('^spid/saml/metadata/?$',              'index.php?spid_saml_route=metadata', 'top');

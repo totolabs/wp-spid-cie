@@ -390,10 +390,36 @@ class WP_SPID_CIE_OIDC_Admin {
 
 
     private function is_spid_saml_effective_enabled(array $options): bool {
-        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation')) {
-            require_once plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlActivation.php';
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation') && !$this->load_spid_saml_activation_helper()) {
+            return false;
         }
         return WP_SPID_CIE_OIDC_Spid_Saml_Activation::is_effective_enabled($options);
+    }
+
+    private function load_spid_saml_activation_helper(): bool {
+        $activation_file = plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlActivation.php';
+        if (!file_exists($activation_file)) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[wp-spid-cie] Missing file: ' . $activation_file);
+            }
+            return false;
+        }
+
+        require_once $activation_file;
+        return class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation');
+    }
+
+    private function load_spid_saml_metadata_protection_helper(): bool {
+        $metadata_file = plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlMetadataProtection.php';
+        if (!file_exists($metadata_file)) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[wp-spid-cie] Missing file: ' . $metadata_file);
+            }
+            return false;
+        }
+
+        require_once $metadata_file;
+        return class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection');
     }
 
     private function spid_saml_keys_exist(): bool {
@@ -424,7 +450,17 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '<li><strong>spid_auth_method:</strong> <code>' . esc_html($spid_auth_method !== '' ? $spid_auth_method : '(unset)') . '</code></li>';
         echo '<li><strong>spid_saml_enabled (legacy):</strong> <code>' . esc_html($spid_saml_enabled) . '</code></li>';
         echo '<li><strong>effective_saml (computed):</strong> <code>' . ($spid_saml_effective_enabled ? 'true' : 'false') . '</code></li>';
+        echo '<li><strong>SAML helpers loaded:</strong> <code>' . ($this->are_saml_helpers_loaded() ? 'OK' : 'KO') . '</code></li>';
         echo '</ul>';
+    }
+
+    private function are_saml_helpers_loaded(): bool {
+        if (defined('WP_SPID_CIE_OIDC_SAML_HELPERS_OK')) {
+            return (bool) WP_SPID_CIE_OIDC_SAML_HELPERS_OK;
+        }
+
+        return class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation')
+            && class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection');
     }
 
     private function render_spid_oidc_tab(): void {
@@ -576,8 +612,8 @@ class WP_SPID_CIE_OIDC_Admin {
             $options['spid_saml_requested_attributes'] = ['name', 'familyName', 'fiscalNumber', 'email'];
             $changed = true;
         }
-        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation')) {
-            require_once plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlActivation.php';
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation') && !$this->load_spid_saml_activation_helper()) {
+            return;
         }
         $aligned_options = WP_SPID_CIE_OIDC_Spid_Saml_Activation::align_legacy_flag($options);
         if (($options['spid_saml_enabled'] ?? '') !== ($aligned_options['spid_saml_enabled'] ?? '')) {
@@ -853,8 +889,12 @@ class WP_SPID_CIE_OIDC_Admin {
         }
 
         if (isset($_GET['toggle_metadata_token']) && check_admin_referer('spid_saml_toggle_metadata_token')) {
-            if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection')) {
-                require_once plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlMetadataProtection.php';
+            if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection') && !$this->load_spid_saml_metadata_protection_helper()) {
+                wp_safe_redirect(add_query_arg([
+                    'page' => $this->plugin_name,
+                    'tab' => 'stato',
+                ], admin_url('options-general.php')));
+                exit;
             }
             $options = WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection::toggle($options);
             update_option($this->plugin_name . '_options', $options, false);
@@ -1331,12 +1371,14 @@ class WP_SPID_CIE_OIDC_Admin {
             }
         }
         if (in_array('spid_auth_method', $allowed, true)) {
-            if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation')) {
-                require_once plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlActivation.php';
-            }
             $method = isset($input['spid_auth_method']) ? (string) $input['spid_auth_method'] : 'saml';
-            $new_input['spid_auth_method'] = WP_SPID_CIE_OIDC_Spid_Saml_Activation::sanitize_method($method);
-            $new_input['spid_saml_enabled'] = WP_SPID_CIE_OIDC_Spid_Saml_Activation::is_effective_enabled($new_input) ? '1' : '0';
+            if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation') && !$this->load_spid_saml_activation_helper()) {
+                $new_input['spid_auth_method'] = in_array($method, ['saml', 'oidc'], true) ? $method : 'oidc';
+                $new_input['spid_saml_enabled'] = '0';
+            } else {
+                $new_input['spid_auth_method'] = WP_SPID_CIE_OIDC_Spid_Saml_Activation::sanitize_method($method);
+                $new_input['spid_saml_enabled'] = WP_SPID_CIE_OIDC_Spid_Saml_Activation::is_effective_enabled($new_input) ? '1' : '0';
+            }
         }
 
 
