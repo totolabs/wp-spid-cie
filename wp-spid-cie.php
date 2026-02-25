@@ -51,6 +51,8 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/Core/PkceService.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Core/StateNonceStore.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Core/TokenValidator.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Core/OidcClient.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/Core/SpidSamlActivation.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/Core/SpidSamlMetadataProtection.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/ProviderProfileInterface.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/DiscoveryResolver.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/SpidProviderProfile.php';

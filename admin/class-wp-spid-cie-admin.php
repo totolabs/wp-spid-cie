@@ -843,17 +843,20 @@ class WP_SPID_CIE_OIDC_Admin {
             return;
         }
 
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
         $options = get_option($this->plugin_name . '_options', []);
         if (!is_array($options)) {
             $options = [];
         }
 
         if (isset($_GET['toggle_metadata_token']) && check_admin_referer('spid_saml_toggle_metadata_token')) {
-            $enabled = !empty($options['spid_saml_metadata_require_token']) && $options['spid_saml_metadata_require_token'] === '1';
-            $options['spid_saml_metadata_require_token'] = $enabled ? '0' : '1';
-            if ($options['spid_saml_metadata_require_token'] === '1' && empty($options['spid_saml_metadata_token'])) {
-                $options['spid_saml_metadata_token'] = wp_generate_password(24, false, false);
+            if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection')) {
+                require_once plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlMetadataProtection.php';
             }
+            $options = WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection::toggle($options);
             update_option($this->plugin_name . '_options', $options, false);
 
             wp_safe_redirect(add_query_arg([
@@ -974,6 +977,18 @@ class WP_SPID_CIE_OIDC_Admin {
         $this->render_spid_saml_test_config();
     }
 
+
+    private function mask_metadata_token(string $token): string {
+        $token = trim($token);
+        if ($token === '') {
+            return '(vuoto)';
+        }
+        if (strlen($token) <= 10) {
+            return str_repeat('*', strlen($token));
+        }
+        return substr($token, 0, 6) . str_repeat('*', max(0, strlen($token) - 10)) . substr($token, -4);
+    }
+
     private function render_spid_saml_metadata_subtab(): void {
         $options = get_option($this->plugin_name . '_options', []);
         if (!is_array($options)) {
@@ -999,10 +1014,11 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '<h2>Metadata SPID SAML</h2>';
         echo '<p><strong>URL metadata SP (ufficiale/stabile):</strong> <code>' . esc_html($official_sp_url) . '</code></p>';
         echo '<p><strong>URL metadata Aggregator:</strong> <code>' . esc_html($official_agg_url) . '</code></p>';
-        echo '<p class="description">Questi URL sono stabili e possono essere pubblicati verso AgID/validator.</p>';
+        echo '<p class="description">Questi URL sono stabili e possono essere pubblicati verso AgID/validator. La protezione token (se attiva) si applica solo all\'endpoint legacy <code>/spid/saml/metadata</code>.</p>';
 
         echo '<h3>Protezione opzionale con token</h3>';
         echo '<p>Stato corrente: <strong>' . ($token_required ? 'ATTIVA' : 'DISATTIVA') . '</strong></p>';
+        echo '<p class="description">Valori raw opzioni: <code>spid_saml_metadata_require_token=' . esc_html(isset($options['spid_saml_metadata_require_token']) ? (string) $options['spid_saml_metadata_require_token'] : '(unset)') . '</code>, <code>spid_saml_metadata_token=' . esc_html($this->mask_metadata_token($token)) . '</code></p>';
         if ($protected_sp_url !== '') {
             echo '<p><strong>URL protetta SP:</strong> <code>' . esc_html($protected_sp_url) . '</code></p>';
             echo '<p><strong>URL protetta Aggregator:</strong> <code>' . esc_html($protected_agg_url) . '</code></p>';
