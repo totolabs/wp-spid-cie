@@ -112,7 +112,9 @@ class WP_SPID_CIE_OIDC_Admin {
                             </div>
                         <?php endif; ?>
 
-                        <?php submit_button('Salva Impostazioni Tab Corrente', 'primary large'); ?>
+                        <?php if ($current_tab !== 'stato') : ?>
+                            <?php submit_button('Salva Impostazioni Tab Corrente', 'primary large'); ?>
+                        <?php endif; ?>
                     </div>
 
                     <div class="spid-side-col">
@@ -370,9 +372,11 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '</fieldset></td></tr>';
         $this->render_checkbox_field(['id' => 'spid_saml_validator_enabled', 'desc' => 'Abilita SPID Validator (solo collaudo).']);
         echo '</tbody></table>';
+
+        $this->render_operational_config_section();
     }
 
-    private function render_stato_operational_config(): void {
+    private function render_operational_config_section(): void {
         echo '<h2>Configurazioni operative</h2>';
         echo '<table class="form-table" role="presentation"><tbody>';
         echo '<tr><th scope="row"><label for="user_provisioning_enabled">Provisioning automatico utenti</label></th><td>';
@@ -513,8 +517,6 @@ class WP_SPID_CIE_OIDC_Admin {
 
 
     private function render_stato_tab(): void {
-        $this->render_stato_operational_config();
-        echo '<hr>';
         echo '<h2>Diagnostica</h2>';
         $this->render_status_dashboard();
         $this->render_operational_help();
@@ -1369,8 +1371,8 @@ class WP_SPID_CIE_OIDC_Admin {
                 'discovery_mode', 'min_loa', 'spid_issuer', 'spid_scope', 'spid_acr_values',
                 'spid_authorization_endpoint', 'spid_token_endpoint', 'spid_jwks_uri', 'spid_userinfo_endpoint', 'spid_end_session_endpoint'
             ],
-            'impostazioni' => ['spid_enabled', 'cie_enabled', 'spid_auth_method', 'spid_saml_validator_enabled'],
-            'stato' => ['disclaimer_enabled', 'disclaimer_text', 'user_provisioning_enabled', 'user_default_role'],
+            'impostazioni' => ['spid_enabled', 'cie_enabled', 'spid_auth_method', 'spid_saml_validator_enabled', 'disclaimer_enabled', 'disclaimer_text', 'user_provisioning_enabled', 'user_default_role'],
+            'stato' => [],
             'spid_saml' => ['spid_saml_entity_id', 'spid_saml_debug', 'spid_saml_clock_skew', 'spid_saml_level', 'spid_saml_binding', 'spid_saml_idp_entity_id', 'spid_saml_idp_sso_url', 'spid_saml_idp_slo_url', 'spid_saml_idp_x509_cert', 'spid_saml_idp_metadata_xml', 'spid_saml_idp_cert', 'spid_saml_show_advanced', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'sp_org_name', 'sp_org_display_name', 'sp_contact_ipa_code', 'sp_contact_fiscal_code', 'sp_contact_email', 'sp_contact_phone', 'spid_saml_idp_mode', 'spid_saml_idp_registry_selected', 'spid_saml_idp_registry_link', 'spid_saml_idp_last_sync', 'spid_saml_metadata_token', 'spid_saml_requested_attributes'],
         ];
 
