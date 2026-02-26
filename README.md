@@ -31,3 +31,11 @@ Checklist operativa GO/NO-GO disponibile in `docs/spid-saml-step2-go-no-go-check
 - Stato mostrato in UI: presenza certificato, scadenza, subject e verifica modulus match chiave/certificato.
 - Al primo salvataggio configurazione (tab Ente/SPID SAML/Impostazioni), se i certificati mancano, il plugin prova a generarli automaticamente e mostra eventuali errori chiari.
 
+
+
+## Changelog 1.1.2
+
+- Menu IdP SPID chiuso di default; apertura solo in stato esplicito `.spid-open`.
+- Toggle token metadata legacy reso più robusto con persistenza raw e verifiche post-update.
+- Fallback logo IdP su `logo_uri` Registry per EtnaID/InfoCamere quando il vendor asset è placeholder o non leggibile.
+- Confermata policy A: `/sp-metadata.xml` resta sempre pubblico; token solo su `/spid/saml/metadata`.
