@@ -174,8 +174,7 @@ body.login .italia-it-button .italia-it-button-text {
 }
 
 .spid-idp-button {
-  display: flex;
-  flex-direction: column;
+  display: none;
 }
 
 .spid-idp-button-menu {
