@@ -24,4 +24,14 @@ if (empty($toggled['spid_saml_metadata_token'])) {
     exit(1);
 }
 
+$toggled_back = WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection::toggle($toggled);
+if (($toggled_back['spid_saml_metadata_require_token'] ?? '') !== '0') {
+    fwrite(STDERR, "Expected spid_saml_metadata_require_token to become '0' after second toggle\n");
+    exit(1);
+}
+if (empty($toggled_back['spid_saml_metadata_token'])) {
+    fwrite(STDERR, "Expected metadata token to remain non-empty after disabling protection\n");
+    exit(1);
+}
+
 echo "metadata token toggle logic: OK\n";
