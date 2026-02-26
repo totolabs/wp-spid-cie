@@ -9,6 +9,26 @@ if (!function_exists('wp_generate_password')) {
 
 require_once __DIR__ . '/../includes/Core/SpidSamlMetadataProtection.php';
 
+
+
+function simulated_sanitize_options(array $input, array $existing): array {
+    $allowed = ['spid_saml_metadata_token'];
+    $new = $existing;
+    foreach ($allowed as $key) {
+        if (array_key_exists($key, $input)) {
+            $new[$key] = (string) $input[$key];
+        }
+    }
+    return $new;
+}
+
+function simulated_update_option_with_sanitize(array $db_value, array $new_value): array {
+    return simulated_sanitize_options($new_value, $db_value);
+}
+
+function simulated_update_option_raw(array $new_value): array {
+    return $new_value;
+}
 function toggle_metadata_token_fallback(array $options): array {
     $require_token = (string) ($options['spid_saml_metadata_require_token'] ?? '0') === '1';
     $options['spid_saml_metadata_require_token'] = $require_token ? '0' : '1';
@@ -68,3 +88,30 @@ if (empty($fallback_off['spid_saml_metadata_token'])) {
 }
 
 echo "metadata token toggle logic (helper + fallback): OK\n";
+
+
+$admin_before = [
+    'spid_saml_metadata_require_token' => '0',
+    'spid_saml_metadata_token' => 'TOK-OLD',
+];
+$admin_target = $admin_before;
+$admin_target['spid_saml_metadata_require_token'] = '1';
+$admin_target['spid_saml_metadata_token'] = 'TOK-NEW';
+
+$admin_after_sanitized = simulated_update_option_with_sanitize($admin_before, $admin_target);
+if ((string) ($admin_after_sanitized['spid_saml_metadata_require_token'] ?? '0') !== '0') {
+    fwrite(STDERR, "Expected sanitized admin update to drop require_token change without bypass\n");
+    exit(1);
+}
+
+$admin_after_raw = simulated_update_option_raw($admin_target);
+if ((string) ($admin_after_raw['spid_saml_metadata_require_token'] ?? '0') !== '1') {
+    fwrite(STDERR, "Expected raw admin update to persist require_token with bypass\n");
+    exit(1);
+}
+if (empty($admin_after_raw['spid_saml_metadata_token'])) {
+    fwrite(STDERR, "Expected raw admin update to keep metadata token\n");
+    exit(1);
+}
+
+echo "admin persistence simulation (sanitize vs raw bypass): OK\n";
