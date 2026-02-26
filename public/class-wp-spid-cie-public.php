@@ -1273,19 +1273,24 @@ private function extract_jwt_payload($jwt) {
 
         if ($file !== '') {
             $local_file = $base_path_fs . $file;
-            $is_placeholder_vendor_logo = in_array($file, $known_placeholder_files, true);
-            if (!$is_placeholder_vendor_logo && file_exists($local_file) && is_readable($local_file)) {
-                $local_hash = md5_file($local_file);
-                if (is_string($local_hash) && $local_hash !== '' && in_array($local_hash, $known_placeholder_hashes, true)) {
-                    $is_placeholder_vendor_logo = true;
+            $local_is_readable = file_exists($local_file) && is_readable($local_file);
+            $is_placeholder_vendor_logo = false;
+
+            if ($local_is_readable) {
+                $is_placeholder_vendor_logo = in_array($file, $known_placeholder_files, true);
+                if (!$is_placeholder_vendor_logo) {
+                    $local_hash = md5_file($local_file);
+                    if (is_string($local_hash) && $local_hash !== '' && in_array($local_hash, $known_placeholder_hashes, true)) {
+                        $is_placeholder_vendor_logo = true;
+                    }
                 }
             }
 
-            if ($is_placeholder_vendor_logo && $logo_uri !== '') {
+            if ((!$local_is_readable || $is_placeholder_vendor_logo) && $logo_uri !== '') {
                 return esc_url($logo_uri);
             }
 
-            if (file_exists($local_file) && is_readable($local_file)) {
+            if ($local_is_readable) {
                 return $base_url . $file;
             }
         }

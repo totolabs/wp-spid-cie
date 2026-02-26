@@ -977,17 +977,17 @@ class WP_SPID_CIE_OIDC_Admin {
             $notice = 'toggle_ok';
             $reason = '';
             if ($used_fallback) {
+                $notice = 'toggle_fail';
                 $reason = 'missing_helper';
-            }
-            if (!$persisted_require_token) {
+            } elseif (!$ok) {
+                $notice = 'toggle_fail';
+                $reason = 'update_raw_failed';
+            } elseif (!$persisted_require_token) {
                 $notice = 'toggle_fail';
                 $reason = 'require_token_not_persisted';
             } elseif (!$persisted_token) {
                 $notice = 'toggle_fail';
                 $reason = 'token_not_persisted';
-            } elseif (!$ok) {
-                $notice = 'toggle_fail';
-                $reason = 'update_raw_failed';
             }
 
             if (defined('WP_DEBUG') && WP_DEBUG) {
