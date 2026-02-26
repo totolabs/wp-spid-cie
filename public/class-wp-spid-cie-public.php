@@ -68,10 +68,7 @@ class WP_SPID_CIE_OIDC_Public {
         }
 
         $spid_enabled = !empty($options['spid_enabled']) && $options['spid_enabled'] === '1';
-        $spid_saml_enabled = !empty($options['spid_saml_enabled']) && $options['spid_saml_enabled'] === '1';
-        $spid_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : ($spid_saml_enabled ? 'saml' : 'oidc');
-
-        if ($spid_enabled && $spid_saml_enabled && $spid_method === 'saml') {
+        if ($spid_enabled && $this->is_spid_saml_effective_enabled($options)) {
             return true;
         }
 
@@ -79,7 +76,28 @@ class WP_SPID_CIE_OIDC_Public {
         return $request_uri !== '' && strpos($request_uri, 'wp-login.php') !== false;
     }
 
-    public function setup_federation_endpoints() {
+
+    private function is_spid_saml_effective_enabled(array $options): bool {
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation') && !$this->load_spid_saml_activation_helper()) {
+            return false;
+        }
+        return WP_SPID_CIE_OIDC_Spid_Saml_Activation::is_effective_enabled($options);
+    }
+
+    private function load_spid_saml_activation_helper(): bool {
+        $activation_file = plugin_dir_path(dirname(__FILE__)) . 'includes/Core/SpidSamlActivation.php';
+        if (!file_exists($activation_file)) {
+            if (defined('WP_DEBUG') && WP_DEBUG) {
+                error_log('[wp-spid-cie] Missing file: ' . $activation_file);
+            }
+            return false;
+        }
+
+        require_once $activation_file;
+        return class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation');
+    }
+	public function setup_federation_endpoints() {
+		add_rewrite_rule('^sp-metadata\.xml/?$',               'index.php?spid_saml_route=metadata', 'top');
 		add_rewrite_rule('^spid/saml/metadata/?$',              'index.php?spid_saml_route=metadata', 'top');
 		add_rewrite_rule('^spid/saml/login/?$',                 'index.php?spid_saml_route=login',    'top');
 		add_rewrite_rule('^spid/saml/acs/?$',                   'index.php?spid_saml_route=acs',      'top');
@@ -100,6 +118,7 @@ class WP_SPID_CIE_OIDC_Public {
     }
 	
 	public function disable_canonical_for_federation($redirect_url, $requested_url) {
+			if (strpos($requested_url, '/sp-metadata.xml') !== false) return false;
 			if (strpos($requested_url, '/spid/saml/metadata') !== false) return false;
 			if (strpos($requested_url, '/spid/saml/login') !== false) return false;
 			if (strpos($requested_url, '/spid/saml/acs') !== false) return false;
@@ -118,7 +137,7 @@ class WP_SPID_CIE_OIDC_Public {
 		if (!is_string($saml_route) || $saml_route === '') {
 			$path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 			$path = '/' . ltrim((string) $path, '/');
-			if ($path === '/spid/saml/metadata') {
+			if ($path === '/spid/saml/metadata' || $path === '/sp-metadata.xml') {
 				$saml_route = 'metadata';
 			} elseif ($path === '/spid/saml/login') {
 				$saml_route = 'login';
@@ -261,9 +280,7 @@ class WP_SPID_CIE_OIDC_Public {
 	private function serve_spid_saml_route(string $route): void {
 		$options = get_option($this->plugin_name . '_options', []);
 		$spid_enabled = !empty($options['spid_enabled']) && $options['spid_enabled'] === '1';
-		$spid_saml_enabled = !empty($options['spid_saml_enabled']) && $options['spid_saml_enabled'] === '1';
-		$spid_auth_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : ($spid_saml_enabled ? 'saml' : 'oidc');
-		$enabled = $spid_enabled && $spid_saml_enabled && $spid_auth_method === 'saml';
+		$enabled = $spid_enabled && $this->is_spid_saml_effective_enabled(is_array($options) ? $options : []);
 		$debug_enabled = !empty($options['spid_saml_debug']) && $options['spid_saml_debug'] === '1';
 
 		if (!$enabled && $route !== 'metadata') {
@@ -344,15 +361,42 @@ class WP_SPID_CIE_OIDC_Public {
 	}
 
 	private function serve_spid_saml_metadata(array $options): void {
+		$is_official_request = $this->is_official_sp_metadata_request();
+		$requires_token = (string) ($options['spid_saml_metadata_require_token'] ?? '0') === '1';
+		$must_check_token = $requires_token && !$this->is_official_sp_metadata_request();
 		$expected_token = isset($options['spid_saml_metadata_token']) ? (string) $options['spid_saml_metadata_token'] : '';
 		$provided_token = isset($_GET['spid_metadata_token']) ? sanitize_text_field((string) wp_unslash($_GET['spid_metadata_token'])) : '';
-		if ($expected_token !== '' && ($provided_token === '' || !hash_equals($expected_token, $provided_token))) {
+		$debug_enabled = (defined('WP_DEBUG') && WP_DEBUG) || !empty($options['spid_saml_debug']);
+		if ($debug_enabled) {
+			header('X-SPIDCIE-META: ' . ($is_official_request ? 'official' : 'legacy') . '; token_required=' . ($requires_token ? '1' : '0') . '; token_provided=' . ($provided_token !== '' ? '1' : '0'));
+		}
+		if (!$is_official_request && $requires_token && $expected_token !== '' && ($provided_token === '' || !hash_equals($expected_token, $provided_token))) {
 			status_header(403);
 			header('Content-Type: text/plain; charset=utf-8');
 			echo 'Forbidden';
 			exit;
 		}
 
+		$xml = $this->build_spid_saml_metadata_xml($options);
+
+		status_header(200);
+		header('Content-Type: application/samlmetadata+xml; charset=utf-8');
+		echo $xml;
+		exit;
+	}
+
+	private function is_official_sp_metadata_request(): bool {
+		$path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
+		$path = '/' . ltrim((string) $path, '/');
+		// L'endpoint ufficiale pubblico /sp-metadata.xml deve restare riconosciuto anche con slash finale.
+		if ($path !== '/') {
+			$path = rtrim($path, '/');
+		}
+
+		return $path === '/sp-metadata.xml';
+	}
+
+	public function build_spid_saml_metadata_xml(array $options): string {
 		$svc = $this->get_saml_service();
 		$sp = $svc->build_sp_config($options);
 
@@ -364,57 +408,220 @@ class WP_SPID_CIE_OIDC_Public {
 		$ipa_code = isset($options['ipa_code']) ? sanitize_text_field((string) $options['ipa_code']) : '';
 		$fiscal_number = isset($options['fiscal_number']) ? sanitize_text_field((string) $options['fiscal_number']) : '';
 		$cert = $this->get_saml_signing_cert();
+		$cert_path = $this->get_saml_signing_cert_path();
+		$private_key_path = $this->get_saml_private_key_path();
 		$authn_requests_signed = $cert !== '' ? 'true' : 'false';
 
-		status_header(200);
-		header('Content-Type: application/samlmetadata+xml; charset=utf-8');
+		$doc = new DOMDocument('1.0', 'UTF-8');
+		// Keep whitespace handling deterministic across signing/serialization phases:
+		// changing formatting after signature generation can invalidate SignedInfo.
+		$doc->preserveWhiteSpace = true;
+		$doc->formatOutput = false;
 
-		echo '<?xml version="1.0" encoding="UTF-8"?>' . "
-";
-		echo '<md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata" xmlns:ds="http://www.w3.org/2000/09/xmldsig#" xmlns:spid="https://spid.gov.it/saml-extensions" entityID="' . esc_attr($entity_id) . '">' . "
-";
-		echo '  <md:SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol" AuthnRequestsSigned="' . esc_attr($authn_requests_signed) . '" WantAssertionsSigned="true">' . "
-";
+		$entity = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:EntityDescriptor');
+		$entity->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:ds', 'http://www.w3.org/2000/09/xmldsig#');
+		$entity->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:spid', 'https://spid.gov.it/saml-extensions');
+		$entity->setAttribute('entityID', $entity_id);
+		$entity->setAttribute('ID', 'spid-metadata');
+		$doc->appendChild($entity);
+
+		$spsso = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:SPSSODescriptor');
+		$spsso->setAttribute('protocolSupportEnumeration', 'urn:oasis:names:tc:SAML:2.0:protocol');
+		$spsso->setAttribute('AuthnRequestsSigned', $authn_requests_signed);
+		$spsso->setAttribute('WantAssertionsSigned', 'true');
 		if ($cert !== '') {
-			echo '    <md:KeyDescriptor use="signing">' . "
-";
-			echo '      <ds:KeyInfo>' . "
-";
-			echo '        <ds:X509Data><ds:X509Certificate>' . esc_html($cert) . '</ds:X509Certificate></ds:X509Data>' . "
-";
-			echo '      </ds:KeyInfo>' . "
-";
-			echo '    </md:KeyDescriptor>' . "
-";
+			$keyDescriptor = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:KeyDescriptor');
+			$keyDescriptor->setAttribute('use', 'signing');
+			$keyInfo = $doc->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:KeyInfo');
+			$x509Data = $doc->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:X509Data');
+			$x509Cert = $doc->createElementNS('http://www.w3.org/2000/09/xmldsig#', 'ds:X509Certificate', $cert);
+			$x509Data->appendChild($x509Cert);
+			$keyInfo->appendChild($x509Data);
+			$keyDescriptor->appendChild($keyInfo);
+			$spsso->appendChild($keyDescriptor);
 		}
-		echo '    <md:NameIDFormat>urn:oasis:names:tc:SAML:2.0:nameid-format:transient</md:NameIDFormat>' . "
-";
-		echo '    <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Location="' . esc_url($acs_url) . '" index="0" isDefault="true" />' . "
-";
-		echo '    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect" Location="' . esc_url($sls_url) . '" />' . "
-";
+		$sls = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:SingleLogoutService');
+		$sls->setAttribute('Binding', 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect');
+		$sls->setAttribute('Location', $sls_url);
+		$spsso->appendChild($sls);
+
+		$spsso->appendChild($doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:NameIDFormat', 'urn:oasis:names:tc:SAML:2.0:nameid-format:transient'));
+
+		$acs = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:AssertionConsumerService');
+		$acs->setAttribute('Binding', 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST');
+		$acs->setAttribute('Location', $acs_url);
+		$acs->setAttribute('index', '0');
+		$acs->setAttribute('isDefault', 'true');
+		$spsso->appendChild($acs);
+
 		$requested_attributes = $this->get_spid_saml_requested_attributes($options);
-		echo '    <md:AttributeConsumingService index="0"><md:ServiceName xml:lang="it">Set base SPID</md:ServiceName>';
+		$attr_service = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:AttributeConsumingService');
+		$attr_service->setAttribute('index', '0');
+		$svcName = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:ServiceName', 'Set base SPID');
+		$svcName->setAttribute('xml:lang', 'it');
+		$attr_service->appendChild($svcName);
 		foreach ($requested_attributes as $attr_name) {
-			echo '<md:RequestedAttribute Name="' . esc_attr($attr_name) . '" />';
+			$req = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:RequestedAttribute');
+			$req->setAttribute('Name', $attr_name);
+			$attr_service->appendChild($req);
 		}
-		echo '</md:AttributeConsumingService>' . "
-";
-		echo '  </md:SPSSODescriptor>' . "
-";
-		echo '  <md:Organization><md:OrganizationName xml:lang="it">' . esc_html($organization_name) . '</md:OrganizationName><md:OrganizationDisplayName xml:lang="it">' . esc_html($organization_name) . '</md:OrganizationDisplayName><md:OrganizationURL xml:lang="it">' . esc_url(home_url('/')) . '</md:OrganizationURL></md:Organization>' . "
-";
-		echo '  <md:ContactPerson contactType="other"><md:Extensions>';
-		if ($ipa_code !== '') { echo '<spid:IPACode>' . esc_html($ipa_code) . '</spid:IPACode>'; }
-		echo '<spid:Public />';
-		if ($fiscal_number !== '') { echo '<spid:FiscalCode>' . esc_html($fiscal_number) . '</spid:FiscalCode>'; }
-		echo '</md:Extensions>';
-		if (is_email($contacts_email)) { echo '<md:EmailAddress>' . esc_html($contacts_email) . '</md:EmailAddress>'; }
-		echo '</md:ContactPerson>' . "
-";
-		echo '</md:EntityDescriptor>';
-		exit;
+		$spsso->appendChild($attr_service);
+		$entity->appendChild($spsso);
+
+		$org = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:Organization');
+		$orgName = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:OrganizationName', $organization_name);
+		$orgName->setAttribute('xml:lang', 'it');
+		$orgDisplay = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:OrganizationDisplayName', $organization_name);
+		$orgDisplay->setAttribute('xml:lang', 'it');
+		$orgUrl = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:OrganizationURL', home_url('/'));
+		$orgUrl->setAttribute('xml:lang', 'it');
+		$org->appendChild($orgName);
+		$org->appendChild($orgDisplay);
+		$org->appendChild($orgUrl);
+		$entity->appendChild($org);
+
+		$contact = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:ContactPerson');
+		$contact->setAttribute('contactType', 'other');
+		$extensions = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:Extensions');
+		if ($ipa_code !== '') {
+			$extensions->appendChild($doc->createElementNS('https://spid.gov.it/saml-extensions', 'spid:IPACode', $ipa_code));
+		}
+		$extensions->appendChild($doc->createElementNS('https://spid.gov.it/saml-extensions', 'spid:Public'));
+		if ($fiscal_number !== '') {
+			$extensions->appendChild($doc->createElementNS('https://spid.gov.it/saml-extensions', 'spid:FiscalCode', $fiscal_number));
+		}
+		$contact->appendChild($extensions);
+		if (is_email($contacts_email)) {
+			$contact->appendChild($doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:EmailAddress', $contacts_email));
+		}
+		$entity->appendChild($contact);
+
+		if ($cert_path !== '' && $private_key_path !== '') {
+			$this->apply_spid_metadata_signature($doc, $entity, $private_key_path, $cert_path);
+		}
+
+		// Serve the same DOM that has just been signed; avoid any post-processing.
+		return (string) $doc->saveXML();
 	}
+
+	private function apply_spid_metadata_signature(DOMDocument $doc, DOMElement $root, string $private_key_path, string $public_crt_path): void {
+		// Guard deterministic XML output: SignedInfo must be generated and served
+		// from the exact same in-memory DOM without pretty-print rewrites.
+		$doc->preserveWhiteSpace = true;
+		$doc->formatOutput = false;
+
+		if ($root->hasAttribute('ID')) {
+			$root->setIdAttribute('ID', true);
+		}
+
+		$dsig = new \RobRichards\XMLSecLibs\XMLSecurityDSig();
+		$dsig->setCanonicalMethod(\RobRichards\XMLSecLibs\XMLSecurityDSig::EXC_C14N);
+		$dsig->addReference(
+			$root,
+			\RobRichards\XMLSecLibs\XMLSecurityDSig::SHA256,
+			[
+				'http://www.w3.org/2000/09/xmldsig#enveloped-signature',
+				'http://www.w3.org/2001/10/xml-exc-c14n#',
+			]
+		);
+		$key = new \RobRichards\XMLSecLibs\XMLSecurityKey(\RobRichards\XMLSecLibs\XMLSecurityKey::RSA_SHA256, ['type' => 'private']);
+		$key->loadKey($private_key_path, true);
+		$dsig->sign($key);
+		$cert_pem = (string) file_get_contents($public_crt_path);
+		$dsig->add509Cert($cert_pem);
+		$dsig->appendSignature($root);
+		$this->debug_spid_metadata_signature($doc, $root, $private_key_path, $public_crt_path);
+	}
+
+	private function debug_spid_metadata_signature(DOMDocument $doc, DOMElement $root, string $private_key_path, string $public_crt_path): void {
+		if (!$this->is_spid_saml_signature_debug_enabled()) {
+			return;
+		}
+
+		$debug_file = trailingslashit(dirname($private_key_path)) . 'debug.txt';
+		$lines = [];
+		$lines[] = '[spid-saml metadata signature] ' . gmdate('c');
+		$lines[] = 'private_key_path=' . $private_key_path;
+		$lines[] = 'public_crt_path=' . $public_crt_path;
+
+		$cert_pem = is_readable($public_crt_path) ? (string) file_get_contents($public_crt_path) : '';
+		$lines[] = 'cert_file_readable=' . ($cert_pem !== '' ? 'yes' : 'no');
+
+		$xp = new DOMXPath($doc);
+		$xp->registerNamespace('ds', 'http://www.w3.org/2000/09/xmldsig#');
+		$signature_node = $xp->query('./ds:Signature', $root)->item(0);
+		$signed_info_node = $signature_node instanceof DOMElement ? $xp->query('./ds:SignedInfo', $signature_node)->item(0) : null;
+		$signature_value_node = $signature_node instanceof DOMElement ? $xp->query('./ds:SignatureValue', $signature_node)->item(0) : null;
+		$keyinfo_cert_node = $signature_node instanceof DOMElement ? $xp->query('./ds:KeyInfo/ds:X509Data/ds:X509Certificate', $signature_node)->item(0) : null;
+
+		$canonicalized_signed_info = $signed_info_node instanceof DOMNode ? (string) $signed_info_node->C14N(true, false) : '';
+		$signature_value_b64 = $signature_value_node instanceof DOMNode ? preg_replace('/\s+/', '', (string) $signature_value_node->textContent) : '';
+		$signature_raw = $signature_value_b64 !== '' ? base64_decode($signature_value_b64, true) : false;
+
+		$keyinfo_cert_b64 = $keyinfo_cert_node instanceof DOMNode ? preg_replace('/\s+/', '', (string) $keyinfo_cert_node->textContent) : '';
+		$keyinfo_cert_pem = '';
+		if ($keyinfo_cert_b64 !== '') {
+			$keyinfo_cert_pem = "-----BEGIN CERTIFICATE-----\n" . chunk_split($keyinfo_cert_b64, 64, "\n") . "-----END CERTIFICATE-----\n";
+		}
+
+		$verify_result = 'n/a';
+		if ($canonicalized_signed_info !== '' && is_string($signature_raw) && $signature_raw !== '' && $keyinfo_cert_pem !== '') {
+			$pub_from_keyinfo = @openssl_pkey_get_public($keyinfo_cert_pem);
+			if ($pub_from_keyinfo !== false) {
+				$verify = @openssl_verify($canonicalized_signed_info, $signature_raw, $pub_from_keyinfo, OPENSSL_ALGO_SHA256);
+				$verify_result = $verify === 1 ? 'valid' : ($verify === 0 ? 'invalid' : 'error');
+				if (function_exists('openssl_free_key')) {
+					@openssl_free_key($pub_from_keyinfo);
+				}
+			} else {
+				$verify_result = 'keyinfo_public_key_unavailable';
+			}
+		}
+		$lines[] = 'openssl_verify_signedinfo=' . $verify_result;
+
+		$pub_modulus_hex = '';
+		$priv_modulus_hex = '';
+
+		$pub_key = $cert_pem !== '' ? @openssl_pkey_get_public($cert_pem) : false;
+		if ($pub_key !== false) {
+			$pub_details = openssl_pkey_get_details($pub_key);
+			if (is_array($pub_details) && isset($pub_details['rsa']['n'])) {
+				$pub_modulus_hex = bin2hex((string) $pub_details['rsa']['n']);
+			}
+			if (function_exists('openssl_free_key')) {
+				@openssl_free_key($pub_key);
+			}
+		}
+
+		$private_pem = is_readable($private_key_path) ? (string) file_get_contents($private_key_path) : '';
+		$priv_key = $private_pem !== '' ? @openssl_pkey_get_private($private_pem) : false;
+		if ($priv_key !== false) {
+			$priv_details = openssl_pkey_get_details($priv_key);
+			if (is_array($priv_details) && isset($priv_details['rsa']['n'])) {
+				$priv_modulus_hex = bin2hex((string) $priv_details['rsa']['n']);
+			}
+			if (function_exists('openssl_free_key')) {
+				@openssl_free_key($priv_key);
+			}
+		}
+
+		$lines[] = 'pub_modulus_sha256=' . ($pub_modulus_hex !== '' ? hash('sha256', $pub_modulus_hex) : 'n/a');
+		$lines[] = 'priv_modulus_sha256=' . ($priv_modulus_hex !== '' ? hash('sha256', $priv_modulus_hex) : 'n/a');
+		$lines[] = 'modulus_match=' . (($pub_modulus_hex !== '' && $priv_modulus_hex !== '' && hash_equals($pub_modulus_hex, $priv_modulus_hex)) ? 'yes' : 'no');
+		$lines[] = '---';
+
+		@file_put_contents($debug_file, implode("\n", $lines) . "\n", FILE_APPEND);
+	}
+
+	private function is_spid_saml_signature_debug_enabled(): bool {
+		$options = get_option($this->plugin_name . '_options', []);
+		if (!is_array($options)) {
+			$options = [];
+		}
+		$plugin_debug = !empty($options['spid_saml_debug']) && (string) $options['spid_saml_debug'] === '1';
+		return (defined('WP_DEBUG') && WP_DEBUG) || $plugin_debug;
+	}
+
 
 	private function serve_spid_saml_login(array $options, bool $debug_enabled): void {
 		$svc = $this->get_saml_service();
@@ -533,9 +740,34 @@ class WP_SPID_CIE_OIDC_Public {
 		return new WP_SPID_CIE_OIDC_Saml_Service();
 	}
 
-	private function get_saml_signing_cert(): string {
+	private function resolve_spid_saml_active_key_dir(): string {
 		$upload_dir = wp_upload_dir();
-		$cert_file = trailingslashit($upload_dir['basedir']) . 'spid-cie-oidc-keys/public.crt';
+		$base_dir = trailingslashit($upload_dir['basedir']);
+
+		$primary_dir = $base_dir . 'wp-spid-cie-keys';
+		$fallback_dir = $base_dir . 'spid-cie-oidc-keys';
+		$primary_private = trailingslashit($primary_dir) . 'private.key';
+		$primary_cert = trailingslashit($primary_dir) . 'public.crt';
+		$fallback_private = trailingslashit($fallback_dir) . 'private.key';
+		$fallback_cert = trailingslashit($fallback_dir) . 'public.crt';
+
+		if (file_exists($primary_private) && is_readable($primary_private) && file_exists($primary_cert) && is_readable($primary_cert)) {
+			return $primary_dir;
+		}
+
+		if (file_exists($fallback_private) && is_readable($fallback_private) && file_exists($fallback_cert) && is_readable($fallback_cert)) {
+			return $fallback_dir;
+		}
+
+		return $primary_dir;
+	}
+
+	private function resolve_spid_saml_key_path(string $filename): string {
+		return trailingslashit($this->resolve_spid_saml_active_key_dir()) . ltrim($filename, '/');
+	}
+
+	private function get_saml_signing_cert(): string {
+		$cert_file = $this->resolve_spid_saml_key_path('public.crt');
 		if (!file_exists($cert_file) || !is_readable($cert_file)) {
 			return '';
 		}
@@ -543,10 +775,26 @@ class WP_SPID_CIE_OIDC_Public {
 		if ($cert === '') {
 			return '';
 		}
-		$cert = str_replace(["
-", "
-", '-----BEGIN CERTIFICATE-----', '-----END CERTIFICATE-----'], '', $cert);
+		$cert = preg_replace('/-----BEGIN CERTIFICATE-----|-----END CERTIFICATE-----|\s+/', '', $cert);
 		return trim($cert);
+	}
+
+	private function get_saml_signing_cert_path(): string {
+		$cert_file = $this->resolve_spid_saml_key_path('public.crt');
+		if (!file_exists($cert_file) || !is_readable($cert_file)) {
+			return '';
+		}
+
+		return $cert_file;
+	}
+
+	private function get_saml_private_key_path(): string {
+		$key_file = $this->resolve_spid_saml_key_path('private.key');
+		if (!file_exists($key_file) || !is_readable($key_file)) {
+			return '';
+		}
+
+		return $key_file;
 	}
 
 private function extract_jwt_payload($jwt) {
@@ -758,14 +1006,13 @@ private function extract_jwt_payload($jwt) {
         } elseif ($provider_mode === 'cie_only') {
             $spid_enabled = false;
         }
-        $spid_saml_enabled = isset($options['spid_saml_enabled']) && $options['spid_saml_enabled'] === '1';
-        $spid_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : ($spid_saml_enabled ? 'saml' : 'oidc');
+        $spid_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : 'oidc';
         if (!in_array($spid_method, ['saml', 'oidc'], true)) {
             $spid_method = 'oidc';
         }
         $spid_visible = $spid_enabled;
-        $show_spid_oidc = $spid_visible && $spid_method === 'oidc';
-        $show_spid_saml = $spid_visible && $spid_method === 'saml' && $spid_saml_enabled;
+        $show_spid_saml = $spid_visible && $this->is_spid_saml_effective_enabled($options);
+        $show_spid_oidc = $spid_visible && !$show_spid_saml && $spid_method === 'oidc';
         $saml_login_url = add_query_arg(['spid_saml_route' => 'login'], home_url('/'));
         
         // Gestione Disclaimer
@@ -963,7 +1210,24 @@ private function extract_jwt_payload($jwt) {
 
     private function get_spid_idp_logo_by_entity(string $entityId, string $logo_uri = ''): string {
         $entity = trim($entityId);
-        $base = plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/';
+        $base_url = plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/';
+        $base_path_fs = plugin_dir_path(__FILE__) . 'vendor/spid-access-button/img/';
+        $logo_uri = trim($logo_uri);
+
+        $known_placeholder_files = [
+            'spid-idp-etnaid.svg',
+            'spid-idp-infocamereid.svg',
+        ];
+        $known_placeholder_hashes = [];
+        foreach ($known_placeholder_files as $placeholder_file) {
+            $placeholder_path = $base_path_fs . $placeholder_file;
+            if (file_exists($placeholder_path) && is_readable($placeholder_path)) {
+                $hash = md5_file($placeholder_path);
+                if (is_string($hash) && $hash !== '') {
+                    $known_placeholder_hashes[] = $hash;
+                }
+            }
+        }
 
         $map_exact = [
             'https://loginspid.aruba.it' => 'spid-idp-arubaid.svg',
@@ -980,8 +1244,9 @@ private function extract_jwt_payload($jwt) {
             'https://login.id.tim.it/affwebservices/public/saml2sso' => 'spid-idp-timid.svg',
         ];
 
+        $file = '';
         if (isset($map_exact[$entity])) {
-            return $base . $map_exact[$entity];
+            $file = $map_exact[$entity];
         }
 
         $host = strtolower((string) wp_parse_url($entity, PHP_URL_HOST));
@@ -999,13 +1264,37 @@ private function extract_jwt_payload($jwt) {
             'team' => 'spid-idp-teamsystemid.svg',
             'tim.it' => 'spid-idp-timid.svg',
         ];
-        foreach ($map_host as $needle => $file) {
+        foreach ($map_host as $needle => $mapped_file) {
             if ($host !== '' && strpos($host, $needle) !== false) {
-                return $base . $file;
+                $file = $mapped_file;
+                break;
             }
         }
 
-        $logo_uri = trim($logo_uri);
+        if ($file !== '') {
+            $local_file = $base_path_fs . $file;
+            $local_is_readable = file_exists($local_file) && is_readable($local_file);
+            $is_placeholder_vendor_logo = false;
+
+            if ($local_is_readable) {
+                $is_placeholder_vendor_logo = in_array($file, $known_placeholder_files, true);
+                if (!$is_placeholder_vendor_logo) {
+                    $local_hash = md5_file($local_file);
+                    if (is_string($local_hash) && $local_hash !== '' && in_array($local_hash, $known_placeholder_hashes, true)) {
+                        $is_placeholder_vendor_logo = true;
+                    }
+                }
+            }
+
+            if ((!$local_is_readable || $is_placeholder_vendor_logo) && $logo_uri !== '') {
+                return esc_url($logo_uri);
+            }
+
+            if ($local_is_readable) {
+                return $base_url . $file;
+            }
+        }
+
         if ($logo_uri !== '') {
             return esc_url($logo_uri);
         }

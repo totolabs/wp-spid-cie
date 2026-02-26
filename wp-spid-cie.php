@@ -16,7 +16,7 @@
  * Plugin Name:       SPID & CIE Login per WordPress
  * Plugin URI:        https://github.com/totolabs/wp-spid-cie
  * Description:       Abilita l'autenticazione tramite SPID e CIE con protocollo OpenID Connect per le Pubbliche Amministrazioni italiane. Conforme PNRR 1.4.4. Sviluppato da Totolabs Srl.
- * Version:           1.1.1
+ * Version:           1.1.2
  * Author:            Totolabs Srl
  * Author URI:        https://totolabs.it
  * License:           GPL-2.0-or-later
@@ -33,7 +33,7 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 if ( ! defined( 'WP_SPID_CIE_OIDC_VERSION' ) ) {
-	define( 'WP_SPID_CIE_OIDC_VERSION', '1.1.1' );
+	define( 'WP_SPID_CIE_OIDC_VERSION', '1.1.2' );
 }
 
 // 1. Carica l'autoloader di Composer (Librerie esterne)
@@ -43,6 +43,7 @@ if ( file_exists( plugin_dir_path( __FILE__ ) . 'vendor/autoload.php' ) ) {
 
 // 2. Carica la nostra Factory (Gestione Configurazione e Chiavi)
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-wp-spid-cie-factory.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-wp-spid-cie-spid-certificates.php';
 
 // 2.b Core OIDC runtime services (Milestone 1)
 require_once plugin_dir_path( __FILE__ ) . 'includes/Logging/Logger.php';
@@ -50,6 +51,42 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/Core/PkceService.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Core/StateNonceStore.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Core/TokenValidator.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Core/OidcClient.php';
+
+$spid_saml_helpers_ok = true;
+$spid_saml_missing_helpers = [];
+
+$activation_relative_file = 'includes/Core/SpidSamlActivation.php';
+$activation_file = plugin_dir_path( __FILE__ ) . $activation_relative_file;
+if ( file_exists( $activation_file ) ) {
+    require_once $activation_file;
+} else {
+    $spid_saml_helpers_ok = false;
+    $spid_saml_missing_helpers[] = $activation_relative_file;
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+        error_log( '[wp-spid-cie] Missing file: ' . $activation_file );
+    }
+}
+
+$metadata_protection_relative_file = 'includes/Core/SpidSamlMetadataProtection.php';
+$metadata_protection_file = plugin_dir_path( __FILE__ ) . $metadata_protection_relative_file;
+if ( file_exists( $metadata_protection_file ) ) {
+    require_once $metadata_protection_file;
+} else {
+    $spid_saml_helpers_ok = false;
+    $spid_saml_missing_helpers[] = $metadata_protection_relative_file;
+    if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
+        error_log( '[wp-spid-cie] Missing file: ' . $metadata_protection_file );
+    }
+}
+
+if ( ! defined( 'WP_SPID_CIE_OIDC_SAML_HELPERS_OK' ) ) {
+    define( 'WP_SPID_CIE_OIDC_SAML_HELPERS_OK', $spid_saml_helpers_ok );
+}
+
+if ( ! defined( 'WP_SPID_CIE_OIDC_SAML_MISSING_HELPERS' ) ) {
+    define( 'WP_SPID_CIE_OIDC_SAML_MISSING_HELPERS', implode( ',', $spid_saml_missing_helpers ) );
+}
+
 require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/ProviderProfileInterface.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/DiscoveryResolver.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/SpidProviderProfile.php';
