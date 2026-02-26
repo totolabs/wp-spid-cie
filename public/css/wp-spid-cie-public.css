@@ -2,8 +2,7 @@
  * Stili per l'area pubblica del plugin SPID/CIE OIDC Login.
  */
 
-/* --- Contenitore Login --- */
-.spid-cie-container {
+.wp-spid-cie-auth .spid-cie-container {
     width: 100%;
     margin: 20px 0;
     padding: 15px;
@@ -13,10 +12,10 @@
     text-align: center;
     box-sizing: border-box;
     clear: both;
-    font-family: "Titillium Web", Helvetica, Arial, sans-serif; /* Font AgID friendly */
+    font-family: "Titillium Web", Helvetica, Arial, sans-serif;
 }
 
-.spid-cie-title {
+.wp-spid-cie-auth .spid-cie-title {
     display: block;
     font-size: 16px;
     font-weight: 700;
@@ -24,64 +23,82 @@
     margin-bottom: 15px;
 }
 
-/* --- Pulsanti Principali (Blu) --- */
-.spid-cie-button {
+.wp-spid-cie-auth .wp-spid-cie-auth__button,
+.wp-spid-cie-auth .spid-cie-button {
     display: flex !important;
     align-items: center;
     justify-content: center;
     width: 100%;
     max-width: 320px;
+    min-height: 48px;
     margin: 0 auto 12px auto !important;
-    padding: 10px 0 !important;
+    padding: 12px 16px !important;
     text-decoration: none !important;
-    color: white !important;
+    color: #fff !important;
     font-weight: 700 !important;
-    font-size: 18px !important;
-    border-radius: 4px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-    transition: all 0.2s ease-in-out;
+    font-size: 16px !important;
     line-height: 1.2;
+    border-radius: 6px;
+    border: 1px solid transparent !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+    transition: all 0.2s ease-in-out;
     box-sizing: border-box;
     cursor: pointer;
-    position: relative;
 }
 
-.spid-cie-button:hover {
-    opacity: 0.9;
+.wp-spid-cie-auth .wp-spid-cie-auth__button:hover,
+.wp-spid-cie-auth .spid-cie-button:hover {
+    opacity: 0.95;
     transform: translateY(-1px);
-    box-shadow: 0 4px 6px rgba(0,0,0,0.25);
-    color: white !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.25);
+    color: #fff !important;
 }
 
-.spid-button {
-    background-color: #0066CC !important;
-    border: 1px solid #005ab3 !important;
+.wp-spid-cie-auth .wp-spid-cie-auth__button:focus-visible,
+.wp-spid-cie-auth .spid-cie-button:focus-visible {
+    outline: 3px solid #17324d;
+    outline-offset: 2px;
 }
 
-.cie-button {
-    background-color: #0055A4 !important;
-    border: 1px solid #004482 !important;
+.wp-spid-cie-auth .wp-spid-cie-auth__button--spid,
+.wp-spid-cie-auth .spid-button {
+    background-color: #0066cc !important;
+    border-color: #005ab3 !important;
 }
 
-/* --- Wrapper per il Dropdown SPID --- */
-.spid-button-wrapper {
+.wp-spid-cie-auth .wp-spid-cie-auth__button--spid:hover,
+.wp-spid-cie-auth .spid-button:hover {
+    background-color: #005ab3 !important;
+}
+
+.wp-spid-cie-auth .wp-spid-cie-auth__button--cie,
+.wp-spid-cie-auth .cie-button {
+    background-color: #0055a4 !important;
+    border-color: #004482 !important;
+}
+
+.wp-spid-cie-auth .wp-spid-cie-auth__button--cie:hover,
+.wp-spid-cie-auth .cie-button:hover {
+    background-color: #004482 !important;
+}
+
+.wp-spid-cie-auth .spid-button-wrapper {
     position: relative;
     width: 100%;
     max-width: 320px;
     margin: 0 auto 12px auto;
 }
 
-/* --- Dropdown Lista Provider --- */
-#spid-dropdown {
+.wp-spid-cie-auth #spid-dropdown {
     display: none;
     position: absolute;
     top: 100%;
     left: 0;
     width: 100%;
-    background: white;
+    background: #fff;
     border: 1px solid #cfcfcf;
     border-radius: 4px;
-    box-shadow: 0 8px 20px rgba(0,0,0,0.15);
+    box-shadow: 0 8px 20px rgba(0, 0, 0, 0.15);
     z-index: 99999;
     padding: 0;
     margin: 5px 0 0 0;
@@ -91,7 +108,7 @@
     overflow-y: auto;
 }
 
-#spid-dropdown.visible {
+.wp-spid-cie-auth #spid-dropdown.visible {
     display: block;
     animation: slideDown 0.2s ease-out;
 }
@@ -101,19 +118,17 @@
     to { opacity: 1; transform: translateY(0); }
 }
 
-/* Elemento Lista */
-.spid-idp-item {
+.wp-spid-cie-auth .spid-idp-item {
     border-bottom: 1px solid #f0f0f0;
     margin: 0;
     padding: 0;
 }
 
-.spid-idp-item:last-child {
+.wp-spid-cie-auth .spid-idp-item:last-child {
     border-bottom: none;
 }
 
-/* Link Provider */
-.spid-idp-link {
+.wp-spid-cie-auth .spid-idp-link {
     display: flex;
     align-items: center;
     padding: 12px 15px;
@@ -122,14 +137,13 @@
     transition: background-color 0.1s;
 }
 
-.spid-idp-link:hover {
+.wp-spid-cie-auth .spid-idp-link:hover {
     background-color: #e6f1fa;
     color: #0066cc !important;
 }
 
-/* Logo Provider nel Dropdown */
-.spid-idp-icon {
-    width: 100px; /* Dimensione fissa per i loghi */
+.wp-spid-cie-auth .spid-idp-icon {
+    width: 100px;
     height: 30px;
     margin-right: 15px;
     object-fit: contain;
@@ -137,19 +151,17 @@
     background-color: transparent;
 }
 
-/* Nome Provider (Nascosto se c'è il logo, o stilizzato) */
-.spid-idp-label {
+.wp-spid-cie-auth .spid-idp-label {
     font-size: 15px;
     font-weight: 600;
     display: block;
 }
-/* Se l'immagine manca (alt text visibile) o per fallback */
-.spid-idp-link img[src=""] + .spid-idp-label {
+
+.wp-spid-cie-auth .spid-idp-link img[src=""] + .spid-idp-label {
     display: block;
 }
 
-/* Footer del Dropdown */
-.spid-dropdown-footer {
+.wp-spid-cie-auth .spid-dropdown-footer {
     background-color: #f5f5f5;
     padding: 12px;
     font-size: 13px;
@@ -157,14 +169,16 @@
     border-top: 1px solid #e1e1e1;
 }
 
-.spid-dropdown-footer a {
+.wp-spid-cie-auth .spid-dropdown-footer a {
     color: #0066cc;
     text-decoration: none;
     font-weight: 600;
 }
-.spid-dropdown-footer a:hover {
+
+.wp-spid-cie-auth .spid-dropdown-footer a:hover {
     text-decoration: underline;
 }
+
 body.login .italia-it-button .italia-it-button-icon {
     display: none;
 }
@@ -174,65 +188,27 @@ body.login .italia-it-button .italia-it-button-text {
 }
 
 .spid-idp-button {
-  display: none;
+    display: none;
 }
 
 .spid-idp-button-menu {
-  max-height: 360px;
-  overflow-y: auto;
+    max-height: 360px;
+    overflow-y: auto;
 }
 
-.spid-idp-support-link {
-  display: block;
-  font-size: .9em;
-  margin: 4px 0;
-}
-
-/* ===== SPID DROPDOWN HOTFIX 1.1.1 ===== */
-
-/* Quando aperto: layout verticale */
 .spid-idp-button.spid-open {
-  display: flex;
-  flex-direction: column;
+    display: flex;
+    flex-direction: column;
 }
 
-/* Lista scrollabile */
-.spid-idp-button-menu {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  max-height: 360px;
-}
-
-/* Uniforma dimensione loghi */
 .spid-idp-button-menu li img {
-  max-height: 40px;
-  width: auto;
-  object-fit: contain;
+    max-height: 40px;
+    width: auto;
+    object-fit: contain;
 }
 
-/* Link supporto */
 .spid-idp-support-link {
-  display: block;
-  font-size: 0.9em;
-  margin: 4px 0;
-}
-
-/* Uniforma SPID e CIE */
-.spid-button {
-  width: 100%;
-  padding: 12px 16px;
-  font-size: 1rem;
-  font-weight: 600;
-  border-radius: 6px;
-  border: none;
-  cursor: pointer;
-}
-
-.spid-button {
-  background: #1565c0;
-  color: #fff;
-}
-
-.spid-button:hover {
-  background: #0d47a1;
+    display: block;
+    font-size: 0.9em;
+    margin: 4px 0;
 }

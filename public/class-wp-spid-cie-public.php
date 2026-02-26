@@ -58,7 +58,7 @@ class WP_SPID_CIE_OIDC_Public {
 
         wp_register_script($this->plugin_name . '-dropdown-inline', '', array(), $this->version, true);
         wp_enqueue_script($this->plugin_name . '-dropdown-inline');
-        wp_add_inline_script($this->plugin_name . '-dropdown-inline', 'window.toggleSpidDropdown=window.toggleSpidDropdown||function(){var d=document.getElementById("spid-dropdown");if(!d)return;d.classList.toggle("visible");};document.addEventListener("click",function(e){var w=document.querySelector(".spid-button-wrapper");var d=document.getElementById("spid-dropdown");if(w&&d&&!w.contains(e.target)){d.classList.remove("visible");}});');
+        wp_add_inline_script($this->plugin_name . '-dropdown-inline', 'window.toggleSpidDropdown=window.toggleSpidDropdown||function(){var d=document.getElementById("spid-dropdown");var t=document.getElementById("wp-spid-cie-spid-toggle");if(!d)return;var isVisible=d.classList.toggle("visible");if(t){t.setAttribute("aria-expanded",isVisible?"true":"false");}};document.addEventListener("click",function(e){var w=document.querySelector(".spid-button-wrapper");var d=document.getElementById("spid-dropdown");var t=document.getElementById("wp-spid-cie-spid-toggle");if(w&&d&&!w.contains(e.target)){d.classList.remove("visible");if(t){t.setAttribute("aria-expanded","false");}}});');
     }
 
     private function should_enqueue_spid_saml_access_button(): bool {
@@ -1043,6 +1043,7 @@ private function extract_jwt_payload($jwt) {
 
         ob_start();
         ?>
+        <div class="wp-spid-cie-auth">
         <div class="spid-cie-container">
             
             <?php if ($disclaimer_enabled && !empty($disclaimer_text)): ?>
@@ -1055,9 +1056,13 @@ private function extract_jwt_payload($jwt) {
             
             <?php if ($show_spid_oidc): ?>
                 <div class="spid-button-wrapper">
-                    <a href="javascript:void(0)" onclick="toggleSpidDropdown()" class="spid-cie-button spid-button">
-                        Entra con SPID
-                    </a>
+                    <?php echo $this->render_primary_auth_button('spid', 'Entra con SPID', [
+                        'href' => 'javascript:void(0)',
+                        'onclick' => 'toggleSpidDropdown()',
+                        'id' => 'wp-spid-cie-spid-toggle',
+                        'aria-expanded' => 'false',
+                        'aria-controls' => 'spid-dropdown',
+                    ]); ?>
                     <ul id="spid-dropdown">
                         <?php foreach($shuffled_idps as $key => $idp): ?>
                             <?php 
@@ -1075,9 +1080,9 @@ private function extract_jwt_payload($jwt) {
                             </li>
                         <?php endforeach; ?>
                         <li class="spid-dropdown-footer">
-                            <a href="https://www.spid.gov.it/cos-e-spid/come-attivare-spid/" target="_blank">Non hai SPID?</a>
+                            <a href="https://www.spid.gov.it/cos-e-spid/come-attivare-spid/" target="_blank" rel="noopener noreferrer">Non hai SPID?</a>
                             &nbsp;|&nbsp; 
-                            <a href="https://www.spid.gov.it/" target="_blank">Maggiori info</a>
+                            <a href="https://www.spid.gov.it/" target="_blank" rel="noopener noreferrer">Maggiori informazioni</a>
                         </li>
                     </ul>
                 </div>
@@ -1103,9 +1108,11 @@ private function extract_jwt_payload($jwt) {
                     $spid_menu_id = 'spid-idp-button-medium-get-' . uniqid();
                 ?>
                 <div class="spid-button-wrapper">
-                    <button class="spid-cie-button spid-button" type="button" spid-idp-button="#<?php echo esc_attr($spid_menu_id); ?>">
-                        Entra con SPID
-                    </button>
+                    <?php echo $this->render_primary_auth_button('spid', 'Entra con SPID', [
+                        'tag' => 'button',
+                        'type' => 'button',
+                        'spid-idp-button' => '#' . $spid_menu_id,
+                    ]); ?>
                     <div id="<?php echo esc_attr($spid_menu_id); ?>" class="spid-idp-button spid-idp-button-tip spid-idp-button-relative">
                         <ul class="spid-idp-button-menu">
                             <?php if (is_wp_error($saml_idps) || empty($saml_idps)): ?>
@@ -1142,13 +1149,58 @@ private function extract_jwt_payload($jwt) {
             <?php endif; ?>
 
             <?php if ($cie_enabled): ?>
-                <a href="<?php echo esc_url($login_url_cie); ?>" class="spid-cie-button cie-button">
-                    Entra con CIE
-                </a>
+                <?php echo $this->render_primary_auth_button('cie', 'Entra con CIE', [
+                    'href' => $login_url_cie,
+                ]); ?>
             <?php endif; ?>
+        </div>
         </div>
         <?php
         return ob_get_clean();
+    }
+
+
+    private function render_primary_auth_button(string $type, string $label, array $attributes = []): string {
+        $modifier = $type === 'cie' ? 'cie' : 'spid';
+        $tag = isset($attributes['tag']) && $attributes['tag'] === 'button' ? 'button' : 'a';
+        $base_classes = [
+            'wp-spid-cie-auth__button',
+            'wp-spid-cie-auth__button--' . $modifier,
+            'spid-cie-button',
+            $modifier === 'spid' ? 'spid-button' : 'cie-button',
+        ];
+
+        $provided_class = isset($attributes['class']) ? trim((string) $attributes['class']) : '';
+        if ($provided_class !== '') {
+            $base_classes[] = $provided_class;
+        }
+
+        $attrs = [];
+        $attrs[] = 'class="' . esc_attr(implode(' ', array_filter($base_classes))) . '"';
+
+        if ($tag === 'button') {
+            $attrs[] = 'type="' . esc_attr((string) ($attributes['type'] ?? 'button')) . '"';
+        } else {
+            $href = isset($attributes['href']) ? (string) $attributes['href'] : 'javascript:void(0)';
+            if (strpos($href, 'javascript:') === 0) {
+                $attrs[] = 'href="' . esc_attr($href) . '"';
+            } else {
+                $attrs[] = 'href="' . esc_url($href) . '"';
+            }
+        }
+
+        foreach ($attributes as $name => $value) {
+            if (in_array($name, ['tag', 'type', 'href', 'class'], true)) {
+                continue;
+            }
+            $attr_name = preg_replace('/[^a-zA-Z0-9_:\-]/', '', (string) $name);
+            if ($attr_name === '') {
+                continue;
+            }
+            $attrs[] = $attr_name . '="' . esc_attr((string) $value) . '"';
+        }
+
+        return '<' . $tag . ' ' . implode(' ', $attrs) . '>' . esc_html($label) . '</' . $tag . '>';
     }
 
     private function get_registry_service() {
