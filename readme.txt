@@ -3,7 +3,7 @@ Contributors: totolabs
 Tags: spid, cie, oidc, login, pnrr, pa, openid connect, italia
 Requires at least: 6.0
 Tested up to: 6.7
-Stable tag: 1.1.2
+Stable tag: 1.2.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -39,6 +39,12 @@ Sviluppato pensando alle esigenze delle Pubbliche Amministrazioni italiane (Comu
 7. Una volta attivati i servizi sui portali istituzionali, abilita i pulsanti di login nelle impostazioni del plugin.
 
 == Changelog ==
+
+= 1.2.1 =
+* Allineamento UI/UX pulsanti “Entra con SPID” e “Entra con CIE” con base grafica comune.
+* Aggiornamento footer dropdown SPID OIDC: testo “Maggiori informazioni” e link esterni con `rel="noopener noreferrer"`.
+* Rimosso IdP legacy “IntesaID” dagli asset locali e dai riferimenti interni.
+* Garantito mapping SAML per `https://idp.intesigroup.com` con logo locale `spid-idp-intesigroupspid.svg` e fallback logo remoto dal Registry.
 
 = 1.1.2 =
 * Stabilità UI SPID: menu IdP chiuso di default e apertura esplicita solo quando richiesto.
