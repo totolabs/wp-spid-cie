@@ -33,9 +33,9 @@ Checklist operativa GO/NO-GO disponibile in `docs/spid-saml-step2-go-no-go-check
 
 
 
-## Changelog 1.1.2
+## Changelog 1.2.1
 
-- Menu IdP SPID chiuso di default; apertura solo in stato esplicito `.spid-open`.
-- Toggle token metadata legacy reso più robusto con persistenza raw e verifiche post-update.
-- Fallback logo IdP su `logo_uri` Registry per EtnaID/InfoCamere quando il vendor asset è placeholder o non leggibile.
-- Confermata policy A: `/sp-metadata.xml` resta sempre pubblico; token solo su `/spid/saml/metadata`.
+- Allineamento UI/UX dei pulsanti primari “Entra con SPID” e “Entra con CIE” con struttura HTML/CSS condivisa.
+- Dropdown SPID OIDC aggiornato con testo “Maggiori informazioni” e link esterni hardenizzati (`rel="noopener noreferrer"`).
+- Rimozione asset/riferimenti legacy di “IntesaID”.
+- Mapping logo SAML confermato per `https://idp.intesigroup.com` con `spid-idp-intesigroupspid.svg` e fallback al logo remoto del Registry.
