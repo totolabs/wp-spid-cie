@@ -3,7 +3,7 @@ Contributors: totolabs
 Tags: spid, cie, oidc, login, pnrr, pa, openid connect, italia
 Requires at least: 6.0
 Tested up to: 6.7
-Stable tag: 1.0.0
+Stable tag: 1.1.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -39,6 +39,12 @@ Sviluppato pensando alle esigenze delle Pubbliche Amministrazioni italiane (Comu
 7. Una volta attivati i servizi sui portali istituzionali, abilita i pulsanti di login nelle impostazioni del plugin.
 
 == Changelog ==
+
+= 1.1.2 =
+* Stabilità UI SPID: menu IdP chiuso di default e apertura esplicita solo quando richiesto.
+* Stabilità metadata SAML: persistenza affidabile del toggle token con verifica post-salvataggio.
+* Compatibilità logo IdP: fallback su `logo_uri` Registry per EtnaID/InfoCamere quando asset vendor placeholder o assente.
+* Policy metadata: `/sp-metadata.xml` pubblico; token applicato solo all'endpoint legacy `/spid/saml/metadata`.
 
 = 1.0.0 =
 * Rilascio iniziale pubblico.
