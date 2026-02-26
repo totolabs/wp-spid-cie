@@ -923,17 +923,21 @@ class WP_SPID_CIE_OIDC_Admin {
         }
 
         if (isset($_GET['toggle_metadata_token']) && check_admin_referer('spid_saml_toggle_metadata_token')) {
+            $used_fallback = false;
             if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection') && !$this->load_spid_saml_metadata_protection_helper()) {
-                wp_safe_redirect(add_query_arg([
-                    'page' => $this->plugin_name,
-                    'tab' => 'stato',
-                    'metadata_token_notice' => 'toggle_fail',
-                ], admin_url('options-general.php')));
-                exit;
+                $used_fallback = true;
             }
 
             $before = $options;
-            $options = WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection::toggle($options);
+            if ($used_fallback) {
+                $require_token = (string) ($options['spid_saml_metadata_require_token'] ?? '0') === '1';
+                $options['spid_saml_metadata_require_token'] = $require_token ? '0' : '1';
+                if ($options['spid_saml_metadata_require_token'] === '1' && empty($options['spid_saml_metadata_token'])) {
+                    $options['spid_saml_metadata_token'] = wp_generate_password(24, false, false);
+                }
+            } else {
+                $options = WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection::toggle($options);
+            }
 
             // Keep a fallback baseline if toggle() unexpectedly returns invalid data.
             if (!is_array($options)) {
@@ -941,19 +945,41 @@ class WP_SPID_CIE_OIDC_Admin {
             }
 
             $ok = update_option($this->plugin_name . '_options', $options, false);
+            $desired = (string) ($options['spid_saml_metadata_require_token'] ?? '0');
             $after = get_option($this->plugin_name . '_options', []);
             if (!is_array($after)) {
                 $after = [];
             }
-            $persisted_require_token = isset($after['spid_saml_metadata_require_token']);
-            $persisted_token = !empty($after['spid_saml_metadata_token']);
-            $notice = ($ok && $persisted_require_token && $persisted_token) ? 'toggle_ok' : 'toggle_fail';
 
-            wp_safe_redirect(add_query_arg([
+            $persisted_require_token = isset($after['spid_saml_metadata_require_token']) && (string) $after['spid_saml_metadata_require_token'] === $desired;
+            $persisted_token = $desired !== '1' || !empty($after['spid_saml_metadata_token']);
+
+            $notice = 'toggle_ok';
+            $reason = '';
+            if ($used_fallback) {
+                $reason = 'missing_helper';
+            }
+            if (!$persisted_require_token) {
+                $notice = 'toggle_fail';
+                $reason = 'require_token_not_persisted';
+            } elseif (!$persisted_token) {
+                $notice = 'toggle_fail';
+                $reason = 'token_not_persisted';
+            } elseif (!$ok && $reason !== 'missing_helper') {
+                $notice = 'toggle_fail';
+                $reason = 'update_option_false';
+            }
+
+            $redirect_args = [
                 'page' => $this->plugin_name,
                 'tab' => 'stato',
                 'metadata_token_notice' => $notice,
-            ], admin_url('options-general.php')));
+            ];
+            if ($reason !== '') {
+                $redirect_args['metadata_token_reason'] = $reason;
+            }
+
+            wp_safe_redirect(add_query_arg($redirect_args, admin_url('options-general.php')));
             exit;
         }
 
@@ -1087,12 +1113,27 @@ class WP_SPID_CIE_OIDC_Admin {
 
         if (isset($_GET['metadata_token_notice'])) {
             $notice = sanitize_key((string) wp_unslash($_GET['metadata_token_notice']));
+            $reason = isset($_GET['metadata_token_reason']) ? sanitize_key((string) wp_unslash($_GET['metadata_token_reason'])) : '';
             if ($notice === 'toggle_ok') {
                 echo '<div class="notice notice-success inline"><p>Protezione token metadata aggiornata.</p></div>';
             } elseif ($notice === 'toggle_fail') {
-                echo '<div class="notice notice-error inline"><p>Impossibile salvare opzioni token, verifica DB/cache/permessi.</p></div>';
+                $reason_messages = [
+                    'missing_helper' => 'Helper protezione metadata non caricato; fallback applicato ma lo stato non è verificabile. Reinstallare il plugin completo.',
+                    'require_token_not_persisted' => 'Il flag di protezione token non risulta persistito dopo il salvataggio.',
+                    'token_not_persisted' => 'Protezione token attiva ma token metadata non persistito.',
+                    'update_option_false' => 'WordPress ha restituito update_option() = false con stato non coerente.',
+                ];
+                $message = isset($reason_messages[$reason]) ? $reason_messages[$reason] : 'Impossibile salvare opzioni token, verifica DB/cache/permessi.';
+                echo '<div class="notice notice-error inline"><p>' . esc_html($message) . '</p>';
+                if ($reason !== '') {
+                    echo '<p><strong>Reason:</strong> <code>' . esc_html($reason) . '</code></p>';
+                }
+                echo '</div>';
             } elseif ($notice === 'regen_ok') {
                 echo '<div class="notice notice-success inline"><p>Token metadata rigenerato.</p></div>';
+            }
+            if ($notice === 'toggle_ok' && $reason === 'missing_helper') {
+                echo '<div class="notice notice-warning inline"><p>Helper mancante: stai usando fallback; reinstallare plugin completo.</p><p><strong>Reason:</strong> <code>missing_helper</code></p></div>';
             }
         }
 
