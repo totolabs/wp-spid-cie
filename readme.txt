@@ -46,6 +46,12 @@ Sviluppato pensando alle esigenze delle Pubbliche Amministrazioni italiane (Comu
 * Rimosso IdP legacy “IntesaID” dagli asset locali e dai riferimenti interni.
 * Garantito mapping SAML per `https://idp.intesigroup.com` con logo locale `spid-idp-intesigroupspid.svg` e fallback logo remoto dal Registry.
 
+= 1.1.2 =
+* Stabilità UI SPID: menu IdP chiuso di default e apertura esplicita solo quando richiesto.
+* Stabilità metadata SAML: persistenza affidabile del toggle token con verifica post-salvataggio.
+* Compatibilità logo IdP: fallback su `logo_uri` Registry per EtnaID/InfoCamere quando asset vendor placeholder o assente.
+* Policy metadata: `/sp-metadata.xml` pubblico; token applicato solo all'endpoint legacy `/spid/saml/metadata`.
+
 = 1.0.0 =
 * Rilascio iniziale pubblico.
 * Supporto completo OIDC Federation 1.0.
