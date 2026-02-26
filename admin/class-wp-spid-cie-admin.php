@@ -450,7 +450,13 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '<li><strong>spid_auth_method:</strong> <code>' . esc_html($spid_auth_method !== '' ? $spid_auth_method : '(unset)') . '</code></li>';
         echo '<li><strong>spid_saml_enabled (legacy):</strong> <code>' . esc_html($spid_saml_enabled) . '</code></li>';
         echo '<li><strong>effective_saml (computed):</strong> <code>' . ($spid_saml_effective_enabled ? 'true' : 'false') . '</code></li>';
-        echo '<li><strong>SAML helpers loaded:</strong> <code>' . ($this->are_saml_helpers_loaded() ? 'OK' : 'KO') . '</code></li>';
+        $helpers_loaded = $this->are_saml_helpers_loaded();
+        echo '<li><strong>SAML helpers loaded:</strong> <code>' . ($helpers_loaded ? 'OK' : 'KO') . '</code></li>';
+        if (!$helpers_loaded && defined('WP_DEBUG') && WP_DEBUG) {
+            foreach ($this->get_missing_saml_helper_paths() as $missing_helper) {
+                echo '<li><strong>Missing helper:</strong> <code>' . esc_html($missing_helper) . '</code></li>';
+            }
+        }
         echo '</ul>';
     }
 
@@ -461,6 +467,32 @@ class WP_SPID_CIE_OIDC_Admin {
 
         return class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation')
             && class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection');
+    }
+
+    private function get_missing_saml_helper_paths(): array {
+        $missing = [];
+
+        if (defined('WP_SPID_CIE_OIDC_SAML_MISSING_HELPERS')) {
+            $raw = (string) WP_SPID_CIE_OIDC_SAML_MISSING_HELPERS;
+            if ($raw !== '') {
+                $parts = array_map('trim', explode(',', $raw));
+                foreach ($parts as $part) {
+                    if ($part !== '') {
+                        $missing[] = $part;
+                    }
+                }
+            }
+        }
+
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation')) {
+            $missing[] = 'includes/Core/SpidSamlActivation.php';
+        }
+
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection')) {
+            $missing[] = 'includes/Core/SpidSamlMetadataProtection.php';
+        }
+
+        return array_values(array_unique($missing));
     }
 
     private function render_spid_oidc_tab(): void {

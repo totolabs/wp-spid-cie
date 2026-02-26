@@ -53,22 +53,27 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/Core/TokenValidator.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Core/OidcClient.php';
 
 $spid_saml_helpers_ok = true;
+$spid_saml_missing_helpers = [];
 
-$activation_file = plugin_dir_path( __FILE__ ) . 'includes/Core/SpidSamlActivation.php';
+$activation_relative_file = 'includes/Core/SpidSamlActivation.php';
+$activation_file = plugin_dir_path( __FILE__ ) . $activation_relative_file;
 if ( file_exists( $activation_file ) ) {
     require_once $activation_file;
 } else {
     $spid_saml_helpers_ok = false;
+    $spid_saml_missing_helpers[] = $activation_relative_file;
     if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
         error_log( '[wp-spid-cie] Missing file: ' . $activation_file );
     }
 }
 
-$metadata_protection_file = plugin_dir_path( __FILE__ ) . 'includes/Core/SpidSamlMetadataProtection.php';
+$metadata_protection_relative_file = 'includes/Core/SpidSamlMetadataProtection.php';
+$metadata_protection_file = plugin_dir_path( __FILE__ ) . $metadata_protection_relative_file;
 if ( file_exists( $metadata_protection_file ) ) {
     require_once $metadata_protection_file;
 } else {
     $spid_saml_helpers_ok = false;
+    $spid_saml_missing_helpers[] = $metadata_protection_relative_file;
     if ( defined( 'WP_DEBUG' ) && WP_DEBUG ) {
         error_log( '[wp-spid-cie] Missing file: ' . $metadata_protection_file );
     }
@@ -76,6 +81,10 @@ if ( file_exists( $metadata_protection_file ) ) {
 
 if ( ! defined( 'WP_SPID_CIE_OIDC_SAML_HELPERS_OK' ) ) {
     define( 'WP_SPID_CIE_OIDC_SAML_HELPERS_OK', $spid_saml_helpers_ok );
+}
+
+if ( ! defined( 'WP_SPID_CIE_OIDC_SAML_MISSING_HELPERS' ) ) {
+    define( 'WP_SPID_CIE_OIDC_SAML_MISSING_HELPERS', implode( ',', $spid_saml_missing_helpers ) );
 }
 
 require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/ProviderProfileInterface.php';
