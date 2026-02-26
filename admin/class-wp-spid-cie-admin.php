@@ -1091,7 +1091,54 @@ class WP_SPID_CIE_OIDC_Admin {
             echo '<p style="color:#b32d2e;">Registry non disponibile: ' . esc_html($list->get_error_code()) . '</p>';
         }
 
+        if (defined('WP_DEBUG') && WP_DEBUG) {
+            $this->render_idp_logos_diagnostic($list);
+        }
+
         echo '<p class="description">Cosa fare ora: 1) Compila Impostazioni minime. 2) Genera/Rigenera certificati SP. 3) Aggiorna Registry IdP. 4) Copia URL metadata.</p>';
+    }
+
+    private function render_idp_logos_diagnostic($list): void {
+        if (!is_array($list) || empty($list)) {
+            echo '<h3>IdP logos diagnostic</h3><p class="description">Nessun IdP disponibile.</p>';
+            return;
+        }
+
+        if (!class_exists('WP_SPID_CIE_OIDC_Public')) {
+            require_once plugin_dir_path(dirname(__FILE__)) . 'public/class-wp-spid-cie-public.php';
+        }
+
+        $public = new WP_SPID_CIE_OIDC_Public($this->plugin_name, $this->version);
+        $method = new ReflectionMethod($public, 'get_spid_idp_logo_by_entity');
+        $method->setAccessible(true);
+
+        echo '<h3>IdP logos diagnostic</h3>';
+        echo '<table class="widefat striped" role="table"><thead><tr><th>entity_id</th><th>name</th><th>logo_uri (registry, host)</th><th>logo_resolved (local/remote)</th></tr></thead><tbody>';
+
+        foreach ($list as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $entity = (string) ($item['entity_id'] ?? '');
+            $name = (string) ($item['name'] ?? $entity);
+            $logo_uri = trim((string) ($item['logo'] ?? ''));
+            $resolved = (string) $method->invoke($public, $entity, $logo_uri);
+            $resolved_type = $resolved !== '' && strpos($resolved, plugin_dir_url(dirname(__FILE__))) === 0 ? 'local' : ($resolved !== '' ? 'remote' : 'none');
+            $logo_host = $logo_uri !== '' ? (string) wp_parse_url($logo_uri, PHP_URL_HOST) : '';
+
+            echo '<tr>';
+            echo '<td><code>' . esc_html($entity) . '</code></td>';
+            echo '<td>' . esc_html($name) . '</td>';
+            echo '<td><code>' . esc_html($logo_uri) . '</code>' . ($logo_host !== '' ? '<br><span class="description">' . esc_html($logo_host) . '</span>' : '') . '</td>';
+            echo '<td><strong>' . esc_html($resolved_type) . '</strong>';
+            if ($resolved !== '') {
+                echo '<br><code>' . esc_html($resolved) . '</code>';
+            }
+            echo '</td>';
+            echo '</tr>';
+        }
+
+        echo '</tbody></table>';
     }
 
     private function render_spid_saml_settings_subtab(): void {
