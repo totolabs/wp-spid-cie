@@ -1210,7 +1210,24 @@ private function extract_jwt_payload($jwt) {
 
     private function get_spid_idp_logo_by_entity(string $entityId, string $logo_uri = ''): string {
         $entity = trim($entityId);
-        $base = plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/';
+        $base_url = plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/';
+        $base_path_fs = plugin_dir_path(__FILE__) . 'vendor/spid-access-button/img/';
+        $logo_uri = trim($logo_uri);
+
+        $known_placeholder_files = [
+            'spid-idp-etnaid.svg',
+            'spid-idp-infocamereid.svg',
+        ];
+        $known_placeholder_hashes = [];
+        foreach ($known_placeholder_files as $placeholder_file) {
+            $placeholder_path = $base_path_fs . $placeholder_file;
+            if (file_exists($placeholder_path) && is_readable($placeholder_path)) {
+                $hash = md5_file($placeholder_path);
+                if (is_string($hash) && $hash !== '') {
+                    $known_placeholder_hashes[] = $hash;
+                }
+            }
+        }
 
         $map_exact = [
             'https://loginspid.aruba.it' => 'spid-idp-arubaid.svg',
@@ -1227,8 +1244,9 @@ private function extract_jwt_payload($jwt) {
             'https://login.id.tim.it/affwebservices/public/saml2sso' => 'spid-idp-timid.svg',
         ];
 
+        $file = '';
         if (isset($map_exact[$entity])) {
-            return $base . $map_exact[$entity];
+            $file = $map_exact[$entity];
         }
 
         $host = strtolower((string) wp_parse_url($entity, PHP_URL_HOST));
@@ -1246,13 +1264,32 @@ private function extract_jwt_payload($jwt) {
             'team' => 'spid-idp-teamsystemid.svg',
             'tim.it' => 'spid-idp-timid.svg',
         ];
-        foreach ($map_host as $needle => $file) {
+        foreach ($map_host as $needle => $mapped_file) {
             if ($host !== '' && strpos($host, $needle) !== false) {
-                return $base . $file;
+                $file = $mapped_file;
+                break;
             }
         }
 
-        $logo_uri = trim($logo_uri);
+        if ($file !== '') {
+            $local_file = $base_path_fs . $file;
+            $is_placeholder_vendor_logo = in_array($file, $known_placeholder_files, true);
+            if (!$is_placeholder_vendor_logo && file_exists($local_file) && is_readable($local_file)) {
+                $local_hash = md5_file($local_file);
+                if (is_string($local_hash) && $local_hash !== '' && in_array($local_hash, $known_placeholder_hashes, true)) {
+                    $is_placeholder_vendor_logo = true;
+                }
+            }
+
+            if ($is_placeholder_vendor_logo && $logo_uri !== '') {
+                return esc_url($logo_uri);
+            }
+
+            if (file_exists($local_file) && is_readable($local_file)) {
+                return $base_url . $file;
+            }
+        }
+
         if ($logo_uri !== '') {
             return esc_url($logo_uri);
         }
