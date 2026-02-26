@@ -362,10 +362,14 @@ class WP_SPID_CIE_OIDC_Public {
 
 	private function serve_spid_saml_metadata(array $options): void {
 		$is_official_request = $this->is_official_sp_metadata_request();
-		$requires_token = !empty($options['spid_saml_metadata_require_token']) && $options['spid_saml_metadata_require_token'] === '1';
+		$requires_token = (string) ($options['spid_saml_metadata_require_token'] ?? '0') === '1';
 		$must_check_token = $requires_token && !$this->is_official_sp_metadata_request();
 		$expected_token = isset($options['spid_saml_metadata_token']) ? (string) $options['spid_saml_metadata_token'] : '';
 		$provided_token = isset($_GET['spid_metadata_token']) ? sanitize_text_field((string) wp_unslash($_GET['spid_metadata_token'])) : '';
+		$debug_enabled = (defined('WP_DEBUG') && WP_DEBUG) || !empty($options['spid_saml_debug']);
+		if ($debug_enabled) {
+			header('X-SPIDCIE-META: ' . ($is_official_request ? 'official' : 'legacy') . '; token_required=' . ($requires_token ? '1' : '0') . '; token_provided=' . ($provided_token !== '' ? '1' : '0'));
+		}
 		if (!$is_official_request && $requires_token && $expected_token !== '' && ($provided_token === '' || !hash_equals($expected_token, $provided_token))) {
 			status_header(403);
 			header('Content-Type: text/plain; charset=utf-8');
