@@ -9,6 +9,15 @@ if (!function_exists('wp_generate_password')) {
 
 require_once __DIR__ . '/../includes/Core/SpidSamlMetadataProtection.php';
 
+function toggle_metadata_token_fallback(array $options): array {
+    $require_token = (string) ($options['spid_saml_metadata_require_token'] ?? '0') === '1';
+    $options['spid_saml_metadata_require_token'] = $require_token ? '0' : '1';
+    if ($options['spid_saml_metadata_require_token'] === '1' && empty($options['spid_saml_metadata_token'])) {
+        $options['spid_saml_metadata_token'] = wp_generate_password(24, false, false);
+    }
+    return $options;
+}
+
 $options = [
     'spid_saml_metadata_require_token' => '0',
     'spid_saml_metadata_token' => '',
@@ -34,4 +43,28 @@ if (empty($toggled_back['spid_saml_metadata_token'])) {
     exit(1);
 }
 
-echo "metadata token toggle logic: OK\n";
+$fallback_options = [
+    'spid_saml_metadata_require_token' => '0',
+    'spid_saml_metadata_token' => '',
+];
+$fallback_on = toggle_metadata_token_fallback($fallback_options);
+if (($fallback_on['spid_saml_metadata_require_token'] ?? '') !== '1') {
+    fwrite(STDERR, "Fallback expected require_token='1' after enable\n");
+    exit(1);
+}
+if (empty($fallback_on['spid_saml_metadata_token'])) {
+    fwrite(STDERR, "Fallback expected token generation when enabling protection\n");
+    exit(1);
+}
+
+$fallback_off = toggle_metadata_token_fallback($fallback_on);
+if (($fallback_off['spid_saml_metadata_require_token'] ?? '') !== '0') {
+    fwrite(STDERR, "Fallback expected require_token='0' after disable\n");
+    exit(1);
+}
+if (empty($fallback_off['spid_saml_metadata_token'])) {
+    fwrite(STDERR, "Fallback expected token to stay available after disabling protection\n");
+    exit(1);
+}
+
+echo "metadata token toggle logic (helper + fallback): OK\n";
