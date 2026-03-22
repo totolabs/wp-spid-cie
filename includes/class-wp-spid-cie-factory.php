@@ -28,7 +28,7 @@ class WP_SPID_CIE_OIDC_Factory {
 
         $entity_id_override = isset($options['entity_id']) ? trim((string) $options['entity_id']) : '';
         $entity_id_source = $entity_id_override !== '' ? $entity_id_override : ($issuer_override !== '' ? $issuer_override : home_url('/'));
-        $entity_id = set_url_scheme((string) $entity_id_source, 'https');
+        $entity_id = untrailingslashit(set_url_scheme((string) $entity_id_source, 'https'));
 
         $config = [
             'organization_name' => $options['organization_name'] ?? get_bloginfo('name'),
@@ -196,7 +196,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
     public function getEntityStatement() {
         $now = time();
         $exp = $now + 21600; // 6 ore 
-        $sub = trim((string) ($this->config['entity_id'] ?? $this->config['base_url'] ?? ''));
+        $sub = $this->getEntityId();
         if ($sub === '') {
             throw new Exception('Issuer base_url non configurato');
         }
@@ -210,74 +210,41 @@ class WP_SPID_CIE_OIDC_Wrapper {
         $fetch   = $endpoint_base . '/fetch';
         $list    = $endpoint_base . '/list';
         $status  = $endpoint_base . '/trust_mark_status';
-        $jwks_uri = $endpoint_base . '/jwks.json';
 
         $org_id_val = $this->config['ipa_code'];
         if (!empty($this->config['fiscal_number'])) {
              $org_id_val = $this->config['fiscal_number'];
         }
         $org_identifier = "PA:IT-" . $org_id_val;
-		
-		$authority_hints = [];
+        $omit_initial_cie_claims = $this->shouldOmitInitialCieClaims();
+        $rp_metadata = [
+            "application_type" => "web",
+            "client_id" => $sub,
+            "client_registration_types" => ["automatic"],
+            "jwks" => $jwks_structure,
+            "client_name" => $this->config['organization_name'],
+            "contacts" => [$this->config['contacts_email']],
+            "grant_types" => ["authorization_code", "refresh_token"],
+            "redirect_uris" => [
+                add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], $endpoint_base),
+                add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], $endpoint_base)
+            ],
+            "response_types" => ["code"],
+            "subject_type" => "public"
+        ];
 
-		// Includi TA CIE solo se CIE è abilitato
-		if (!empty($this->config['cie_enabled'])) {
-			if (!empty($this->config['cie_trust_anchor_preprod'])) {
-				$authority_hints[] = untrailingslashit($this->config['cie_trust_anchor_preprod']);
-			}
-			if (!empty($this->config['cie_trust_anchor_prod'])) {
-				$authority_hints[] = untrailingslashit($this->config['cie_trust_anchor_prod']);
-			}
-		}
+        if (!$omit_initial_cie_claims) {
+            $rp_metadata["jwks_uri"] = $endpoint_base . '/jwks.json';
+        }
 
-		// Includi TA SPID solo se SPID è abilitato
-		if (!empty($this->config['spid_enabled']) && !empty($this->config['spid_trust_anchor'])) {
-			$authority_hints[] = untrailingslashit($this->config['spid_trust_anchor']);
-		}
-
-		// Rimuovi duplicati e reindicizza
-		$authority_hints = array_values(array_unique($authority_hints));
-		
-		$trust_marks = [];
-
-		$tm_pre = trim($this->config['cie_trust_mark_preprod'] ?? '');
-		$tm_prod = trim($this->config['cie_trust_mark_prod'] ?? '');
-
-		foreach ([$tm_pre, $tm_prod] as $tm) {
-			if (!$tm) continue;
-
-			$id = $this->extract_trust_mark_id($tm);
-			if ($id) {
-				$trust_marks[] = [
-					'id' => $id,
-					'trust_mark' => $tm,
-				];
-			}
-		}	
         $payload = [
             "iss" => $sub,
             "sub" => $sub,
             "iat" => $now,
             "exp" => $exp,
             "jwks" => $jwks_structure,
-            "authority_hints" => $authority_hints, 
             "metadata" => [
-                "openid_relying_party" => [
-                    "application_type" => "web",
-                    "client_id" => $sub,
-                    "client_registration_types" => ["automatic"],
-                    "jwks" => $jwks_structure,
-                    "jwks_uri" => $jwks_uri,
-                    "client_name" => $this->config['organization_name'],
-                    "contacts" => [$this->config['contacts_email']],
-                    "grant_types" => ["authorization_code", "refresh_token"],
-                    "redirect_uris" => [
-                        add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], $endpoint_base),
-                        add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], $endpoint_base)
-                    ],
-                    "response_types" => ["code"],
-                    "subject_type" => "public"
-                ],
+                "openid_relying_party" => $rp_metadata,
                 "federation_entity" => [
                     "organization_name" => $this->config['organization_name'],
                     "homepage_uri" => $endpoint_base,
@@ -294,29 +261,19 @@ class WP_SPID_CIE_OIDC_Wrapper {
                 ]
             ]
         ];
-		
-		// --- Trust Marks (se presenti) ---
-		$trust_marks = [];
 
-		$tm_pre  = trim($this->config['cie_trust_mark_preprod'] ?? '');
-		$tm_prod = trim($this->config['cie_trust_mark_prod'] ?? '');
+        if (!$omit_initial_cie_claims) {
+            $authority_hints = $this->buildAuthorityHints();
+            if (!empty($authority_hints)) {
+                $payload['authority_hints'] = $authority_hints;
+            }
+        }
 
-		foreach ([$tm_pre, $tm_prod] as $tm) {
-			if (!$tm) continue;
+        $trust_marks = $this->buildTrustMarks();
+        if (!empty($trust_marks)) {
+            $payload['trust_marks'] = $trust_marks;
+        }
 
-			$id = $this->extract_trust_mark_id($tm);
-			if ($id) {
-				$trust_marks[] = [
-					'id' => $id,
-					'trust_mark' => $tm,
-				];
-			}
-		}
-
-		if (!empty($trust_marks)) {
-			$payload['trust_marks'] = $trust_marks;
-		}
-		
         return $this->signJwt($payload);
     }
 
@@ -325,12 +282,12 @@ class WP_SPID_CIE_OIDC_Wrapper {
      * Ritorna un resolve-response+jwt firmato con la stessa chiave federativa.
      */
     public function getResolveResponse($sub = '', $trust_anchor = '') {
-        $base_sub = trim((string) ($this->config['entity_id'] ?? $this->config['base_url'] ?? ''));
+        $base_sub = $this->getEntityId();
         if ($base_sub === '') {
             throw new Exception('Issuer base_url non configurato');
         }
 
-        $resolved_sub = trim((string) $sub);
+        $resolved_sub = $this->normalizeEntityIdentifier((string) $sub);
         if ($resolved_sub === '') {
             $resolved_sub = $base_sub;
         }
@@ -404,11 +361,11 @@ class WP_SPID_CIE_OIDC_Wrapper {
 
 
     public function getEntityId() {
-        $entity_id = trim((string) ($this->config['entity_id'] ?? ''));
+        $entity_id = $this->normalizeEntityIdentifier((string) ($this->config['entity_id'] ?? ''));
         if ($entity_id !== '') {
             return $entity_id;
         }
-        return trim((string) ($this->config['base_url'] ?? ''));
+        return $this->normalizeEntityIdentifier((string) ($this->config['base_url'] ?? ''));
     }
 
     /**
@@ -589,4 +546,54 @@ class WP_SPID_CIE_OIDC_Wrapper {
 
     return isset($data['id']) && is_string($data['id']) ? $data['id'] : null;
 	}
+
+    private function normalizeEntityIdentifier(string $value): string {
+        return untrailingslashit(trim($value));
+    }
+
+    private function shouldOmitInitialCieClaims(): bool {
+        return !empty($this->config['cie_enabled']);
+    }
+
+    private function buildAuthorityHints(): array {
+        $authority_hints = [];
+
+        if (!empty($this->config['cie_enabled'])) {
+            if (!empty($this->config['cie_trust_anchor_preprod'])) {
+                $authority_hints[] = untrailingslashit((string) $this->config['cie_trust_anchor_preprod']);
+            }
+
+            if (!empty($this->config['cie_trust_anchor_prod'])) {
+                $authority_hints[] = untrailingslashit((string) $this->config['cie_trust_anchor_prod']);
+            }
+        }
+
+        if (!empty($this->config['spid_enabled']) && !empty($this->config['spid_trust_anchor'])) {
+            $authority_hints[] = untrailingslashit((string) $this->config['spid_trust_anchor']);
+        }
+
+        return array_values(array_unique(array_filter($authority_hints)));
+    }
+
+    private function buildTrustMarks(): array {
+        $trust_marks = [];
+        $tm_pre  = trim((string) ($this->config['cie_trust_mark_preprod'] ?? ''));
+        $tm_prod = trim((string) ($this->config['cie_trust_mark_prod'] ?? ''));
+
+        foreach ([$tm_pre, $tm_prod] as $tm) {
+            if ($tm === '') {
+                continue;
+            }
+
+            $id = $this->extract_trust_mark_id($tm);
+            if ($id) {
+                $trust_marks[] = [
+                    'id' => $id,
+                    'trust_mark' => $tm,
+                ];
+            }
+        }
+
+        return $trust_marks;
+    }
 }
