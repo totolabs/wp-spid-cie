@@ -323,7 +323,6 @@ class WP_SPID_CIE_OIDC_Wrapper {
                     'client_id' => $base_sub,
                     'client_registration_types' => ['automatic'],
                     'jwks' => $jwks_structure,
-                    'jwks_uri' => $jwks_uri,
                     'client_name' => $this->config['organization_name'],
                     'contacts' => [$this->config['contacts_email']],
                     'grant_types' => ['authorization_code', 'refresh_token'],
