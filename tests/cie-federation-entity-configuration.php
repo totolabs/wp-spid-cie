@@ -215,7 +215,7 @@ assert_true(($resolvePayload['sub'] ?? '') === 'https://example.gov.it', 'Resolv
 assert_true(isset($resolvePayload['jwks']['keys'][0]), 'Resolve deve continuare a includere jwks.');
 assert_true(($resolveRpMetadata['subject_type'] ?? '') === 'pairwise', 'Resolve deve esporre subject_type=pairwise.');
 assert_true(($resolveRpMetadata['subject_type'] ?? '') !== 'public', 'Resolve non deve esporre subject_type=public.');
-assert_true(($resolveRpMetadata['jwks_uri'] ?? '') === 'https://example.gov.it/jwks.json', 'Resolve non deve perdere jwks_uri.');
+assert_true(!array_key_exists('jwks_uri', $resolveRpMetadata), 'Resolve non deve esporre jwks_uri.');
 assert_true(($resolveFederationMetadata['federation_resolve_endpoint'] ?? '') === 'https://example.gov.it/resolve', 'Resolve deve continuare a pubblicare l\'endpoint /resolve corretto.');
 assert_true(($resolvePayload['trust_anchor'] ?? '') === 'https://registry.interno.gov.it', 'trust_anchor deve essere normalizzato senza trailing slash.');
 
