@@ -196,6 +196,8 @@ assert_true(isset($entityStatementPayload['jwks']['keys'][0]), 'L\'entity config
 assert_true(isset($entityStatementPayload['iss']) && $entityStatementPayload['iss'] === 'https://example.gov.it', 'iss deve essere presente e normalizzato senza trailing slash.');
 assert_true(isset($entityStatementPayload['sub']) && $entityStatementPayload['sub'] === 'https://example.gov.it', 'sub deve essere presente e normalizzato senza trailing slash.');
 assert_true($entityStatementPayload['iss'] === $entityStatementPayload['sub'], 'iss e sub devono restare coerenti.');
+assert_true(($entityRpMetadata['subject_type'] ?? '') === 'pairwise', 'L\'entity configuration iniziale CIE deve esporre subject_type=pairwise.');
+assert_true(($entityRpMetadata['subject_type'] ?? '') !== 'public', 'L\'entity configuration iniziale CIE non deve esporre subject_type=public.');
 assert_true(!array_key_exists('jwks_uri', $entityRpMetadata), 'L\'entity configuration iniziale non deve esporre jwks_uri.');
 assert_true(isset($entityRpMetadata['jwks']['keys'][0]), 'La metadata RP deve continuare a includere jwks.');
 assert_true(($entityStatementPayload['trust_marks'][0]['id'] ?? '') === 'https://example.gov.it/trust-mark/test', 'I trust marks CIE validi devono restare presenti.');
@@ -211,6 +213,8 @@ assert_true(($resolveHeader['typ'] ?? '') === 'resolve-response+jwt', 'La resolv
 assert_true(($resolvePayload['iss'] ?? '') === 'https://example.gov.it', 'Resolve deve mantenere iss coerente con l\'entity identifier normalizzato.');
 assert_true(($resolvePayload['sub'] ?? '') === 'https://example.gov.it', 'Resolve deve mantenere sub coerente con l\'entity identifier normalizzato.');
 assert_true(isset($resolvePayload['jwks']['keys'][0]), 'Resolve deve continuare a includere jwks.');
+assert_true(($resolveRpMetadata['subject_type'] ?? '') === 'pairwise', 'Resolve deve esporre subject_type=pairwise.');
+assert_true(($resolveRpMetadata['subject_type'] ?? '') !== 'public', 'Resolve non deve esporre subject_type=public.');
 assert_true(($resolveRpMetadata['jwks_uri'] ?? '') === 'https://example.gov.it/jwks.json', 'Resolve non deve perdere jwks_uri.');
 assert_true(($resolveFederationMetadata['federation_resolve_endpoint'] ?? '') === 'https://example.gov.it/resolve', 'Resolve deve continuare a pubblicare l\'endpoint /resolve corretto.');
 assert_true(($resolvePayload['trust_anchor'] ?? '') === 'https://registry.interno.gov.it', 'trust_anchor deve essere normalizzato senza trailing slash.');

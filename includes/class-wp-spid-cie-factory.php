@@ -230,7 +230,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
                 add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], $endpoint_base)
             ],
             "response_types" => ["code"],
-            "subject_type" => "public"
+            "subject_type" => "pairwise"
         ];
 
         if (!$omit_initial_cie_claims) {
@@ -332,7 +332,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
                         add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], $endpoint_base)
                     ],
                     'response_types' => ['code'],
-                    'subject_type' => 'public'
+                    'subject_type' => 'pairwise'
                 ],
                 'federation_entity' => [
                     'organization_name' => $this->config['organization_name'],
