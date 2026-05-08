@@ -189,6 +189,7 @@ $entityStatementJwt = $wrapper->getEntityStatement();
 $entityStatementHeader = decode_jwt_segment($entityStatementJwt, 0);
 $entityStatementPayload = decode_jwt_segment($entityStatementJwt, 1);
 $entityRpMetadata = (array) ($entityStatementPayload['metadata']['openid_relying_party'] ?? []);
+$entityFederationMetadata = (array) ($entityStatementPayload['metadata']['federation_entity'] ?? []);
 
 assert_true(($entityStatementHeader['typ'] ?? '') === 'entity-statement+jwt', 'L\'entity configuration deve avere typ=entity-statement+jwt.');
 assert_true(!array_key_exists('authority_hints', $entityStatementPayload), 'L\'entity configuration iniziale non deve esporre authority_hints.');
@@ -196,10 +197,34 @@ assert_true(isset($entityStatementPayload['jwks']['keys'][0]), 'L\'entity config
 assert_true(isset($entityStatementPayload['iss']) && $entityStatementPayload['iss'] === 'https://example.gov.it', 'iss deve essere presente e normalizzato senza trailing slash.');
 assert_true(isset($entityStatementPayload['sub']) && $entityStatementPayload['sub'] === 'https://example.gov.it', 'sub deve essere presente e normalizzato senza trailing slash.');
 assert_true($entityStatementPayload['iss'] === $entityStatementPayload['sub'], 'iss e sub devono restare coerenti.');
+assert_true(isset($entityStatementPayload['iat']) && is_int($entityStatementPayload['iat']), 'L\'entity configuration iniziale deve includere iat.');
+assert_true(isset($entityStatementPayload['exp']) && is_int($entityStatementPayload['exp']), 'L\'entity configuration iniziale deve includere exp.');
+assert_true(isset($entityStatementPayload['metadata']['openid_relying_party']), 'L\'entity configuration iniziale deve includere metadata.openid_relying_party.');
 assert_true(($entityRpMetadata['subject_type'] ?? '') === 'pairwise', 'L\'entity configuration iniziale CIE deve esporre subject_type=pairwise.');
 assert_true(($entityRpMetadata['subject_type'] ?? '') !== 'public', 'L\'entity configuration iniziale CIE non deve esporre subject_type=public.');
+assert_true(!array_key_exists('subject_types_supported', $entityRpMetadata), 'Il metadata RP non deve esporre subject_types_supported.');
 assert_true(!array_key_exists('jwks_uri', $entityRpMetadata), 'L\'entity configuration iniziale non deve esporre jwks_uri.');
 assert_true(isset($entityRpMetadata['jwks']['keys'][0]), 'La metadata RP deve continuare a includere jwks.');
+assert_true(($entityRpMetadata['client_id'] ?? '') === $entityStatementPayload['sub'], 'client_id deve coincidere con l\'entity identifier normalizzato.');
+assert_true(in_array('automatic', $entityRpMetadata['client_registration_types'] ?? [], true), 'client_registration_types deve contenere automatic.');
+assert_true(in_array('authorization_code', $entityRpMetadata['grant_types'] ?? [], true), 'grant_types deve contenere authorization_code.');
+assert_true(in_array('refresh_token', $entityRpMetadata['grant_types'] ?? [], true), 'grant_types deve contenere refresh_token.');
+assert_true(in_array('code', $entityRpMetadata['response_types'] ?? [], true), 'response_types deve contenere code.');
+foreach (($entityRpMetadata['redirect_uris'] ?? []) as $redirect_uri) {
+    assert_true(strpos((string) $redirect_uri, 'https://example.gov.it?') === 0, 'redirect_uris deve usare HTTPS ed essere coerente con il dominio.');
+}
+assert_true(($entityFederationMetadata['organization_name'] ?? '') === 'Comune di Test', 'federation_entity RP deve includere organization_name.');
+assert_true(($entityFederationMetadata['homepage_uri'] ?? '') === 'https://example.gov.it', 'federation_entity RP deve includere homepage_uri.');
+assert_true(($entityFederationMetadata['policy_uri'] ?? '') === 'https://example.gov.it/privacy-policy', 'federation_entity RP deve includere policy_uri.');
+assert_true(($entityFederationMetadata['logo_uri'] ?? '') === 'https://example.gov.it/wp-admin/images/w-logo-blue.png', 'federation_entity RP deve includere logo_uri.');
+assert_true(($entityFederationMetadata['contacts'][0] ?? '') === 'servizi@example.gov.it', 'federation_entity RP deve includere contacts.');
+assert_true(($entityFederationMetadata['federation_resolve_endpoint'] ?? '') === 'https://example.gov.it/resolve', 'federation_entity RP deve includere federation_resolve_endpoint.');
+assert_true(!array_key_exists('federation_api_endpoint', $entityFederationMetadata), 'federation_entity RP CIE iniziale non deve esporre federation_api_endpoint.');
+assert_true(!array_key_exists('federation_fetch_endpoint', $entityFederationMetadata), 'federation_entity RP CIE iniziale non deve esporre federation_fetch_endpoint.');
+assert_true(!array_key_exists('federation_list_endpoint', $entityFederationMetadata), 'federation_entity RP CIE iniziale non deve esporre federation_list_endpoint.');
+assert_true(!array_key_exists('federation_trust_mark_status_endpoint', $entityFederationMetadata), 'federation_entity RP CIE iniziale non deve esporre federation_trust_mark_status_endpoint.');
+assert_true(!array_key_exists('ipa_code', $entityFederationMetadata), 'federation_entity RP CIE iniziale non deve esporre ipa_code.');
+assert_true(!array_key_exists('organization_identifier', $entityFederationMetadata), 'federation_entity RP CIE iniziale non deve esporre organization_identifier.');
 assert_true(($entityStatementPayload['trust_marks'][0]['id'] ?? '') === 'https://example.gov.it/trust-mark/test', 'I trust marks CIE validi devono restare presenti.');
 assert_true(($entityStatementPayload['trust_marks'][0]['trust_mark'] ?? '') === $trustMark, 'Il trust mark CIE non deve essere alterato.');
 
@@ -213,10 +238,15 @@ assert_true(($resolveHeader['typ'] ?? '') === 'resolve-response+jwt', 'La resolv
 assert_true(($resolvePayload['iss'] ?? '') === 'https://example.gov.it', 'Resolve deve mantenere iss coerente con l\'entity identifier normalizzato.');
 assert_true(($resolvePayload['sub'] ?? '') === 'https://example.gov.it', 'Resolve deve mantenere sub coerente con l\'entity identifier normalizzato.');
 assert_true(isset($resolvePayload['jwks']['keys'][0]), 'Resolve deve continuare a includere jwks.');
+assert_true(isset($resolvePayload['metadata']['openid_relying_party']), 'Resolve deve includere metadata.openid_relying_party.');
 assert_true(($resolveRpMetadata['subject_type'] ?? '') === 'pairwise', 'Resolve deve esporre subject_type=pairwise.');
 assert_true(($resolveRpMetadata['subject_type'] ?? '') !== 'public', 'Resolve non deve esporre subject_type=public.');
+assert_true(!array_key_exists('subject_types_supported', $resolveRpMetadata), 'Resolve RP non deve esporre subject_types_supported.');
 assert_true(!array_key_exists('jwks_uri', $resolveRpMetadata), 'Resolve non deve esporre jwks_uri.');
 assert_true(($resolveFederationMetadata['federation_resolve_endpoint'] ?? '') === 'https://example.gov.it/resolve', 'Resolve deve continuare a pubblicare l\'endpoint /resolve corretto.');
+assert_true(!array_key_exists('federation_fetch_endpoint', $resolveFederationMetadata), 'Resolve RP CIE non deve esporre federation_fetch_endpoint.');
+assert_true(!array_key_exists('federation_list_endpoint', $resolveFederationMetadata), 'Resolve RP CIE non deve esporre federation_list_endpoint.');
+assert_true(!array_key_exists('federation_trust_mark_status_endpoint', $resolveFederationMetadata), 'Resolve RP CIE non deve esporre federation_trust_mark_status_endpoint.');
 assert_true(($resolvePayload['trust_anchor'] ?? '') === 'https://registry.interno.gov.it', 'trust_anchor deve essere normalizzato senza trailing slash.');
 
 $spidOnlyWrapper = new WP_SPID_CIE_OIDC_Wrapper([
@@ -241,6 +271,7 @@ $spidOnlyRpMetadata = (array) ($spidOnlyEntityStatement['metadata']['openid_rely
 
 assert_true(($spidOnlyRpMetadata['jwks_uri'] ?? '') === 'https://example.gov.it/jwks.json', 'La entity configuration senza CIE deve continuare a esporre jwks_uri.');
 assert_true(($spidOnlyEntityStatement['authority_hints'][0] ?? '') === 'https://registry.agid.gov.it', 'La entity configuration SPID-only deve continuare a esporre authority_hints.');
+assert_true(isset($spidOnlyEntityStatement['metadata']['federation_entity']['federation_fetch_endpoint']), 'La compatibilita SPID-only deve mantenere federation_fetch_endpoint.');
 
 echo "entity configuration CIE initial claims: OK\n";
 echo "entity identifier normalization: OK\n";

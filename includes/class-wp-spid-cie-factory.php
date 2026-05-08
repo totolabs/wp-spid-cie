@@ -205,17 +205,6 @@ class WP_SPID_CIE_OIDC_Wrapper {
         $jwks_structure = ['keys' => [$jwk_item]];
 
         $endpoint_base = untrailingslashit((string) ($this->config['base_url'] ?? $sub));
-        $fed_api = $endpoint_base . '/.well-known/openid-federation';
-        $resolve = $endpoint_base . '/resolve';
-        $fetch   = $endpoint_base . '/fetch';
-        $list    = $endpoint_base . '/list';
-        $status  = $endpoint_base . '/trust_mark_status';
-
-        $org_id_val = $this->config['ipa_code'];
-        if (!empty($this->config['fiscal_number'])) {
-             $org_id_val = $this->config['fiscal_number'];
-        }
-        $org_identifier = "PA:IT-" . $org_id_val;
         $omit_initial_cie_claims = $this->shouldOmitInitialCieClaims();
         $rp_metadata = [
             "application_type" => "web",
@@ -245,20 +234,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
             "jwks" => $jwks_structure,
             "metadata" => [
                 "openid_relying_party" => $rp_metadata,
-                "federation_entity" => [
-                    "organization_name" => $this->config['organization_name'],
-                    "homepage_uri" => $endpoint_base,
-                    "policy_uri" => $endpoint_base . '/privacy-policy', 
-                    "logo_uri" => $endpoint_base . '/wp-admin/images/w-logo-blue.png',
-                    "contacts" => [$this->config['contacts_email']],
-                    "federation_api_endpoint" => $fed_api,
-                    "federation_resolve_endpoint" => $resolve,
-                    "federation_fetch_endpoint" => $fetch,
-                    "federation_list_endpoint" => $list,
-                    "federation_trust_mark_status_endpoint" => $status,
-                    "ipa_code" => $this->config['ipa_code'],
-                    "organization_identifier" => $org_identifier
-                ]
+                "federation_entity" => $this->buildFederationEntityMetadata($endpoint_base, !$omit_initial_cie_claims)
             ]
         ];
 
@@ -298,18 +274,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
         $jwks_structure = ['keys' => [$jwk_item]];
 
         $endpoint_base = untrailingslashit((string) ($this->config['base_url'] ?? $base_sub));
-        $fed_api = $endpoint_base . '/.well-known/openid-federation';
-        $resolve = $endpoint_base . '/resolve';
-        $fetch   = $endpoint_base . '/fetch';
-        $list    = $endpoint_base . '/list';
-        $status  = $endpoint_base . '/trust_mark_status';
-        $jwks_uri = $endpoint_base . '/jwks.json';
-
-        $org_id_val = $this->config['ipa_code'];
-        if (!empty($this->config['fiscal_number'])) {
-            $org_id_val = $this->config['fiscal_number'];
-        }
-        $org_identifier = 'PA:IT-' . $org_id_val;
+        $omit_initial_cie_claims = $this->shouldOmitInitialCieClaims();
 
         $payload = [
             'iss' => $base_sub,
@@ -333,20 +298,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
                     'response_types' => ['code'],
                     'subject_type' => 'pairwise'
                 ],
-                'federation_entity' => [
-                    'organization_name' => $this->config['organization_name'],
-                    'homepage_uri' => $endpoint_base,
-                    'policy_uri' => $endpoint_base . '/privacy-policy',
-                    'logo_uri' => $endpoint_base . '/wp-admin/images/w-logo-blue.png',
-                    'contacts' => [$this->config['contacts_email']],
-                    'federation_api_endpoint' => $fed_api,
-                    'federation_resolve_endpoint' => $resolve,
-                    'federation_fetch_endpoint' => $fetch,
-                    'federation_list_endpoint' => $list,
-                    'federation_trust_mark_status_endpoint' => $status,
-                    'ipa_code' => $this->config['ipa_code'],
-                    'organization_identifier' => $org_identifier
-                ]
+                'federation_entity' => $this->buildFederationEntityMetadata($endpoint_base, !$omit_initial_cie_claims)
             ]
         ];
 
@@ -530,6 +482,36 @@ class WP_SPID_CIE_OIDC_Wrapper {
     private function generateCodeChallenge($verifier) {
         return $this->base64url_encode(hash('sha256', $verifier, true));
     }
+
+    private function buildFederationEntityMetadata(string $endpoint_base, bool $include_extended_fields): array {
+        $metadata = [
+            'organization_name' => $this->config['organization_name'],
+            'homepage_uri' => $endpoint_base,
+            'policy_uri' => $endpoint_base . '/privacy-policy',
+            'logo_uri' => $endpoint_base . '/wp-admin/images/w-logo-blue.png',
+            'contacts' => [$this->config['contacts_email']],
+            'federation_resolve_endpoint' => $endpoint_base . '/resolve',
+        ];
+
+        if (!$include_extended_fields) {
+            return $metadata;
+        }
+
+        $org_id_val = $this->config['ipa_code'];
+        if (!empty($this->config['fiscal_number'])) {
+            $org_id_val = $this->config['fiscal_number'];
+        }
+
+        $metadata['federation_api_endpoint'] = $endpoint_base . '/.well-known/openid-federation';
+        $metadata['federation_fetch_endpoint'] = $endpoint_base . '/fetch';
+        $metadata['federation_list_endpoint'] = $endpoint_base . '/list';
+        $metadata['federation_trust_mark_status_endpoint'] = $endpoint_base . '/trust_mark_status';
+        $metadata['ipa_code'] = $this->config['ipa_code'];
+        $metadata['organization_identifier'] = 'PA:IT-' . $org_id_val;
+
+        return $metadata;
+    }
+
 	private function extract_trust_mark_id(string $jwt): ?string {
     $parts = explode('.', $jwt);
     if (count($parts) < 2) return null;
