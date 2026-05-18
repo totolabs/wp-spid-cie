@@ -355,6 +355,11 @@ class WP_SPID_CIE_OIDC_Wrapper {
             $payload['trust_anchor'] = untrailingslashit($ta);
         }
 
+        $trust_chain = $this->buildTrustChain();
+        if (!empty($trust_chain)) {
+            $payload['trust_chain'] = $trust_chain;
+        }
+
         return $this->signGenericJwt($payload, 'resolve-response+jwt');
     }
 
@@ -594,5 +599,13 @@ class WP_SPID_CIE_OIDC_Wrapper {
         }
 
         return $trust_marks;
+    }
+
+    private function buildTrustChain(): array {
+        try {
+            return [$this->getEntityStatement()];
+        } catch (\Exception $e) {
+            return [];
+        }
     }
 }
