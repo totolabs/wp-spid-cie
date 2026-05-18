@@ -220,7 +220,11 @@ class WP_SPID_CIE_OIDC_Wrapper {
                 add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], $endpoint_base)
             ],
             "response_types" => ["code"],
-            "subject_type" => "pairwise"
+            "subject_type" => "pairwise",
+            "id_token_signed_response_alg" => "RS256",
+            "userinfo_signed_response_alg" => "RS256",
+            "token_endpoint_auth_method" => "private_key_jwt",
+            "token_endpoint_auth_signing_alg" => "RS256"
         ];
 
         if (!$omit_initial_cie_claims) {
@@ -297,7 +301,11 @@ class WP_SPID_CIE_OIDC_Wrapper {
                         add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], $endpoint_base)
                     ],
                     'response_types' => ['code'],
-                    'subject_type' => 'pairwise'
+                    'subject_type' => 'pairwise',
+                    'id_token_signed_response_alg' => 'RS256',
+                    'userinfo_signed_response_alg' => 'RS256',
+                    'token_endpoint_auth_method' => 'private_key_jwt',
+                    'token_endpoint_auth_signing_alg' => 'RS256'
                 ],
                 'federation_entity' => $this->buildFederationEntityMetadata($endpoint_base, !$omit_initial_cie_claims)
             ]
@@ -306,6 +314,11 @@ class WP_SPID_CIE_OIDC_Wrapper {
         $ta = trim((string) $trust_anchor);
         if ($ta !== '') {
             $payload['trust_anchor'] = untrailingslashit($ta);
+        }
+
+        $trust_marks = $this->buildTrustMarks();
+        if (!empty($trust_marks)) {
+            $payload['trust_marks'] = $trust_marks;
         }
 
         $trust_chain = $this->buildTrustChain();
