@@ -1043,6 +1043,9 @@ private function extract_jwt_payload($jwt) {
 
         ob_start();
         ?>
+        <?php if (!empty($_GET['spid_cie_error'])): ?>
+        <p class="message" style="border-left-color:#d63638;"><?php echo esc_html__('Autenticazione SPID/CIE non completata. Riprova.', 'wp-spid-cie'); ?> (<?php echo esc_html(sanitize_key(wp_unslash($_GET['spid_cie_error']))); ?>)</p>
+        <?php endif; ?>
         <div class="wp-spid-cie-auth">
         <div class="spid-cie-container">
             
