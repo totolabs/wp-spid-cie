@@ -50,6 +50,10 @@ class WP_SPID_CIE_OIDC_Spid_Certificates {
             $common_name = $cn_default;
         }
 
+        // X.509 / ASN.1 imposes a 64-character limit on O and CN fields.
+        $org         = mb_substr($org, 0, 64);
+        $common_name = mb_substr($common_name, 0, 64);
+
         $dn = [
             'countryName' => 'IT',
             'localityName' => $locality,
