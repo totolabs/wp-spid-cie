@@ -1167,32 +1167,8 @@ class WP_SPID_CIE_OIDC_Admin {
             echo '<p><strong>Ultimo aggiornamento registry:</strong> ' . esc_html(wp_date('d/m/Y H:i:s', $lastSync)) . '</p>';
         }
 
-        echo '<h3>IdP SPID (Registry AgID)</h3>';
-        echo '<p class="description">Seleziona il provider di identità SPID da usare. I dati tecnici (SSO URL e certificato) vengono caricati automaticamente dal registry AgID al salvataggio.</p>';
-        $registry_list = $this->get_registry_idp_list(false);
-        $selected_idp = isset($options['spid_saml_idp_registry_selected']) ? (string) $options['spid_saml_idp_registry_selected'] : '';
-        if (is_wp_error($registry_list) || !is_array($registry_list) || empty($registry_list)) {
-            echo '<p style="color:#b32d2e;">Lista IdP non disponibile. Premi "Aggiorna Registry IdP ora" per scaricarla.</p>';
-            echo '<input type="hidden" name="' . esc_attr($this->plugin_name . '_options[spid_saml_idp_registry_selected]') . '" value="' . esc_attr($selected_idp) . '">';
-        } else {
-            echo '<select name="' . esc_attr($this->plugin_name . '_options[spid_saml_idp_registry_selected]') . '" style="max-width:500px;width:100%;">';
-            echo '<option value="">' . esc_html__('— Nessuno (configurazione manuale) —', 'wp-spid-cie') . '</option>';
-            foreach ($registry_list as $item) {
-                $n = $this->normalize_registry_list_item(is_array($item) ? $item : []);
-                if ($n['entity_id'] === '') {
-                    continue;
-                }
-                $label = $n['name'] !== '' ? $n['name'] : $n['entity_id'];
-                echo '<option value="' . esc_attr($n['entity_id']) . '" ' . selected($selected_idp, $n['entity_id'], false) . '>' . esc_html($label) . '</option>';
-            }
-            echo '</select>';
-            if ($selected_idp !== '') {
-                echo '<p class="description" style="color:#2e7d32;">IdP selezionato: <code>' . esc_html($selected_idp) . '</code>. SSO URL e certificato vengono sincronizzati ad ogni salvataggio.</p>';
-            }
-        }
-
         $refresh_url = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'spid_saml','action'=>'spid_saml_refresh_registry'], admin_url('options-general.php')), 'spid_saml_refresh_registry');
-        echo '<p><a class="button button-secondary" href="' . esc_url($refresh_url) . '">Aggiorna Registry IdP ora</a> <span class="description">Scarica/aggiorna la lista degli IdP dal Registry AgID.</span></p>';
+        echo '<p><a class="button button-secondary" href="' . esc_url($refresh_url) . '">Aggiorna Registry IdP ora</a></p>';
 
         echo '<hr><h3>Opzioni avanzate</h3>';
         $this->render_select_field(['id' => 'spid_saml_level','options'=>['SpidL1'=>'SPID L1','SpidL2'=>'SPID L2','SpidL3'=>'SPID L3'],'default'=>'SpidL2']);
