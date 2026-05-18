@@ -36,6 +36,7 @@ class WP_SPID_CIE_OIDC_Factory {
             'fiscal_number'     => $options['fiscal_number'] ?? '',
             'contacts_email'    => $options['contacts_email'] ?? get_option('admin_email'),
             'spid_saml_locality_name' => $options['spid_saml_locality_name'] ?? '',
+            'spid_cert_org_name'      => $options['spid_cert_org_name'] ?? '',
             'base_url'          => $base_url,
             'entity_id'         => $entity_id,
             'test_env'          => isset($options['spid_test_env']) && $options['spid_test_env'] === '1',
