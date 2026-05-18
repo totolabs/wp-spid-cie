@@ -1147,6 +1147,7 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '<h2>Impostazioni SPID SAML</h2>';
         echo '<p class="description">Se lasci vuoto, usiamo automaticamente i valori del tab A. Ente.</p>';
 
+        $this->render_text_field(['id' => 'spid_cert_org_name', 'placeholder' => 'Es. ORDINE DEI FISIOTERAPISTI DI NAPOLI...', 'desc' => 'Denominazione per certificato SPID (campi O e CN, max 64 caratteri). Se compilata sovrascrive la denominazione ente. Usare la denominazione AOO ufficiale IPA.']);
         $this->render_text_field(['id' => 'spid_saml_country_name', 'placeholder' => 'IT', 'desc' => 'countryName (esempio: IT)']);
         $this->render_text_field(['id' => 'spid_saml_state_or_province_name', 'placeholder' => 'Roma', 'desc' => 'stateOrProvinceName (esempio: Roma)']);
         $this->render_text_field(['id' => 'spid_saml_locality_name', 'placeholder' => 'Roma', 'desc' => 'localityName (esempio: Roma)']);
@@ -1536,7 +1537,7 @@ class WP_SPID_CIE_OIDC_Admin {
             ],
             'impostazioni' => ['spid_enabled', 'cie_enabled', 'spid_auth_method', 'spid_saml_validator_enabled', 'disclaimer_enabled', 'disclaimer_text', 'user_provisioning_enabled', 'user_default_role'],
             'stato' => [],
-            'spid_saml' => ['spid_saml_entity_id', 'spid_saml_debug', 'spid_saml_clock_skew', 'spid_saml_level', 'spid_saml_binding', 'spid_saml_idp_entity_id', 'spid_saml_idp_sso_url', 'spid_saml_idp_slo_url', 'spid_saml_idp_x509_cert', 'spid_saml_idp_metadata_xml', 'spid_saml_idp_cert', 'spid_saml_show_advanced', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'sp_org_name', 'sp_org_display_name', 'sp_contact_ipa_code', 'sp_contact_fiscal_code', 'sp_contact_email', 'sp_contact_phone', 'spid_saml_idp_mode', 'spid_saml_idp_registry_selected', 'spid_saml_idp_registry_link', 'spid_saml_idp_last_sync', 'spid_saml_metadata_token', 'spid_saml_requested_attributes'],
+            'spid_saml' => ['spid_cert_org_name', 'spid_saml_entity_id', 'spid_saml_debug', 'spid_saml_clock_skew', 'spid_saml_level', 'spid_saml_binding', 'spid_saml_idp_entity_id', 'spid_saml_idp_sso_url', 'spid_saml_idp_slo_url', 'spid_saml_idp_x509_cert', 'spid_saml_idp_metadata_xml', 'spid_saml_idp_cert', 'spid_saml_show_advanced', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'sp_org_name', 'sp_org_display_name', 'sp_contact_ipa_code', 'sp_contact_fiscal_code', 'sp_contact_email', 'sp_contact_phone', 'spid_saml_idp_mode', 'spid_saml_idp_registry_selected', 'spid_saml_idp_registry_link', 'spid_saml_idp_last_sync', 'spid_saml_metadata_token', 'spid_saml_requested_attributes'],
         ];
 
         $new_input = $existing;
@@ -1554,7 +1555,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
         $allowed = $allowed_by_tab[$current_tab] ?? [];
 
-        $text_fields = ['organization_name', 'ipa_code', 'fiscal_number', 'contacts_email', 'spid_scope', 'cie_scope', 'spid_acr_values', 'cie_acr_values', 'spid_saml_clock_skew', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'sp_org_name', 'sp_org_display_name', 'sp_contact_ipa_code', 'sp_contact_fiscal_code', 'sp_contact_email', 'sp_contact_phone'];
+        $text_fields = ['organization_name', 'ipa_code', 'fiscal_number', 'contacts_email', 'spid_scope', 'cie_scope', 'spid_acr_values', 'cie_acr_values', 'spid_saml_clock_skew', 'spid_cert_org_name', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'sp_org_name', 'sp_org_display_name', 'sp_contact_ipa_code', 'sp_contact_fiscal_code', 'sp_contact_email', 'sp_contact_phone'];
         foreach ($text_fields as $f) {
             if (in_array($f, $allowed, true) && isset($input[$f])) {
                 $new_input[$f] = sanitize_text_field($input[$f]);
