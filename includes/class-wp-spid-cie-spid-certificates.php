@@ -125,6 +125,17 @@ class WP_SPID_CIE_OIDC_Spid_Certificates {
         if (file_exists($csr_path)) {
             @chmod($csr_path, 0644);
         }
+
+        $pub_key_res = openssl_pkey_get_private($private_pem);
+        if ($pub_key_res !== false) {
+            $pub_details = openssl_pkey_get_details($pub_key_res);
+            if (!empty($pub_details['key'])) {
+                $public_key_path = trailingslashit($key_dir) . 'public.key';
+                @file_put_contents($public_key_path, $pub_details['key']);
+                @chmod($public_key_path, 0644);
+            }
+        }
+
         @unlink($config_path);
 
         $status = self::validate($private_path, $cert_path, $options);
