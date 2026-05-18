@@ -1281,11 +1281,11 @@ class WP_SPID_CIE_OIDC_Admin {
             try {
                 $client = WP_SPID_CIE_OIDC_Factory::get_client();
                 $client->generateKeys();
-                wp_redirect(admin_url('options-general.php?page=' . $this->plugin_name . '&keys-generated=true'));
+                wp_redirect(admin_url('options-general.php?page=' . $this->plugin_name . '&tab=cie&keys-generated=true'));
                 exit;
             } catch (Exception $e) {
                 set_transient('spid_cie_oidc_error', $e->getMessage(), 45);
-                wp_redirect(admin_url('options-general.php?page=' . $this->plugin_name . '&keys-error=true'));
+                wp_redirect(admin_url('options-general.php?page=' . $this->plugin_name . '&tab=cie&keys-error=true'));
                 exit;
             }
         }
