@@ -82,7 +82,8 @@ class WP_SPID_CIE_OIDC_Saml_Service {
 
         $binding = $sp['binding'] === 'post' ? 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST' : 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect';
         $loa = isset($sp['loa']) ? (string) $sp['loa'] : 'SpidL2';
-        $xml = '<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="' . esc_attr($id) . '" Version="2.0" IssueInstant="' . esc_attr($issueInstant) . '" Destination="' . esc_attr($idp['sso_url']) . '" ProtocolBinding="' . esc_attr($binding) . '" AssertionConsumerServiceURL="' . esc_attr($sp['acs_url']) . '"><saml:Issuer Format="urn:oasis:names:tc:SAML:2.0:nameid-format:entity">' . esc_html($sp['entity_id']) . '</saml:Issuer><samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:2.0:nameid-format:transient" AllowCreate="true"/><samlp:RequestedAuthnContext Comparison="exact"><saml:AuthnContextClassRef>https://www.spid.gov.it/' . esc_html($loa) . '</saml:AuthnContextClassRef></samlp:RequestedAuthnContext></samlp:AuthnRequest>';
+        $forceAuthn = in_array($loa, ['SpidL2', 'SpidL3'], true) ? ' ForceAuthn="true"' : '';
+        $xml = '<samlp:AuthnRequest xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol" xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="' . esc_attr($id) . '" Version="2.0" IssueInstant="' . esc_attr($issueInstant) . '" Destination="' . esc_attr($idp['sso_url']) . '" ProtocolBinding="' . esc_attr($binding) . '" AssertionConsumerServiceURL="' . esc_attr($sp['acs_url']) . '"' . $forceAuthn . ' AttributeConsumingServiceIndex="0"><saml:Issuer Format="urn:oasis:names:tc:SAML:2.0:nameid-format:entity" NameQualifier="' . esc_attr($sp['entity_id']) . '">' . esc_html($sp['entity_id']) . '</saml:Issuer><samlp:NameIDPolicy Format="urn:oasis:names:tc:SAML:2.0:nameid-format:transient"/><samlp:RequestedAuthnContext Comparison="exact"><saml:AuthnContextClassRef>https://www.spid.gov.it/' . esc_html($loa) . '</saml:AuthnContextClassRef></samlp:RequestedAuthnContext></samlp:AuthnRequest>';
 
         $this->store_request_context($id, array_merge([
             'idp' => $idp['entity_id'],
@@ -95,7 +96,7 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         $samlRequest = base64_encode(gzdeflate($xml));
         $params = [
             'SAMLRequest' => $samlRequest,
-            'RelayState' => $relayState,
+            'RelayState' => $id,
             'SigAlg' => 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
         ];
 
