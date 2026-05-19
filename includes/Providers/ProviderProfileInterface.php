@@ -1,6 +1,18 @@
 <?php
 
+/**
+ * Contract for SPID and CIE provider configuration profiles.
+ *
+ * @since   1.3.0
+ * @package WP_SPID_CIE_OIDC
+ */
 interface WP_SPID_CIE_OIDC_ProviderProfileInterface {
+    /**
+     * Returns the unique provider key for this profile.
+     *
+     * @since  1.3.0
+     * @return string Provider key (e.g. 'spid' or 'cie').
+     */
     public function getProviderKey(): string;
 
     /**
