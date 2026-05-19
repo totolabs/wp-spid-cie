@@ -36,12 +36,12 @@ if ( ! defined( 'WP_SPID_CIE_OIDC_VERSION' ) ) {
 	define( 'WP_SPID_CIE_OIDC_VERSION', '1.2.1' );
 }
 
-// 1. Carica l'autoloader di Composer (Librerie esterne)
+// 1. Load Composer autoloader (external libraries)
 if ( file_exists( plugin_dir_path( __FILE__ ) . 'vendor/autoload.php' ) ) {
     require_once plugin_dir_path( __FILE__ ) . 'vendor/autoload.php';
 }
 
-// 2. Carica la nostra Factory (Gestione Configurazione e Chiavi)
+// 2. Load our Factory (configuration and key management)
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-wp-spid-cie-factory.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-wp-spid-cie-spid-certificates.php';
 
@@ -95,21 +95,21 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/ProviderRegistry.
 require_once plugin_dir_path( __FILE__ ) . 'includes/WP/WpUserMapper.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/WP/WpAuthService.php';
 
-// 3. Carica le classi Admin e Public
+// 3. Load Admin and Public classes
 require_once plugin_dir_path( __FILE__ ) . 'admin/class-wp-spid-cie-admin.php';
 require_once plugin_dir_path( __FILE__ ) . 'public/class-wp-spid-cie-public.php';
 
 
 /**
- * Esegue il plugin.
- * Inizializza le classi Admin (se siamo nel backend) e Public (sempre).
+ * Runs the plugin.
+ * Initializes the Admin class (when in wp-admin) and the Public class (always).
  */
 function run_wp_spid_cie() {
 
     $plugin_name = 'wp-spid-cie';
     $version = WP_SPID_CIE_OIDC_VERSION;
 
-    // Avvia la parte Admin (solo se l'utente è amministratore o sta caricando /wp-admin/)
+    // Start Admin side (only when loading /wp-admin/)
     if ( is_admin() ) {
         $plugin_admin = new WP_SPID_CIE_OIDC_Admin( $plugin_name, $version );
     }
@@ -118,19 +118,19 @@ function run_wp_spid_cie() {
     WP_SPID_CIE_OIDC_Factory::get_runtime_services();
     WP_SPID_CIE_OIDC_Factory::get_provider_registry();
 
-    // Avvia la parte Public (Login, Callback, Shortcodes, Endpoint API)
+    // Start Public side (login, callbacks, shortcodes, federation endpoints)
     $plugin_public = new WP_SPID_CIE_OIDC_Public( $plugin_name, $version );
 
 }
 
 /**
- * Imposta valori di default alla prima attivazione.
+ * Sets default option values on first activation.
  */
 function wp_spid_cie_activate() {
     $option_name = 'wp-spid-cie_options';
     $options = get_option($option_name, []);
 
-    // Imposta i default solo se il campo è vuoto/non esiste
+    // Set each default only if the field is empty or missing
     $defaults = [
         'cie_trust_anchor_preprod' => 'https://registry.interno.gov.it/',
         'cie_trust_anchor_prod'    => 'https://registry.interno.gov.it/',
@@ -153,9 +153,9 @@ function wp_spid_cie_activate() {
 register_activation_hook(__FILE__, 'wp_spid_cie_activate');
 
 /**
- * Aggiunge il link "Settings" nella lista plugin di WordPress.
+ * Adds the "Settings" link to the WordPress plugin action links.
  *
- * @param array $links Action links correnti.
+ * @param array $links Current action links.
  * @return array
  */
 function wp_spid_cie_plugin_action_links( $links ) {
@@ -170,9 +170,9 @@ function wp_spid_cie_plugin_action_links( $links ) {
 add_filter( 'plugin_action_links_' . plugin_basename( __FILE__ ), 'wp_spid_cie_plugin_action_links' );
 
 add_action('plugins_loaded', function () {
-    // Imposta i default anche su installazioni già attive (upgrade-safe)
+    // Set defaults also on already-active installs (upgrade-safe)
     wp_spid_cie_activate();
 });
 
-// Avvia tutto
+// Bootstrap everything
 run_wp_spid_cie();
