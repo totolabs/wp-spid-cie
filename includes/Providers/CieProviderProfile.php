@@ -1,10 +1,27 @@
 <?php
 
+/**
+ * CIE OIDC provider profile.
+ *
+ * @since   1.3.0
+ * @package WP_SPID_CIE_OIDC
+ */
 class WP_SPID_CIE_OIDC_CieProviderProfile implements WP_SPID_CIE_OIDC_ProviderProfileInterface {
+    /**
+     * @since  1.3.0
+     * @return string Always 'cie'.
+     */
     public function getProviderKey(): string {
         return 'cie';
     }
 
+    /**
+     * @since  1.3.0
+     * @param  array                     $options Plugin options.
+     * @param  string|null               $idp     Unused for CIE.
+     * @param  WP_SPID_CIE_OIDC_Wrapper  $wrapper Provider wrapper.
+     * @return array Baseline configuration.
+     */
     public function buildBaseConfig(array $options, ?string $idp, WP_SPID_CIE_OIDC_Wrapper $wrapper): array {
         return [
             'provider' => 'cie',
@@ -18,6 +35,14 @@ class WP_SPID_CIE_OIDC_CieProviderProfile implements WP_SPID_CIE_OIDC_ProviderPr
         ];
     }
 
+    /**
+     * @since  1.3.0
+     * @param  array                              $options           Plugin options.
+     * @param  string|null                        $idp               Unused for CIE.
+     * @param  WP_SPID_CIE_OIDC_Wrapper           $wrapper           Provider wrapper.
+     * @param  WP_SPID_CIE_OIDC_DiscoveryResolver $discoveryResolver Discovery service.
+     * @return array|WP_Error Resolved configuration, or error.
+     */
     public function resolveConfig(array $options, ?string $idp, WP_SPID_CIE_OIDC_Wrapper $wrapper, WP_SPID_CIE_OIDC_DiscoveryResolver $discoveryResolver) {
         $base = $this->buildBaseConfig($options, $idp, $wrapper);
         $mode = $options['discovery_mode'] ?? 'auto';

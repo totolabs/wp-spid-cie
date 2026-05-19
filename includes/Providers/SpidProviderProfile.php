@@ -1,10 +1,27 @@
 <?php
 
+/**
+ * SPID OIDC provider profile.
+ *
+ * @since   1.3.0
+ * @package WP_SPID_CIE_OIDC
+ */
 class WP_SPID_CIE_OIDC_SpidProviderProfile implements WP_SPID_CIE_OIDC_ProviderProfileInterface {
+    /**
+     * @since  1.3.0
+     * @return string Always 'spid'.
+     */
     public function getProviderKey(): string {
         return 'spid';
     }
 
+    /**
+     * @since  1.3.0
+     * @param  array                     $options Plugin options.
+     * @param  string|null               $idp     Optional SPID IdP key.
+     * @param  WP_SPID_CIE_OIDC_Wrapper  $wrapper Provider wrapper.
+     * @return array Baseline configuration.
+     */
     public function buildBaseConfig(array $options, ?string $idp, WP_SPID_CIE_OIDC_Wrapper $wrapper): array {
         $providers = $wrapper->getSpidProviders();
         $selected = 'validator';
@@ -35,6 +52,14 @@ class WP_SPID_CIE_OIDC_SpidProviderProfile implements WP_SPID_CIE_OIDC_ProviderP
         ];
     }
 
+    /**
+     * @since  1.3.0
+     * @param  array                              $options           Plugin options.
+     * @param  string|null                        $idp               Optional SPID IdP key.
+     * @param  WP_SPID_CIE_OIDC_Wrapper           $wrapper           Provider wrapper.
+     * @param  WP_SPID_CIE_OIDC_DiscoveryResolver $discoveryResolver Discovery service.
+     * @return array|WP_Error Resolved configuration, or error.
+     */
     public function resolveConfig(array $options, ?string $idp, WP_SPID_CIE_OIDC_Wrapper $wrapper, WP_SPID_CIE_OIDC_DiscoveryResolver $discoveryResolver) {
         $base = $this->buildBaseConfig($options, $idp, $wrapper);
         $mode = $options['discovery_mode'] ?? 'auto';

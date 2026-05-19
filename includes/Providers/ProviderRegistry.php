@@ -1,10 +1,21 @@
 <?php
 
+/**
+ * Resolves the full OIDC configuration for a given provider key.
+ *
+ * @since   1.3.0
+ * @package WP_SPID_CIE_OIDC
+ */
 class WP_SPID_CIE_OIDC_ProviderRegistry {
     private $profiles = [];
     private $discoveryResolver;
     private $wrapper;
 
+    /**
+     * @since 1.3.0
+     * @param WP_SPID_CIE_OIDC_DiscoveryResolver $discoveryResolver
+     * @param WP_SPID_CIE_OIDC_Wrapper           $wrapper
+     */
     public function __construct(WP_SPID_CIE_OIDC_DiscoveryResolver $discoveryResolver, WP_SPID_CIE_OIDC_Wrapper $wrapper) {
         $this->discoveryResolver = $discoveryResolver;
         $this->wrapper = $wrapper;
@@ -13,6 +24,14 @@ class WP_SPID_CIE_OIDC_ProviderRegistry {
         $this->profiles['cie'] = new WP_SPID_CIE_OIDC_CieProviderProfile();
     }
 
+    /**
+     * Returns the complete provider configuration including discovery and credentials.
+     *
+     * @since  1.3.0
+     * @param  string      $provider Provider key ('spid' or 'cie').
+     * @param  string|null $idp      Optional IdP identifier (SPID only).
+     * @return array|WP_Error Provider configuration array, or error.
+     */
     public function resolveConfig(string $provider, ?string $idp = null) {
         if (!isset($this->profiles[$provider])) {
             return new WP_Error('oidc_provider_not_supported', __('Provider non supportato.', 'wp-spid-cie'));

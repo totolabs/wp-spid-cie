@@ -1,12 +1,32 @@
 <?php
 
+/**
+ * Resolves or auto-provisions a WordPress user from a verified OIDC identity.
+ *
+ * @since   1.0.0
+ * @package WP_SPID_CIE_OIDC
+ */
 class WP_SPID_CIE_OIDC_WpAuthService {
     private $logger;
 
+    /**
+     * @since 1.0.0
+     * @param WP_SPID_CIE_OIDC_Logger $logger
+     */
     public function __construct(WP_SPID_CIE_OIDC_Logger $logger) {
         $this->logger = $logger;
     }
 
+    /**
+     * Finds an existing WP user or creates one, then updates identity meta.
+     *
+     * @since  1.0.0
+     * @param  array  $identity       Normalized OIDC identity claims.
+     * @param  array  $providerConfig Resolved provider configuration.
+     * @param  array  $options        Plugin options.
+     * @param  string $correlationId  Unique request identifier for logging.
+     * @return WP_User|WP_Error WordPress user on success, or error.
+     */
     public function resolveOrProvisionUser(array $identity, array $providerConfig, array $options, string $correlationId) {
         $provider = $identity['provider'];
         $providerSubMeta = $this->getProviderSubMetaKey($provider);

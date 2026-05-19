@@ -1,12 +1,30 @@
 <?php
 
+/**
+ * Fetches and validates the OpenID Connect provider discovery document.
+ *
+ * @since   1.3.0
+ * @package WP_SPID_CIE_OIDC
+ */
 class WP_SPID_CIE_OIDC_DiscoveryResolver {
     private $logger;
 
+    /**
+     * @since 1.3.0
+     * @param WP_SPID_CIE_OIDC_Logger $logger
+     */
     public function __construct(WP_SPID_CIE_OIDC_Logger $logger) {
         $this->logger = $logger;
     }
 
+    /**
+     * Fetches and validates the OIDC discovery document for an issuer.
+     *
+     * @since  1.3.0
+     * @param  string $issuer        Provider issuer URL.
+     * @param  string $correlationId Unique request identifier for logging.
+     * @return array|WP_Error Normalized endpoint map, or error.
+     */
     public function resolveFromIssuer(string $issuer, string $correlationId) {
         $issuer = untrailingslashit(trim($issuer));
         if (empty($issuer)) {

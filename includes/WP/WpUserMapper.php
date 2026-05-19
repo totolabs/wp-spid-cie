@@ -1,8 +1,18 @@
 <?php
 
+/**
+ * Maps raw OIDC provider claims to the normalized internal identity schema.
+ *
+ * @since   1.0.0
+ * @package WP_SPID_CIE_OIDC
+ */
 class WP_SPID_CIE_OIDC_WpUserMapper {
     private $logger;
 
+    /**
+     * @since 1.0.0
+     * @param WP_SPID_CIE_OIDC_Logger $logger
+     */
     public function __construct(WP_SPID_CIE_OIDC_Logger $logger) {
         $this->logger = $logger;
     }

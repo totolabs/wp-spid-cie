@@ -1,11 +1,24 @@
 <?php
 
+/**
+ * Handles the OIDC authorization code flow with PKCE.
+ *
+ * @since   1.0.0
+ * @package WP_SPID_CIE_OIDC
+ */
 class WP_SPID_CIE_OIDC_OidcClient {
     private $pkce;
     private $stateStore;
     private $tokenValidator;
     private $logger;
 
+    /**
+     * @since 1.0.0
+     * @param WP_SPID_CIE_OIDC_PkceService              $pkce
+     * @param WP_SPID_CIE_OIDC_StateNonceStoreInterface $stateStore
+     * @param WP_SPID_CIE_OIDC_TokenValidator           $tokenValidator
+     * @param WP_SPID_CIE_OIDC_Logger                   $logger
+     */
     public function __construct(
         WP_SPID_CIE_OIDC_PkceService $pkce,
         WP_SPID_CIE_OIDC_StateNonceStoreInterface $stateStore,
@@ -18,6 +31,15 @@ class WP_SPID_CIE_OIDC_OidcClient {
         $this->logger = $logger;
     }
 
+    /**
+     * Builds the OIDC authorization URL with PKCE and stores the state context.
+     *
+     * @since  1.0.0
+     * @param  array  $providerConfig Resolved provider configuration.
+     * @param  string $targetUrl      URL to redirect to after successful login.
+     * @param  string $correlationId  Unique request identifier for logging.
+     * @return string|WP_Error Authorization URL, or error.
+     */
     public function buildAuthorizationUrl(array $providerConfig, string $targetUrl, string $correlationId) {
         $state = bin2hex(random_bytes(16));
         $nonce = bin2hex(random_bytes(16));
@@ -61,6 +83,14 @@ class WP_SPID_CIE_OIDC_OidcClient {
         return $authorizationEndpoint . '?' . http_build_query($params);
     }
 
+    /**
+     * Handles the OIDC callback: validates state, exchanges code, validates id_token.
+     *
+     * @since  1.0.0
+     * @param  array $request        Callback query parameters (state, code, error).
+     * @param  array $providerConfig Resolved provider configuration.
+     * @return array|WP_Error Validated claims and state context, or error.
+     */
     public function handleCallback(array $request, array $providerConfig) {
         $correlationId = $request['correlation_id'] ?? $this->logger->generateCorrelationId();
 
