@@ -1,12 +1,32 @@
 <?php
 
+/**
+ * Validates OIDC id_tokens received from SPID and CIE providers.
+ *
+ * @since   1.0.0
+ * @package WP_SPID_CIE_OIDC
+ */
 class WP_SPID_CIE_OIDC_TokenValidator {
     private $logger;
 
+    /**
+     * @since 1.0.0
+     * @param WP_SPID_CIE_OIDC_Logger $logger
+     */
     public function __construct(WP_SPID_CIE_OIDC_Logger $logger) {
         $this->logger = $logger;
     }
 
+    /**
+     * Validates an id_token JWT: structure, claims, nonce, ACR, and signature.
+     *
+     * @since  1.0.0
+     * @param  string $idToken        Compact JWT string.
+     * @param  array  $providerConfig Resolved provider configuration (includes jwks_uri, issuer, client_id).
+     * @param  string $expectedNonce  Nonce stored during the authorization request.
+     * @param  string $correlationId  Unique request identifier for logging.
+     * @return array|WP_Error Validated payload claims, or error.
+     */
     public function validateIdToken(string $idToken, array $providerConfig, string $expectedNonce, string $correlationId) {
         $parts = explode('.', $idToken);
         if (count($parts) !== 3) {

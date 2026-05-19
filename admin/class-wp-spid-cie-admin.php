@@ -14,6 +14,11 @@ class WP_SPID_CIE_OIDC_Admin {
     private $plugin_name;
     private $version;
 
+    /**
+     * @since 1.0.0
+     * @param string $plugin_name Plugin slug.
+     * @param string $version     Plugin version string.
+     */
     public function __construct( $plugin_name, $version ) {
         $this->plugin_name = $plugin_name;
         $this->version = $version;
@@ -29,6 +34,10 @@ class WP_SPID_CIE_OIDC_Admin {
 
     /**
      * Enqueues CSS styles for the administration panel.
+     *
+     * @since  1.0.0
+     * @param  string $hook Current admin page hook suffix.
+     * @return void
      */
     public function enqueue_admin_styles($hook) {
         if (strpos($hook, $this->plugin_name) === false) {
@@ -44,6 +53,12 @@ class WP_SPID_CIE_OIDC_Admin {
         );
     }
 
+    /**
+     * Registers the plugin settings page under Settings in wp-admin.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function add_options_page() {
         add_options_page(
             'Configurazione SPID & CIE', // Titolo pagina browser
@@ -54,6 +69,12 @@ class WP_SPID_CIE_OIDC_Admin {
         );
     }
 
+    /**
+     * Renders the main plugin settings page with tabbed navigation.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function create_admin_page() {
         $current_tab = $this->get_current_tab();
         $tabs = $this->get_admin_tabs();
@@ -155,6 +176,12 @@ class WP_SPID_CIE_OIDC_Admin {
         <?php
     }
 
+    /**
+     * Registers plugin settings and settings sections/fields.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function register_settings() {
         register_setting(
             $this->plugin_name . '_options_group', 
@@ -579,6 +606,12 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '<p class="description">Compatibilità login: se il path standard di WordPress è nascosto (es. WPS Hide Login), lo shortcode resta il fallback supportato.</p>';
     }
 
+    /**
+     * Renders the read-only SPID SAML endpoint URL list.
+     *
+     * @since  1.3.0
+     * @return void
+     */
     public function render_spid_saml_endpoints_preview() {
         $metadata = home_url('/sp-metadata.xml');
         $acs = home_url('/spid/saml/acs');
@@ -594,6 +627,12 @@ class WP_SPID_CIE_OIDC_Admin {
     }
 
 
+    /**
+     * Renders a quick configuration check summary for the SPID SAML module.
+     *
+     * @since  1.3.0
+     * @return void
+     */
     public function render_spid_saml_test_config() {
         $options = get_option($this->plugin_name . '_options', []);
         $missing = [];
@@ -638,6 +677,12 @@ class WP_SPID_CIE_OIDC_Admin {
         ];
     }
 
+    /**
+     * Syncs legacy SPID SAML option flags after settings are saved.
+     *
+     * @since  1.3.0
+     * @return void
+     */
     public function normalize_spid_saml_options(): void {
         if (!is_admin()) {
             return;
@@ -897,6 +942,12 @@ class WP_SPID_CIE_OIDC_Admin {
         return $options;
     }
 
+    /**
+     * Handles the admin action to force-refresh the SPID IdP registry cache.
+     *
+     * @since  1.3.0
+     * @return void
+     */
     public function handle_spid_saml_registry_refresh(): void {
         if (!is_admin() || !current_user_can('manage_options')) {
             return;
@@ -922,6 +973,12 @@ class WP_SPID_CIE_OIDC_Admin {
         exit;
     }
 
+    /**
+     * Handles admin actions for SPID SAML metadata protection (token toggle/regenerate).
+     *
+     * @since  1.3.0
+     * @return void
+     */
     public function handle_spid_saml_metadata_actions(): void {
         if (!is_admin()) {
             return;
@@ -1273,6 +1330,12 @@ class WP_SPID_CIE_OIDC_Admin {
 
     // --- CALLBACK RENDERING ---
 
+    /**
+     * Handles the admin action to generate SPID/CIE cryptographic keys.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function handle_key_generation() {
         if ( isset( $_GET['action'], $_GET['_wpnonce'] ) && $_GET['action'] === 'generate_oidc_keys' ) {
             if ( ! wp_verify_nonce( $_GET['_wpnonce'], 'generate_oidc_keys_nonce' ) ) { wp_die('Security check failed'); }
@@ -1293,6 +1356,12 @@ class WP_SPID_CIE_OIDC_Admin {
         }
     }
 
+    /**
+     * Renders the key/certificate status panel and generation button.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function render_keys_manager() {
         $options = get_option($this->plugin_name . '_options', []);
         $status = WP_SPID_CIE_OIDC_Spid_Certificates::describe_status(is_array($options) ? $options : []);
@@ -1338,6 +1407,12 @@ class WP_SPID_CIE_OIDC_Admin {
         }
     }
 
+    /**
+     * Renders the key section description and generation notices.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function print_keys_section_info() {
         if (isset($_GET['keys-generated'])) { echo '<div class="notice notice-success inline"><p>Certificati SPID generati con successo.</p></div>'; }
         if (isset($_GET['keys-error'])) {
@@ -1347,6 +1422,13 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '<p>Generazione one-click certificati SPID (profilo SP pubblico): RSA>=2048, SHA-256, Subject con OID 2.5.4.83 e 2.5.4.97, estensioni SPID-compliant.</p>';
     }
 
+    /**
+     * Renders a text input field for a settings entry.
+     *
+     * @since  1.0.0
+     * @param  array $args Field arguments: id, desc, placeholder, type.
+     * @return void
+     */
     public function render_text_field( $args ) {
         $options = get_option( $this->plugin_name . '_options' );
         $id = $args['id'];
@@ -1358,6 +1440,13 @@ class WP_SPID_CIE_OIDC_Admin {
         if ($desc) { echo "<p class='description'>$desc</p>"; }
     }
 
+    /**
+     * Renders a textarea field for a settings entry.
+     *
+     * @since  1.0.0
+     * @param  array $args Field arguments: id, desc, default.
+     * @return void
+     */
     public function render_textarea_field( $args ) {
         $options = get_option( $this->plugin_name . '_options' );
         $id = $args['id'];
@@ -1370,6 +1459,13 @@ class WP_SPID_CIE_OIDC_Admin {
         if ($desc) echo "<p class='description'>$desc</p>";
     }
 
+    /**
+     * Renders a checkbox field for a settings entry.
+     *
+     * @since  1.0.0
+     * @param  array $args Field arguments: id, desc.
+     * @return void
+     */
     public function render_checkbox_field( $args ) {
         $options = get_option( $this->plugin_name . '_options' );
         $id = $args['id'];
@@ -1378,6 +1474,13 @@ class WP_SPID_CIE_OIDC_Admin {
         echo "<label><input type='checkbox' name='{$this->plugin_name}_options[$id]' value='1' $checked> $desc</label>";
     }
 	
+    /**
+     * Renders a select dropdown field for a settings entry.
+     *
+     * @since  1.0.0
+     * @param  array $args Field arguments: id, options, default, desc.
+     * @return void
+     */
     public function render_select_field( $args ) {
         $options = get_option( $this->plugin_name . '_options' );
         $id = $args['id'];
@@ -1397,6 +1500,12 @@ class WP_SPID_CIE_OIDC_Admin {
         }
     }
 
+    /**
+     * Renders a read-only textarea containing the public certificate (PEM).
+     *
+     * @since  1.0.0
+     * @return void
+     */
 	public function render_public_key_field() {
 		$keys_dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir();
 
@@ -1424,6 +1533,12 @@ class WP_SPID_CIE_OIDC_Admin {
 		echo '<p class="description"><strong>Nota:</strong> se rigeneri le chiavi, devi aggiornare questa chiave anche sul portale CIE.</p>';
 	}
 	
+    /**
+     * Renders a read-only list of the configured trust anchor URLs.
+     *
+     * @since  1.3.0
+     * @return void
+     */
 	public function render_trust_anchor_preview_field() {
 		$options = get_option($this->plugin_name . '_options', []);
 		$rows = [
@@ -1456,6 +1571,12 @@ class WP_SPID_CIE_OIDC_Admin {
 		}
 	}
 
+    /**
+     * Renders a read-only textarea containing the X.509 certificate for CIE federation.
+     *
+     * @since  1.3.0
+     * @return void
+     */
 	public function render_cie_certificate_field() {
 		$keys_dir = $this->get_keys_dir_path();
 		$cert_file = $keys_dir . '/public.crt';
@@ -1488,6 +1609,12 @@ class WP_SPID_CIE_OIDC_Admin {
 		);
 	}
 
+    /**
+     * Renders a read-only textarea containing the raw public key (PEM).
+     *
+     * @since  1.0.0
+     * @return void
+     */
 	public function render_public_key_raw_field() {
 		$keys_dir = $this->get_keys_dir_path();
 		$pub_file = $keys_dir . '/public.key';
@@ -1522,6 +1649,13 @@ class WP_SPID_CIE_OIDC_Admin {
         return $out;
     }
 
+    /**
+     * Sanitizes and persists plugin options submitted via the settings form.
+     *
+     * @since  1.0.0
+     * @param  array $input Raw submitted values.
+     * @return array Sanitized options merged with existing values.
+     */
     public function sanitize_options( $input ) {
         $existing = get_option($this->plugin_name . '_options', []);
         if (!is_array($existing)) {

@@ -11,6 +11,11 @@ class WP_SPID_CIE_OIDC_Public {
     private $plugin_name;
     private $version;
 
+    /**
+     * @since 1.0.0
+     * @param string $plugin_name Plugin slug.
+     * @param string $version     Plugin version string.
+     */
     public function __construct( $plugin_name, $version ) {
         $this->plugin_name = $plugin_name;
         $this->version = $version;
@@ -26,6 +31,12 @@ class WP_SPID_CIE_OIDC_Public {
 		add_filter('redirect_canonical', array($this, 'disable_canonical_for_federation'), 10, 2);
     }
 
+    /**
+     * Enqueues front-end CSS and JS assets for the login buttons.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function enqueue_styles() {
         $public_style_deps = array();
 
@@ -96,6 +107,12 @@ class WP_SPID_CIE_OIDC_Public {
         require_once $activation_file;
         return class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation');
     }
+    /**
+     * Registers custom rewrite rules for federation and SAML endpoints.
+     *
+     * @since  1.0.0
+     * @return void
+     */
 	public function setup_federation_endpoints() {
 		add_rewrite_rule('^sp-metadata\.xml/?$',               'index.php?spid_saml_route=metadata', 'top');
 		add_rewrite_rule('^spid/saml/metadata/?$',              'index.php?spid_saml_route=metadata', 'top');
@@ -117,6 +134,14 @@ class WP_SPID_CIE_OIDC_Public {
         });
     }
 	
+    /**
+     * Prevents WordPress canonical redirects on federation and SAML endpoint paths.
+     *
+     * @since  1.3.0
+     * @param  string $redirect_url  The redirect URL WordPress would normally use.
+     * @param  string $requested_url The originally requested URL.
+     * @return string|false Original redirect URL, or false to cancel the redirect.
+     */
 	public function disable_canonical_for_federation($redirect_url, $requested_url) {
 			if (strpos($requested_url, '/sp-metadata.xml') !== false) return false;
 			if (strpos($requested_url, '/spid/saml/metadata') !== false) return false;
@@ -130,6 +155,12 @@ class WP_SPID_CIE_OIDC_Public {
 			return $redirect_url;
 	}	
 
+    /**
+     * Detects and serves federation (OIDC/.well-known, JWKS, /resolve) and SAML endpoints.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function serve_federation_endpoints() {
 		global $wp_query;
 
@@ -396,6 +427,13 @@ class WP_SPID_CIE_OIDC_Public {
 		return $path === '/sp-metadata.xml';
 	}
 
+    /**
+     * Builds the signed SPID SAML SP metadata XML string.
+     *
+     * @since  1.3.0
+     * @param  array $options Plugin options.
+     * @return string Serialized XML metadata document.
+     */
 	public function build_spid_saml_metadata_xml(array $options): string {
 		$svc = $this->get_saml_service();
 		$sp = $svc->build_sp_config($options);
@@ -814,6 +852,12 @@ private function extract_jwt_payload($jwt) {
         return is_array($payload) ? $payload : null;
     }
 
+    /**
+     * Handles OIDC login and callback flows triggered by oidc_action query parameter.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function handle_login_flow() {
         $action = isset($_GET['oidc_action']) ? sanitize_key(wp_unslash($_GET['oidc_action'])) : get_query_var('oidc_action');
         $provider = isset($_GET['provider']) ? sanitize_key(wp_unslash($_GET['provider'])) : get_query_var('provider');
@@ -981,6 +1025,13 @@ private function extract_jwt_payload($jwt) {
 
     private static $buttons_printed = false;
 
+    /**
+     * Injects SPID/CIE login buttons into the WordPress login page.
+     *
+     * @since  1.0.0
+     * @param  string|null $arg Passed-through login_message content.
+     * @return string|null Original arg value (for login_message filter), or null.
+     */
     public function print_login_buttons_on_login_page($arg = null) {
         if (self::$buttons_printed) return $arg;
         if (is_string($arg) && !empty($arg)) echo $arg;
@@ -995,6 +1046,12 @@ private function extract_jwt_payload($jwt) {
         return null;
     }
 
+    /**
+     * Renders the SPID and CIE login button HTML (used by [spid_cie_login] shortcode).
+     *
+     * @since  1.0.0
+     * @return string HTML markup, or empty string when both providers are disabled.
+     */
     public function render_login_buttons() {
         $options = get_option( $this->plugin_name . '_options' ); 
         
