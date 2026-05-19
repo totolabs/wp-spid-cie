@@ -113,9 +113,9 @@ class WP_SPID_CIE_OIDC_Saml_Service {
 
         $params['Signature'] = base64_encode($signature);
 
-        // Per HTTP-Redirect la stringa firmata deve combaciare byte-per-byte
-        // con la query inviata (ordine/encoding RFC3986), altrimenti alcuni IdP
-        // SPID rispondono con errori di formato richiesta (es. codice 10).
+        // For HTTP-Redirect the signed string must match byte-for-byte
+        // the query sent (RFC3986 order/encoding), otherwise some SPID IdPs
+        // reject the request with a format error (e.g. error code 10).
         $redirectQuery = $signedQuery . '&Signature=' . rawurlencode($params['Signature']);
         return $idp['sso_url'] . '?' . $redirectQuery;
     }
