@@ -488,7 +488,7 @@ class WP_SPID_CIE_OIDC_Admin {
         $checks = [
             'Chiavi SP presenti' => $this->spid_saml_keys_exist(),
             'Metadata URL ufficiale stabile' => true,
-            'Registry IdP selezionato' => !empty($options['spid_saml_idp_registry_selected']) || !empty($options['spid_saml_idp_entity_id']),
+            'Registry IdP' => (new WP_SPID_CIE_OIDC_Spid_Registry_Service())->get_status()['count'] > 0,
             'SPID SAML enabled (effective)' => $spid_saml_effective_enabled,
         ];
         echo '<h2>Dashboard stato</h2><ul class="spid-readonly-list">';
