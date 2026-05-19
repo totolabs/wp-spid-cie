@@ -221,9 +221,9 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
             }
         }
 
-        // Alcuni payload del Registry arrivano come mappa associativa:
+        // Some Registry payloads arrive as an associative map:
         // {"<entityID>": { ... info_display_base ... }}
-        // In quel caso preserviamo la chiave come entity_id.
+        // In that case preserve the key as entity_id.
         if (empty($rows)) {
             foreach ($payload as $k => $v) {
                 if (!is_array($v)) {
