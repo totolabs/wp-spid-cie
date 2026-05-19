@@ -1,5 +1,11 @@
 <?php
 
+/**
+ * Handles SPID SAML2 SP operations: config, AuthnRequest, ACS response parsing.
+ *
+ * @since   1.0.0
+ * @package WP_SPID_CIE_OIDC
+ */
 class WP_SPID_CIE_OIDC_Saml_Service {
     const REQ_TTL = 600;
     const RESP_TTL = 600;
@@ -26,6 +32,13 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         return $primary_dir;
     }
 
+    /**
+     * Builds the SP configuration map from plugin options.
+     *
+     * @since  1.0.0
+     * @param  array $options Plugin options.
+     * @return array SP config map: entity_id, acs_url, sls_url, key_dir, private_key, cert.
+     */
     public function build_sp_config(array $options): array {
         $entityId = !empty($options['spid_saml_entity_id']) ? (string) $options['spid_saml_entity_id'] : (!empty($options['issuer_override']) ? (string) $options['issuer_override'] : home_url('/'));
         $keys_dir = $this->resolve_active_key_dir();
@@ -44,6 +57,13 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         ];
     }
 
+    /**
+     * Reads the manually configured IdP config from plugin options.
+     *
+     * @since  1.0.0
+     * @param  array $options Plugin options.
+     * @return array IdP config map: entity_id, sso_url, slo_url, x509_cert.
+     */
     public function read_idp_config(array $options): array {
         $legacyCert = isset($options['spid_saml_idp_cert']) ? (string) $options['spid_saml_idp_cert'] : '';
         $cert = isset($options['spid_saml_idp_x509_cert']) ? (string) $options['spid_saml_idp_x509_cert'] : $legacyCert;
@@ -69,10 +89,27 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         return $cfg;
     }
 
+    /**
+     * Checks that the minimum required IdP fields are present.
+     *
+     * @since  1.0.0
+     * @param  array $idp IdP config map.
+     * @return bool True when entity_id, sso_url, and x509_cert are all non-empty.
+     */
     public function is_idp_config_complete(array $idp): bool {
         return !empty($idp['entity_id']) && !empty($idp['sso_url']) && !empty($idp['x509_cert']);
     }
 
+    /**
+     * Builds and returns the HTTP-Redirect URL for a signed SAML AuthnRequest.
+     *
+     * @since  1.0.0
+     * @param  array  $sp             SP config from build_sp_config().
+     * @param  array  $idp            IdP config (entity_id, sso_url, x509_cert).
+     * @param  string $relayState     Opaque relay state (typically a return URL).
+     * @param  array  $requestContext Additional context stored with the request ID.
+     * @return string Redirect URL with SAMLRequest and Signature query params.
+     */
     public function build_authn_request_redirect(array $sp, array $idp, string $relayState, array $requestContext = []): string {
         if (strlen($relayState) > 512) {
             $relayState = home_url('/');
@@ -120,6 +157,13 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         return $idp['sso_url'] . '?' . $redirectQuery;
     }
 
+    /**
+     * Extracts the Issuer element value from a base64-encoded SAMLResponse.
+     *
+     * @since  1.0.0
+     * @param  string $samlResponseB64 Base64-encoded SAMLResponse XML.
+     * @return string Issuer string, or empty string on failure.
+     */
     public function extract_response_issuer(string $samlResponseB64): string {
         if (strlen($samlResponseB64) > 900000) {
             return '';
@@ -148,6 +192,15 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         return trim((string) $xp->evaluate('string(//saml:Assertion/saml:Issuer)'));
     }
 
+    /**
+     * Parses, validates, and extracts claims from a SAML2 ACS response.
+     *
+     * @since  1.0.0
+     * @param  string $samlResponseB64 Base64-encoded SAMLResponse XML.
+     * @param  array  $sp              SP config from build_sp_config().
+     * @param  array  $idp             IdP config (entity_id, sso_url, x509_cert).
+     * @return array|WP_Error Parsed result with 'claims' and 'request_context', or error.
+     */
     public function parse_and_validate_response(string $samlResponseB64, array $sp, array $idp) {
         $xmlRaw = base64_decode($samlResponseB64, true);
         if ($xmlRaw === false || $xmlRaw === '') {
@@ -432,6 +485,13 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         }
     }
 
+    /**
+     * Extracts IdP runtime config (SSO URL, certificate) from SAML metadata XML.
+     *
+     * @since  1.0.0
+     * @param  string $xml Raw SAML metadata XML string.
+     * @return array|WP_Error Parsed IdP map, or error.
+     */
     public function extract_idp_from_metadata(string $xml) {
         libxml_use_internal_errors(true);
         $dom = new DOMDocument();
@@ -451,11 +511,26 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         ];
     }
 
+    /**
+     * Strips PEM headers, footers, and whitespace from a certificate string.
+     *
+     * @since  1.0.0
+     * @param  string $cert PEM or raw base64 certificate data.
+     * @return string Base64-only certificate string.
+     */
     public function normalize_cert(string $cert): string {
         $cert = str_replace(["\r", "\n", '-----BEGIN CERTIFICATE-----', '-----END CERTIFICATE-----'], '', $cert);
         return trim($cert);
     }
 
+    /**
+     * Returns the first non-empty string value found under the given keys.
+     *
+     * @since  1.0.0
+     * @param  array    $source Associative array to search.
+     * @param  string[] $keys   Keys to try in order.
+     * @return string First matching value, or empty string.
+     */
     public function pick_first(array $source, array $keys): string {
         foreach ($keys as $key) {
             if (!isset($source[$key])) {
@@ -469,6 +544,13 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         return '';
     }
 
+    /**
+     * Normalizes a fiscal code by uppercasing and stripping the TINIT- prefix.
+     *
+     * @since  1.0.0
+     * @param  string $value Raw fiscal code from SAML attributes.
+     * @return string Normalized fiscal code.
+     */
     public function normalize_fiscal_code(string $value): string {
         $value = strtoupper(trim($value));
         if (strpos($value, 'TINIT-') === 0) {
@@ -477,10 +559,25 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         return preg_replace('/[^A-Z0-9]/', '', $value);
     }
 
+    /**
+     * Stores AuthnRequest context in a transient for ACS correlation.
+     *
+     * @since  1.3.0
+     * @param  string $requestId SAML request ID.
+     * @param  array  $payload   Context data (relay_state, etc.).
+     * @return void
+     */
     public function store_request_context(string $requestId, array $payload): void {
         set_transient('spid_saml_req_' . md5($requestId), $payload, self::REQ_TTL);
     }
 
+    /**
+     * Retrieves and deletes the stored AuthnRequest context (one-time use).
+     *
+     * @since  1.3.0
+     * @param  string $requestId SAML InResponseTo value.
+     * @return array|WP_Error Stored context, or error if not found.
+     */
     public function consume_request_context(string $requestId) {
         if ($requestId === '') {
             return new WP_Error('saml_missing_inresponseto', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));

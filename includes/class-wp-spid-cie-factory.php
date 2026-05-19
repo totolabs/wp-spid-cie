@@ -14,11 +14,23 @@ if ( file_exists( plugin_dir_path( dirname( __FILE__ ) ) . 'vendor/autoload.php'
 
 use SPID_CIE_OIDC_PHP\Core\Util;
 
+/**
+ * Factory for creating and configuring the OIDC client instance.
+ *
+ * @since   1.0.0
+ * @package WP_SPID_CIE_OIDC
+ */
 class WP_SPID_CIE_OIDC_Factory {
 
     private static $runtime_services = null;
     private static $provider_registry = null;
 
+    /**
+     * Builds and returns a configured WP_SPID_CIE_OIDC_Wrapper instance.
+     *
+     * @since  1.0.0
+     * @return WP_SPID_CIE_OIDC_Wrapper
+     */
     public static function get_client() {
         $options = get_option('wp-spid-cie_options');
         
@@ -54,6 +66,13 @@ class WP_SPID_CIE_OIDC_Factory {
         return new WP_SPID_CIE_OIDC_Wrapper($config);
     }
 
+    /**
+     * Resolves the filesystem path to the active key directory.
+     *
+     * @since  1.0.0
+     * @param  bool $for_generation When true, always returns (and creates) the primary dir.
+     * @return string Absolute path to the key directory.
+     */
     public static function resolve_spid_key_dir(bool $for_generation = false): string {
         $upload_dir = wp_upload_dir();
         $base_dir = trailingslashit($upload_dir['basedir']);
@@ -86,7 +105,10 @@ class WP_SPID_CIE_OIDC_Factory {
     }
 
     /**
-     * Runtime services for OIDC login callback flow (Milestone 1).
+     * Returns (and lazily initialises) the shared OIDC runtime services.
+     *
+     * @since  1.0.0
+     * @return array Associative map: logger, oidc_client, user_mapper, auth_service.
      */
     public static function get_runtime_services() {
         if (is_array(self::$runtime_services)) {
@@ -112,7 +134,10 @@ class WP_SPID_CIE_OIDC_Factory {
     }
 
     /**
-     * Provider registry with SPID/CIE profiles + discovery resolver.
+     * Returns (and lazily initialises) the shared provider registry.
+     *
+     * @since  1.0.0
+     * @return WP_SPID_CIE_OIDC_ProviderRegistry
      */
     public static function get_provider_registry() {
         if (self::$provider_registry instanceof WP_SPID_CIE_OIDC_ProviderRegistry) {
@@ -129,8 +154,14 @@ class WP_SPID_CIE_OIDC_Factory {
     }
 }
 
+/**
+ * Wraps SPID/CIE provider configuration and JWT-signing operations.
+ *
+ * @since   1.0.0
+ * @package WP_SPID_CIE_OIDC
+ */
 class WP_SPID_CIE_OIDC_Wrapper {
-    
+
     private $config;
 
     private $spid_providers = [
@@ -166,10 +197,20 @@ class WP_SPID_CIE_OIDC_Wrapper {
         ],
     ];
 
+    /**
+     * @since 1.0.0
+     * @param array $config Configuration map (base_url, entity_id, key_dir, etc.).
+     */
     public function __construct($config) {
         $this->config = $config;
     }
 
+    /**
+     * Returns the available SPID providers, excluding the validator in production.
+     *
+     * @since  1.0.0
+     * @return array Associative map keyed by provider ID.
+     */
     public function getSpidProviders() {
         $providers = $this->spid_providers;
         if (empty($this->config['test_env'])) {
@@ -178,6 +219,13 @@ class WP_SPID_CIE_OIDC_Wrapper {
         return $providers;
     }
 
+    /**
+     * Generates SPID-compliant key/certificate pair and updates the key_dir config.
+     *
+     * @since  1.0.0
+     * @return true
+     * @throws Exception On generation failure.
+     */
 	public function generateKeys() {
 		$result = WP_SPID_CIE_OIDC_Spid_Certificates::generate($this->config, true);
 		if (!$result['success']) {
@@ -188,12 +236,25 @@ class WP_SPID_CIE_OIDC_Wrapper {
 		return true;
 	}
 
+    /**
+     * Returns the JWK Set JSON string for the entity's signing key.
+     *
+     * @since  1.0.0
+     * @return string JSON-encoded JWK Set.
+     */
     public function getJwks() {
         $jwk_item = $this->buildJwkItem();
         $jwks = ['keys' => [$jwk_item]];
         return json_encode($jwks);
     }
 
+    /**
+     * Builds and signs the OpenID Federation entity statement JWT.
+     *
+     * @since  1.0.0
+     * @return string Compact entity-statement+jwt.
+     * @throws Exception On signing or key-loading failure.
+     */
     public function getEntityStatement() {
         $now = time();
         $exp = $now + 21600; // 6 hours
@@ -259,8 +320,13 @@ class WP_SPID_CIE_OIDC_Wrapper {
     }
 
     /**
-     * OpenID Federation /resolve endpoint.
-     * Returns a resolve-response+jwt signed with the federation key.
+     * Builds and signs the OpenID Federation /resolve response JWT.
+     *
+     * @since  1.0.0
+     * @param  string $sub          Entity identifier to resolve (defaults to own entity ID).
+     * @param  string $trust_anchor Trust anchor URI included in the payload.
+     * @return string Compact resolve-response+jwt.
+     * @throws Exception On signing or key-loading failure.
      */
     public function getResolveResponse($sub = '', $trust_anchor = '') {
         $base_sub = $this->getEntityId();
@@ -330,6 +396,12 @@ class WP_SPID_CIE_OIDC_Wrapper {
     }
 
 
+    /**
+     * Returns the normalized entity identifier (iss/sub/client_id).
+     *
+     * @since  1.0.0
+     * @return string Entity ID without trailing slash, or empty string if not configured.
+     */
     public function getEntityId() {
         $entity_id = $this->normalizeEntityIdentifier((string) ($this->config['entity_id'] ?? ''));
         if ($entity_id !== '') {
@@ -339,7 +411,12 @@ class WP_SPID_CIE_OIDC_Wrapper {
     }
 
     /**
-     * Generates the authorization URL.
+     * Builds the OIDC authorization URL with a signed Request Object.
+     *
+     * @since  1.0.0
+     * @param  string      $trust_anchor Trust anchor URL used to select provider type (SPID/CIE).
+     * @param  string|null $idp_id       Optional SPID IdP key to pre-select.
+     * @return string Authorization endpoint URL with query parameters.
      */
     public function getAuthorizationUrl($trust_anchor, $idp_id = null) {
         
@@ -413,8 +490,15 @@ class WP_SPID_CIE_OIDC_Wrapper {
         return $auth_endpoint . '?' . http_build_query($params);
     }
 
+    /**
+     * Stub for UserInfo endpoint support (not currently used).
+     *
+     * @since  1.0.0
+     * @param  array $get_params Request parameters.
+     * @return array Empty array (placeholder).
+     */
     public function getUserInfo($get_params) {
-        return []; 
+        return [];
     }
 
     // --- Private Helpers ---

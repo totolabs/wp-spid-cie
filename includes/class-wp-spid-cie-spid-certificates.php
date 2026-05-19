@@ -4,7 +4,21 @@ use phpseclib3\Crypt\PublicKeyLoader;
 use phpseclib3\Crypt\RSA;
 use phpseclib3\File\X509;
 
+/**
+ * Generates and validates SPID-compliant X.509 certificates.
+ *
+ * @since   1.0.0
+ * @package WP_SPID_CIE_OIDC
+ */
 class WP_SPID_CIE_OIDC_Spid_Certificates {
+    /**
+     * Generates a SPID-compliant self-signed RSA certificate and private key.
+     *
+     * @since  1.0.0
+     * @param  array $options Plugin options (organization_name, ipa_code, locality, etc.).
+     * @param  bool  $force   Force regeneration even if valid files already exist.
+     * @return array Result with keys 'success' (bool), 'paths' (array), 'errors' (array).
+     */
     public static function generate(array $options = [], bool $force = false): array {
         $key_dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir(true);
         $private_path = trailingslashit($key_dir) . 'private.key';
@@ -154,6 +168,15 @@ class WP_SPID_CIE_OIDC_Spid_Certificates {
         return ['success' => true, 'paths' => ['private' => $private_path, 'cert' => $cert_path, 'csr' => $csr_path], 'errors' => []];
     }
 
+    /**
+     * Validates a SPID certificate/key pair for conformance requirements.
+     *
+     * @since  1.0.0
+     * @param  string $private_path Filesystem path to the private key file.
+     * @param  string $cert_path    Filesystem path to the X.509 certificate file.
+     * @param  array  $options      Plugin options used for cross-validation (entity_id, ipa_code).
+     * @return array Result with keys 'valid' (bool), 'errors' (array), 'cert' (array|false).
+     */
     public static function validate(string $private_path, string $cert_path, array $options = []): array {
         $errors = [];
         if (!file_exists($private_path) || !is_readable($private_path)) {
@@ -252,6 +275,13 @@ class WP_SPID_CIE_OIDC_Spid_Certificates {
         return ['valid' => empty($errors), 'errors' => $errors, 'cert' => $cert_data];
     }
 
+    /**
+     * Returns a human-readable status summary for the current key/certificate pair.
+     *
+     * @since  1.0.0
+     * @param  array $options Plugin options passed through to validate().
+     * @return array Status map with keys: key_dir, private_path, cert_path, present, valid, errors, subject, expiry, modulus_match.
+     */
     public static function describe_status(array $options = []): array {
         $key_dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir();
         $private_path = trailingslashit($key_dir) . 'private.key';

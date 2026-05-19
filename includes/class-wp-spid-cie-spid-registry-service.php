@@ -1,5 +1,11 @@
 <?php
 
+/**
+ * Fetches and caches the SPID IdP list and details from the AgID registry.
+ *
+ * @since   1.0.0
+ * @package WP_SPID_CIE_OIDC
+ */
 class WP_SPID_CIE_OIDC_Spid_Registry_Service {
     const LIST_TRANSIENT = 'spid_saml_registry_idp_list_v2';
     const LIST_LKG_TRANSIENT = 'spid_saml_registry_idp_list_lkg_v2';
@@ -10,6 +16,13 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
     const REGISTRY_JSON_LIST_FALLBACK = 'https://registry.spid.gov.it/entities-idp?output=json';
     const REGISTRY_XML_LIST = 'https://registry.spid.gov.it/entities?entity_type=idp';
 
+    /**
+     * Returns the normalized list of SPID IdPs, using transient cache.
+     *
+     * @since  1.0.0
+     * @param  bool $force Bypass cache and force a fresh fetch.
+     * @return array|WP_Error Indexed array of IdP records, or error.
+     */
     public function get_idp_list(bool $force = false) {
         if (!$force) {
             $cached = get_transient(self::LIST_TRANSIENT);
@@ -93,6 +106,15 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
         return $normalized;
     }
 
+    /**
+     * Returns runtime configuration (SSO URL, certificate) for a single IdP.
+     *
+     * @since  1.0.0
+     * @param  string $entityId      IdP entity identifier.
+     * @param  string $registryLink  Optional direct link to the IdP's registry detail endpoint.
+     * @param  bool   $force         Bypass cache and force a fresh fetch.
+     * @return array|WP_Error IdP config map, or error.
+     */
     public function get_idp_detail(string $entityId, string $registryLink = '', bool $force = false) {
         $entityId = trim($entityId);
         if ($entityId === '') {
@@ -136,11 +158,23 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
         return $parsed;
     }
 
+    /**
+     * Clears the IdP list cache and triggers a fresh fetch.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function refresh_all(): void {
         delete_transient(self::LIST_TRANSIENT);
         $this->get_idp_list(true);
     }
 
+    /**
+     * Returns the last known registry fetch status (count, source, timestamp).
+     *
+     * @since  1.0.0
+     * @return array Status map with keys: count (int), source (string), fetched_at (int).
+     */
     public function get_status(): array {
         $status = get_transient(self::STATUS_TRANSIENT);
         if (!is_array($status)) {
