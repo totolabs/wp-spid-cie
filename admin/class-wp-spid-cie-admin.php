@@ -1,7 +1,7 @@
 <?php
 
 /**
- * La funzionalità specifica dell'area di amministrazione del plugin.
+ * Plugin-specific functionality for the administration area.
  *
  * @since      1.0.0
  * @package    WP_SPID_CIE_OIDC
@@ -28,7 +28,7 @@ class WP_SPID_CIE_OIDC_Admin {
     }
 
     /**
-     * Carica gli stili CSS per il pannello di amministrazione.
+     * Enqueues CSS styles for the administration panel.
      */
     public function enqueue_admin_styles($hook) {
         if (strpos($hook, $this->plugin_name) === false) {
@@ -162,7 +162,7 @@ class WP_SPID_CIE_OIDC_Admin {
             array( $this, 'sanitize_options' )
         );
 
-        // --- 1. DATI ANAGRAFICI ---
+        // --- 1. ENTITY DATA ---
         add_settings_section('ente_section', '1. Dati Anagrafici Ente', null, $this->plugin_name . '_ente');
         add_settings_field('organization_name', 'Denominazione Ente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section', 
             ['id' => 'organization_name', 'desc' => 'Es. Comune di Roma', 'placeholder' => 'Es. Comune di Roma']
@@ -183,7 +183,7 @@ class WP_SPID_CIE_OIDC_Admin {
             ['id' => 'entity_id', 'desc' => 'Identificativo entità usato come iss/sub/client_id. Mantiene lo slash finale se presente (es. https://demo.ente.it/).', 'placeholder' => 'https://demo.ente.it/']
         );
 
-        // --- 2. CRITTOGRAFIA ---
+        // --- 2. CRYPTOGRAPHY ---
         add_settings_section('keys_section', '2. Crittografia e Federazione', array($this, 'print_keys_section_info'), $this->plugin_name . '_keys');
         add_settings_field('oidc_keys_manager', 'Stato Chiavi', array($this, 'render_keys_manager'), $this->plugin_name . '_keys', 'keys_section');
 		add_settings_field(
@@ -255,13 +255,13 @@ class WP_SPID_CIE_OIDC_Admin {
 		  $this->plugin_name . '_keys',
 		  'keys_section'
 		);
-        // --- 3. ATTIVAZIONE SERVIZI ---
+        // --- 3. SERVICE ACTIVATION ---
         add_settings_section('providers_section', '3. Attivazione Servizi', null, $this->plugin_name . '_providers');
         
-        // SPID e relativo test
+        // SPID and related test
         add_settings_field('spid_enabled', 'Abilita SPID', array($this, 'render_checkbox_field'), $this->plugin_name . '_providers', 'providers_section', ['id' => 'spid_enabled', 'desc' => 'Mostra il pulsante "Entra con SPID".']);
         
-        // Spostiamo qui sotto il Test Environment (logicamente collegato a SPID)
+        // Test Environment below (logically linked to SPID)
         add_settings_field('spid_test_env', 'Ambiente di Test (Validator)', array($this, 'render_checkbox_field'), $this->plugin_name . '_providers', 'providers_section', 
             ['id' => 'spid_test_env', 'desc' => 'Abilita il provider "SPID Validator" (solo per collaudo tecnico AgID).']
         );
@@ -310,7 +310,7 @@ class WP_SPID_CIE_OIDC_Admin {
         add_settings_field('cie_userinfo_endpoint', 'CIE UserInfo endpoint', array($this, 'render_text_field'), $this->plugin_name . '_providers', 'providers_section', ['id' => 'cie_userinfo_endpoint', 'placeholder' => 'https://...', 'desc' => 'Opzionale.']);
         add_settings_field('cie_end_session_endpoint', 'CIE End Session endpoint', array($this, 'render_text_field'), $this->plugin_name . '_providers', 'providers_section', ['id' => 'cie_end_session_endpoint', 'placeholder' => 'https://...', 'desc' => 'Opzionale.']);
 
-        // --- 4. DISCLAIMER ---
+        // --- 4. NOTICES ---
         add_settings_section('disclaimer_section', '4. Gestione Avvisi (Disclaimer)', null, $this->plugin_name . '_disclaimer');
         add_settings_field('disclaimer_enabled', 'Attiva Messaggio Avviso', array($this, 'render_checkbox_field'), $this->plugin_name . '_disclaimer', 'disclaimer_section', 
             ['id' => 'disclaimer_enabled', 'desc' => 'Mostra un box di avviso sopra i pulsanti di login.']
