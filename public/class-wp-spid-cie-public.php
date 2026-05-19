@@ -1,7 +1,7 @@
 <?php
 
 /**
- * La funzionalità specifica dell'area pubblica del plugin.
+ * Plugin-specific functionality for the public-facing area.
  *
  * @package    WP_SPID_CIE_OIDC
  * @subpackage WP_SPID_CIE_OIDC/public
@@ -103,7 +103,7 @@ class WP_SPID_CIE_OIDC_Public {
 		add_rewrite_rule('^spid/saml/acs/?$',                   'index.php?spid_saml_route=acs',      'top');
 		add_rewrite_rule('^spid/saml/sls/?$',                   'index.php?spid_saml_route=sls',      'top');
 		add_rewrite_rule('^\.well-known/openid-federation/?$', 'index.php?oidc_federation=config', 'top');
-		add_rewrite_rule('^\.wellknown/openid-federation/?$',   'index.php?oidc_federation=config', 'top'); // alias (senza "-")
+		add_rewrite_rule('^\.wellknown/openid-federation/?$',   'index.php?oidc_federation=config', 'top'); // alias (without "-")
 		add_rewrite_rule('^jwks.json/?$',                       'index.php?oidc_federation=jwks',   'top');
 		add_rewrite_rule('^resolve/?$',                         'index.php?oidc_federation=resolve','top');
 
@@ -167,18 +167,18 @@ class WP_SPID_CIE_OIDC_Public {
 			}
 		}
 
-		// Per questi endpoint l'output deve essere "pulito":
-		// niente Notice/Deprecated/HTML che romperebbero JWT/JSON
+		// These endpoints must produce clean output:
+		// no Notice/Deprecated/HTML that would break JWT/JSON
 		@ini_set('display_errors', '0');
 		@ini_set('log_errors', '1');
 		error_reporting(0);
 
-		// Svuota qualsiasi buffer già aperto (tema/plugin)
+		// Flush any output buffer already opened (theme/plugin)
 		while (ob_get_level() > 0) {
 			@ob_end_clean();
 		}
 
-		// Log hits (senza dipendere dal Factory)
+		// Log hits (without depending on Factory)
 		$uploads = wp_upload_dir();
 		$keyDir  = trailingslashit($uploads['basedir']) . 'spid-cie-oidc-keys';
 		if ( ! is_dir($keyDir) ) {
@@ -204,7 +204,7 @@ class WP_SPID_CIE_OIDC_Public {
 			nocache_headers();
 			status_header(200);
 
-			// evita che venga trattato come download
+			// prevent browser from treating the response as a download
 			header_remove('Content-Disposition');
 			header('Content-Disposition: inline');
 			header('X-Content-Type-Options: nosniff');
@@ -244,7 +244,7 @@ class WP_SPID_CIE_OIDC_Public {
 
 				header('Content-Type: application/jwk-set+json; charset=utf-8');
 
-				// se getJwks ritorna array, lo serializziamo in JSON
+				// if getJwks returns an array, serialize it to JSON
 				if (is_array($jwks) || is_object($jwks)) {
 					echo wp_json_encode($jwks);
 				} else {
@@ -263,7 +263,7 @@ class WP_SPID_CIE_OIDC_Public {
 				exit;
 			}
 
-			// azione non supportata
+			// unsupported action
 			status_header(404);
 			header('Content-Type: text/plain; charset=utf-8');
 			echo 'Not found';
@@ -388,7 +388,7 @@ class WP_SPID_CIE_OIDC_Public {
 	private function is_official_sp_metadata_request(): bool {
 		$path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 		$path = '/' . ltrim((string) $path, '/');
-		// L'endpoint ufficiale pubblico /sp-metadata.xml deve restare riconosciuto anche con slash finale.
+		// The official public endpoint /sp-metadata.xml must be recognized even with a trailing slash.
 		if ($path !== '/') {
 			$path = rtrim($path, '/');
 		}

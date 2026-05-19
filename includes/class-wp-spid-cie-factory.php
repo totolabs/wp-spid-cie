@@ -1,8 +1,8 @@
 <?php
 
 /**
- * Factory per la creazione e configurazione dell'istanza client OIDC.
- * Wrapper per la libreria SPID_CIE_OIDC_PHP.
+ * Factory for creating and configuring the OIDC client instance.
+ * Wrapper for the SPID_CIE_OIDC_PHP library.
  *
  * @package    WP_SPID_CIE_OIDC
  * @subpackage WP_SPID_CIE_OIDC/includes
@@ -196,7 +196,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
 
     public function getEntityStatement() {
         $now = time();
-        $exp = $now + 21600; // 6 ore 
+        $exp = $now + 21600; // 6 hours
         $sub = $this->getEntityId();
         if ($sub === '') {
             throw new Exception('Issuer base_url non configurato');
@@ -259,8 +259,8 @@ class WP_SPID_CIE_OIDC_Wrapper {
     }
 
     /**
-     * Endpoint /resolve OpenID Federation.
-     * Ritorna un resolve-response+jwt firmato con la stessa chiave federativa.
+     * OpenID Federation /resolve endpoint.
+     * Returns a resolve-response+jwt signed with the federation key.
      */
     public function getResolveResponse($sub = '', $trust_anchor = '') {
         $base_sub = $this->getEntityId();
@@ -339,7 +339,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
     }
 
     /**
-     * Genera l'URL di autorizzazione.
+     * Generates the authorization URL.
      */
     public function getAuthorizationUrl($trust_anchor, $idp_id = null) {
         
@@ -354,16 +354,16 @@ class WP_SPID_CIE_OIDC_Wrapper {
         $_SESSION['oidc_nonce'] = $nonce;
 
         $auth_endpoint = '';
-        $issuer = ''; // Per il campo 'aud' del Request Object
+        $issuer = ''; // For the 'aud' field in the Request Object
         $scope = 'openid profile email';
         $provider_param = isset($_GET['provider']) ? $_GET['provider'] : '';
         $acr_values = 'https://www.spid.gov.it/SpidL2';
 
-        // Selezione Endpoint
+        // Endpoint selection
         if (strpos($trust_anchor, 'cie') !== false || $provider_param === 'cie') {
              // CIE
              $auth_endpoint = 'https://id.cie.gov.it/oidc/authorization';
-             $issuer = 'https://id.cie.gov.it/oidc/op/'; // Issuer CIE standard
+             $issuer = 'https://id.cie.gov.it/oidc/op/'; // CIE standard issuer
              $scope = 'openid profile email';
              $provider_param = 'cie';
              $acr_values = 'https://www.spid.gov.it/SpidL2'; 
@@ -381,11 +381,11 @@ class WP_SPID_CIE_OIDC_Wrapper {
              $issuer = $this->spid_providers[$selected_idp]['issuer'];
         }
 
-        // Costruzione Request Object (JWT)
+        // Build Request Object (JWT)
         $ro_payload = [
             'iss' => $this->config['base_url'],
             'sub' => $this->config['base_url'],
-            'aud' => [$issuer], // Audience fondamentale
+            'aud' => [$issuer], // Mandatory audience
             'iat' => time(),
             'exp' => time() + 300,
             'client_id' => $this->config['base_url'],
@@ -400,14 +400,14 @@ class WP_SPID_CIE_OIDC_Wrapper {
             'prompt' => 'login'
         ];
 
-        // Firma con header 'typ' => 'oauth-authz-req+jwt'
+        // Sign with header 'typ' => 'oauth-authz-req+jwt'
         $request_token = $this->signRequestObject($ro_payload);
 
         $params = [
             'client_id' => $this->config['base_url'],
             'response_type' => 'code',
             'scope' => $scope,
-            'request' => $request_token // Parametro obbligatorio
+            'request' => $request_token // Required parameter
         ];
 
         return $auth_endpoint . '?' . http_build_query($params);
@@ -417,7 +417,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
         return []; 
     }
 
-    // --- Helpers Privati ---
+    // --- Private Helpers ---
 
     private function buildJwkItem() {
         $crt_content = file_get_contents($this->config['key_dir'] . '/public.crt');
@@ -442,12 +442,12 @@ class WP_SPID_CIE_OIDC_Wrapper {
         return $jwk;
     }
 
-    // Firma Metadata (entity-statement+jwt)
+    // Sign Metadata (entity-statement+jwt)
     private function signJwt($payload) {
         return $this->signGenericJwt($payload, 'entity-statement+jwt');
     }
 
-    // Firma Request Object (oauth-authz-req+jwt)
+    // Sign Request Object (oauth-authz-req+jwt)
     private function signRequestObject($payload) {
         return $this->signGenericJwt($payload, 'oauth-authz-req+jwt');
     }
