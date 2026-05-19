@@ -63,7 +63,6 @@ class WP_SPID_CIE_OIDC_TokenValidator {
 
         $jwksUri = $providerConfig['jwks_uri'] ?? '';
         if (empty($jwksUri)) {
-            // TODO Milestone 2/4: supportare trust chain e JWKS caching avanzato.
             return new WP_Error('oidc_no_jwks', __('Impossibile verificare la firma del token.', 'wp-spid-cie'));
         }
 
