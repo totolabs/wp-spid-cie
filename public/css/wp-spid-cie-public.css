@@ -212,3 +212,11 @@ body.login .italia-it-button .italia-it-button-text {
     font-size: 0.9em;
     margin: 4px 0;
 }
+
+.wp-spid-cie-auth .spid-ico-btn {
+    height: 1.4em;
+    width: auto;
+    margin-right: 8px;
+    vertical-align: middle;
+    flex-shrink: 0;
+}
