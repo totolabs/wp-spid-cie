@@ -213,10 +213,13 @@ body.login .italia-it-button .italia-it-button-text {
     margin: 4px 0;
 }
 
-.wp-spid-cie-auth .spid-ico-btn {
-    height: 1.4em;
+.wp-spid-cie-auth .spid-agid-footer {
+    margin-top: 14px;
+    text-align: center;
+}
+
+.wp-spid-cie-auth .spid-agid-logo {
+    height: 40px;
     width: auto;
-    margin-right: 8px;
-    vertical-align: middle;
-    flex-shrink: 0;
+    opacity: 0.75;
 }

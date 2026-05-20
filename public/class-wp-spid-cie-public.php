@@ -1215,6 +1215,12 @@ private function extract_jwt_payload($jwt) {
                     'href' => $login_url_cie,
                 ]); ?>
             <?php endif; ?>
+
+            <div class="spid-agid-footer">
+                <img src="<?php echo esc_url(plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/spid-ico-circle-bb.svg'); ?>"
+                     alt="SPID - Sistema Pubblico di Identità Digitale - AgID"
+                     class="spid-agid-logo">
+            </div>
         </div>
         </div>
         <?php
@@ -1262,14 +1268,7 @@ private function extract_jwt_payload($jwt) {
             $attrs[] = $attr_name . '="' . esc_attr((string) $value) . '"';
         }
 
-        $inner = '';
-        if ($modifier === 'spid') {
-            $icon_url = esc_url(plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/spid-ico-circle-bb.svg');
-            $inner .= '<img src="' . $icon_url . '" alt="" class="spid-ico-btn" aria-hidden="true">';
-        }
-        $inner .= '<span>' . esc_html($label) . '</span>';
-
-        return '<' . $tag . ' ' . implode(' ', $attrs) . '>' . $inner . '</' . $tag . '>';
+        return '<' . $tag . ' ' . implode(' ', $attrs) . '>' . esc_html($label) . '</' . $tag . '>';
     }
 
     private function get_registry_service() {

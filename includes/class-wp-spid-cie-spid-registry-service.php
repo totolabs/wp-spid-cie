@@ -7,11 +7,11 @@
  * @package WP_SPID_CIE_OIDC
  */
 class WP_SPID_CIE_OIDC_Spid_Registry_Service {
-    const LIST_TRANSIENT = 'spid_saml_registry_idp_list_v2';
-    const LIST_LKG_TRANSIENT = 'spid_saml_registry_idp_list_lkg_v2';
+    const LIST_TRANSIENT = 'spid_saml_registry_idp_list_v3';
+    const LIST_LKG_TRANSIENT = 'spid_saml_registry_idp_list_lkg_v3';
     const DETAIL_PREFIX = 'spid_saml_registry_idp_detail_v3_';
     const DETAIL_LKG_PREFIX = 'spid_saml_registry_idp_detail_lkg_v3_';
-    const STATUS_TRANSIENT = 'spid_saml_registry_status_v2';
+    const STATUS_TRANSIENT = 'spid_saml_registry_status_v3';
     const REGISTRY_JSON_LIST = 'https://registry.spid.gov.it/entities-idp?custom=info_display_base&output=json';
     const REGISTRY_JSON_LIST_FALLBACK = 'https://registry.spid.gov.it/entities-idp?output=json';
     const REGISTRY_XML_LIST = 'https://registry.spid.gov.it/entities?entity_type=idp';
