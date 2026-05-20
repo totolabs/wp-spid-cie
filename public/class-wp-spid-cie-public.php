@@ -1141,8 +1141,10 @@ private function extract_jwt_payload($jwt) {
                         <?php endforeach; ?>
                         <li class="spid-dropdown-footer">
                             <a href="https://www.spid.gov.it/cos-e-spid/come-attivare-spid/" target="_blank" rel="noopener noreferrer">Non hai SPID?</a>
-                            &nbsp;|&nbsp; 
+                            &nbsp;|&nbsp;
                             <a href="https://www.spid.gov.it/" target="_blank" rel="noopener noreferrer">Maggiori informazioni</a>
+                            &nbsp;|&nbsp;
+                            <a href="https://helpdesk.spid.gov.it/" target="_blank" rel="noopener noreferrer">Serve aiuto?</a>
                         </li>
                     </ul>
                 </div>
@@ -1260,7 +1262,14 @@ private function extract_jwt_payload($jwt) {
             $attrs[] = $attr_name . '="' . esc_attr((string) $value) . '"';
         }
 
-        return '<' . $tag . ' ' . implode(' ', $attrs) . '>' . esc_html($label) . '</' . $tag . '>';
+        $inner = '';
+        if ($modifier === 'spid') {
+            $icon_url = esc_url(plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/spid-ico-circle-bb.svg');
+            $inner .= '<img src="' . $icon_url . '" alt="" class="spid-ico-btn" aria-hidden="true">';
+        }
+        $inner .= '<span>' . esc_html($label) . '</span>';
+
+        return '<' . $tag . ' ' . implode(' ', $attrs) . '>' . $inner . '</' . $tag . '>';
     }
 
     private function get_registry_service() {
