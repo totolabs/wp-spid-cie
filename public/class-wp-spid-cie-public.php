@@ -1217,8 +1217,8 @@ private function extract_jwt_payload($jwt) {
             <?php endif; ?>
 
             <div class="spid-agid-footer">
-                <img src="<?php echo esc_url(plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/spid-ico-circle-bb.svg'); ?>"
-                     alt="SPID - Sistema Pubblico di Identità Digitale - AgID"
+                <img src="<?php echo esc_url(plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/spid-agid-logo-lb.png'); ?>"
+                     alt="SPID - AgID Agenzia per l'Italia Digitale"
                      class="spid-agid-logo">
             </div>
         </div>
@@ -1268,7 +1268,14 @@ private function extract_jwt_payload($jwt) {
             $attrs[] = $attr_name . '="' . esc_attr((string) $value) . '"';
         }
 
-        return '<' . $tag . ' ' . implode(' ', $attrs) . '>' . esc_html($label) . '</' . $tag . '>';
+        $inner = '';
+        if ($modifier === 'spid') {
+            $icon_url = esc_url(plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/spid-ico-circle-bb.svg');
+            $inner .= '<img src="' . $icon_url . '" alt="" class="spid-ico-btn" aria-hidden="true">';
+        }
+        $inner .= '<span>' . esc_html($label) . '</span>';
+
+        return '<' . $tag . ' ' . implode(' ', $attrs) . '>' . $inner . '</' . $tag . '>';
     }
 
     private function get_registry_service() {
