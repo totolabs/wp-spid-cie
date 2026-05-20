@@ -342,7 +342,7 @@ class WP_SPID_CIE_OIDC_Admin {
         add_settings_field('disclaimer_enabled', 'Attiva Messaggio Avviso', array($this, 'render_checkbox_field'), $this->plugin_name . '_disclaimer', 'disclaimer_section', 
             ['id' => 'disclaimer_enabled', 'desc' => 'Mostra un box di avviso sopra i pulsanti di login.']
         );
-        $default_msg = "⚠️ <strong>Avviso Tecnico:</strong><br>I servizi di accesso SPID e CIE sono in fase di <strong>aggiornamento programmato</strong>. Il login potrebbe essere temporaneamente non disponibile.";
+        $default_msg = "⚠️ <strong>Avviso Tecnico:</strong> Il servizio \"Entra con CIE\" è temporaneamente non disponibile per aggiornamento tecnico. Il login con SPID è regolarmente operativo.";
         add_settings_field('disclaimer_text', 'Testo dell\'Avviso', array($this, 'render_textarea_field'), $this->plugin_name . '_disclaimer', 'disclaimer_section', 
             ['id' => 'disclaimer_text', 'default' => $default_msg, 'desc' => 'HTML consentito (es. &lt;strong&gt;, &lt;br&gt;).']
         );
@@ -586,7 +586,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
     private function render_disclaimer_preview(): void {
         $options = get_option($this->plugin_name . '_options', []);
-        $default_msg = "⚠️ <strong>Avviso Tecnico:</strong><br>I servizi di accesso SPID e CIE sono in fase di <strong>aggiornamento programmato</strong>. Il login potrebbe essere temporaneamente non disponibile.";
+        $default_msg = "⚠️ <strong>Avviso Tecnico:</strong> Il servizio \"Entra con CIE\" è temporaneamente non disponibile per aggiornamento tecnico. Il login con SPID è regolarmente operativo.";
         $text = !empty($options['disclaimer_text']) ? (string) $options['disclaimer_text'] : $default_msg;
 
         echo '<h3>Anteprima disclaimer</h3>';
