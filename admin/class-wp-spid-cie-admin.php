@@ -200,8 +200,11 @@ class WP_SPID_CIE_OIDC_Admin {
         add_settings_field('fiscal_number', 'Codice Fiscale Ente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section', 
             ['id' => 'fiscal_number', 'desc' => 'Codice Fiscale numerico (es. 80012345678)', 'placeholder' => '01234567890']
         );
-        add_settings_field('contacts_email', 'Email Contatto Tecnico', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section', 
+        add_settings_field('contacts_email', 'Email Contatto Tecnico', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
             ['id' => 'contacts_email', 'type' => 'email', 'desc' => 'Email per comunicazioni tecniche.', 'placeholder' => 'ced@ente.it']
+        );
+        add_settings_field('logo_uri', 'URL Logo Ente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
+            ['id' => 'logo_uri', 'desc' => 'URL pubblico del logo dell\'ente (es. https://www.comune.it/logo.png). Usato nella federazione CIE OIDC.', 'placeholder' => 'https://www.ente.it/logo.png']
         );
         add_settings_field('issuer_override', 'Issuer / Identificativo componente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
             ['id' => 'issuer_override', 'desc' => 'URL base HTTPS usato per endpoint e fallback metadata OIDC Federation.', 'placeholder' => 'https://demo.ente.it']
@@ -1664,7 +1667,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
         $current_tab = isset($input['_current_tab']) ? sanitize_key($input['_current_tab']) : 'ente';
         $allowed_by_tab = [
-            'ente' => ['organization_name', 'ipa_code', 'fiscal_number', 'contacts_email', 'issuer_override', 'entity_id'],
+            'ente' => ['organization_name', 'ipa_code', 'fiscal_number', 'contacts_email', 'logo_uri', 'issuer_override', 'entity_id'],
             'cie' => ['cie_trust_anchor_preprod', 'cie_trust_anchor_prod', 'spid_trust_anchor', 'cie_trust_mark_preprod', 'cie_trust_mark_prod'],
             'spid_oidc' => [
                 'discovery_mode', 'min_loa', 'spid_issuer', 'spid_scope', 'spid_acr_values',
@@ -1694,6 +1697,13 @@ class WP_SPID_CIE_OIDC_Admin {
         foreach ($text_fields as $f) {
             if (in_array($f, $allowed, true) && isset($input[$f])) {
                 $new_input[$f] = sanitize_text_field($input[$f]);
+            }
+        }
+
+        $url_fields = ['logo_uri'];
+        foreach ($url_fields as $f) {
+            if (in_array($f, $allowed, true) && isset($input[$f])) {
+                $new_input[$f] = esc_url_raw(trim((string) $input[$f]));
             }
         }
 
