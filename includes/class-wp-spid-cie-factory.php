@@ -275,7 +275,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
             "jwks" => $jwks_structure,
             "client_name" => $this->config['organization_name'],
             "contacts" => [$this->config['contacts_email']],
-            "grant_types" => ["authorization_code", "refresh_token"],
+            "grant_types" => ["authorization_code"],
             "redirect_uris" => [
                 add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], $endpoint_base),
                 add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], $endpoint_base)
@@ -361,7 +361,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
                     'jwks' => $jwks_structure,
                     'client_name' => $this->config['organization_name'],
                     'contacts' => [$this->config['contacts_email']],
-                    'grant_types' => ['authorization_code', 'refresh_token'],
+                    'grant_types' => ['authorization_code'],
                     'redirect_uris' => [
                         add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], $endpoint_base),
                         add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], $endpoint_base)
@@ -591,7 +591,6 @@ class WP_SPID_CIE_OIDC_Wrapper {
             'organization_name' => $this->config['organization_name'],
             'homepage_uri' => $endpoint_base,
             'policy_uri' => $endpoint_base . '/privacy-policy',
-            'logo_uri' => $endpoint_base . '/wp-admin/images/w-logo-blue.png',
             'contacts' => [$this->config['contacts_email']],
             'federation_resolve_endpoint' => $endpoint_base . '/resolve',
         ];
