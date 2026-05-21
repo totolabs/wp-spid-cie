@@ -47,6 +47,7 @@ class WP_SPID_CIE_OIDC_Factory {
             'ipa_code'          => $options['ipa_code'] ?? '',
             'fiscal_number'     => $options['fiscal_number'] ?? '',
             'contacts_email'    => $options['contacts_email'] ?? get_option('admin_email'),
+            'logo_uri'          => isset($options['logo_uri']) ? esc_url_raw((string) $options['logo_uri']) : '',
             'spid_saml_locality_name' => $options['spid_saml_locality_name'] ?? '',
             'spid_cert_org_name'      => $options['spid_cert_org_name'] ?? '',
             'base_url'          => $base_url,
@@ -594,6 +595,10 @@ class WP_SPID_CIE_OIDC_Wrapper {
             'contacts' => [$this->config['contacts_email']],
             'federation_resolve_endpoint' => $endpoint_base . '/resolve',
         ];
+
+        if (!empty($this->config['logo_uri'])) {
+            $metadata['logo_uri'] = $this->config['logo_uri'];
+        }
 
         if (!$include_extended_fields) {
             return $metadata;
