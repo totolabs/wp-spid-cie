@@ -208,7 +208,7 @@ assert_true(isset($entityRpMetadata['jwks']['keys'][0]), 'La metadata RP deve co
 assert_true(($entityRpMetadata['client_id'] ?? '') === $entityStatementPayload['sub'], 'client_id deve coincidere con l\'entity identifier normalizzato.');
 assert_true(in_array('automatic', $entityRpMetadata['client_registration_types'] ?? [], true), 'client_registration_types deve contenere automatic.');
 assert_true(in_array('authorization_code', $entityRpMetadata['grant_types'] ?? [], true), 'grant_types deve contenere authorization_code.');
-assert_true(in_array('refresh_token', $entityRpMetadata['grant_types'] ?? [], true), 'grant_types deve contenere refresh_token.');
+assert_true(!in_array('refresh_token', $entityRpMetadata['grant_types'] ?? [], true), 'grant_types non deve contenere refresh_token (non supportato da CIE OIDC Federation).');
 assert_true(in_array('code', $entityRpMetadata['response_types'] ?? [], true), 'response_types deve contenere code.');
 foreach (($entityRpMetadata['redirect_uris'] ?? []) as $redirect_uri) {
     assert_true(strpos((string) $redirect_uri, 'https://example.gov.it?') === 0, 'redirect_uris deve usare HTTPS ed essere coerente con il dominio.');
