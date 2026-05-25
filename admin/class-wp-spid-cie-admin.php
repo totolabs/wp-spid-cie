@@ -192,7 +192,7 @@ class WP_SPID_CIE_OIDC_Admin {
         // --- 1. ENTITY DATA ---
         add_settings_section('ente_section', '1. Dati Anagrafici Ente', null, $this->plugin_name . '_ente');
         add_settings_field('organization_name', 'Denominazione Ente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section', 
-            ['id' => 'organization_name', 'desc' => 'Es. Comune di Roma', 'placeholder' => 'Es. Comune di Roma']
+            ['id' => 'organization_name', 'desc' => 'Denominazione ufficiale dell\'ente come registrata su IPA (max 64 caratteri). Se superiore ai 64 caratteri è necessario aggiornare la denominazione AOO su IPA prima di procedere.', 'placeholder' => 'Es. Comune di Roma']
         );
         add_settings_field('ipa_code', 'Codice IPA', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section', 
             ['id' => 'ipa_code', 'desc' => 'Codice univoco IPA (es. c_h501)', 'placeholder' => 'c_h501']
@@ -204,7 +204,7 @@ class WP_SPID_CIE_OIDC_Admin {
             ['id' => 'contacts_email', 'type' => 'email', 'desc' => 'Email per comunicazioni tecniche.', 'placeholder' => 'ced@ente.it']
         );
         add_settings_field('logo_uri', 'URL Logo Ente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
-            ['id' => 'logo_uri', 'desc' => 'URL pubblico del logo dell\'ente (es. https://www.comune.it/logo.png). Usato nella federazione CIE OIDC.', 'placeholder' => 'https://www.ente.it/logo.png']
+            ['id' => 'logo_uri', 'desc' => 'URL pubblico del logo dell\'ente in formato SVG (es. https://www.ente.it/logo.svg). Dimensioni consigliate: 200×200px. Obbligatorio per la federazione CIE OIDC.', 'placeholder' => 'https://www.ente.it/logo.svg']
         );
         add_settings_field('issuer_override', 'Issuer / Identificativo componente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
             ['id' => 'issuer_override', 'desc' => 'URL base HTTPS usato per endpoint e fallback metadata OIDC Federation.', 'placeholder' => 'https://demo.ente.it']
@@ -264,24 +264,16 @@ class WP_SPID_CIE_OIDC_Admin {
 		  ['id' => 'cie_trust_mark_prod', 'desc' => 'Incolla qui il JWT Trust Mark rilasciato dal portale CIE prod.']
 		);
 		add_settings_field(
-		  'public_key_pem',
-		  'Chiave pubblica di federazione (PEM)',
-		  array($this, 'render_public_key_field'),
-		  $this->plugin_name . '_keys',
-		  'keys_section'
-		);
-		add_settings_field(
 		  'cie_certificate_pem',
-		  'Certificato pubblico (X.509) per portale CIE',
+		  'Certificato pubblico (X.509)',
 		  array($this, 'render_cie_certificate_field'),
 		  $this->plugin_name . '_keys',
 		  'keys_section'
 		);
-
 		add_settings_field(
-		  'public_key_raw_pem',
-		  'Chiave pubblica (PEM) – raw',
-		  array($this, 'render_public_key_raw_field'),
+		  'jwks_json_viewer',
+		  'Chiave pubblica JWKS (JSON)',
+		  array($this, 'render_jwks_json_field'),
 		  $this->plugin_name . '_keys',
 		  'keys_section'
 		);
@@ -1207,7 +1199,6 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '<h2>Impostazioni SPID SAML</h2>';
         echo '<p class="description">Se lasci vuoto, usiamo automaticamente i valori del tab A. Ente.</p>';
 
-        $this->render_text_field(['id' => 'spid_cert_org_name', 'placeholder' => 'Es. ORDINE DEI FISIOTERAPISTI DI NAPOLI...', 'desc' => 'Denominazione per certificato SPID (campi O e CN, max 64 caratteri). Se compilata sovrascrive la denominazione ente. Usare la denominazione AOO ufficiale IPA.']);
         $this->render_text_field(['id' => 'spid_saml_country_name', 'placeholder' => 'IT', 'desc' => 'countryName (esempio: IT)']);
         $this->render_text_field(['id' => 'spid_saml_state_or_province_name', 'placeholder' => 'Roma', 'desc' => 'stateOrProvinceName (esempio: Roma)']);
         $this->render_text_field(['id' => 'spid_saml_locality_name', 'placeholder' => 'Roma', 'desc' => 'localityName (esempio: Roma)']);
@@ -1610,6 +1601,29 @@ class WP_SPID_CIE_OIDC_Admin {
 			10,
 			$help
 		);
+	}
+
+    /**
+     * Renders the JWKS JSON viewer with a direct URL link and copyable content.
+     *
+     * @since  1.3.0
+     * @return void
+     */
+	public function render_jwks_json_field(): void {
+		$jwks_url = home_url('/jwks.json');
+
+		echo '<p class="description">URL diretto: <code><a href="' . esc_url($jwks_url) . '" target="_blank">' . esc_html($jwks_url) . '</a></code></p>';
+		echo '<button type="button" class="button" style="margin-bottom:8px;" onclick="navigator.clipboard.writeText(\'' . esc_js($jwks_url) . '\')">Copia URL</button>';
+
+		$jwks_content = @file_get_contents($jwks_url); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		if ($jwks_content !== false && $jwks_content !== '') {
+			echo '<br><textarea id="jwks-json-content" class="large-text code" rows="4" style="font-family:monospace;font-size:11px;" readonly>' . esc_textarea($jwks_content) . '</textarea>';
+			echo '<p><button type="button" class="button" onclick="(function(){const el=document.getElementById(\'jwks-json-content\'); el.select(); document.execCommand(\'copy\');})();">Copia JSON</button></p>';
+		} else {
+			echo '<p class="description" style="color:#996600;">Contenuto JWKS non disponibile in anteprima. Apri il link sopra per visualizzarlo.</p>';
+		}
+
+		echo '<p class="description">Contiene la chiave pubblica EC usata per la federazione CIE OIDC. Da comunicare al portale di federazione.</p>';
 	}
 
     /**
