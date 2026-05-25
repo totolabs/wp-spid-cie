@@ -159,7 +159,7 @@ register_activation_hook(__FILE__, 'wp_spid_cie_activate');
  * @return array
  */
 function wp_spid_cie_plugin_action_links( $links ) {
-	$settings_url = admin_url( 'options-general.php?page=wp-spid-cie' );
+	$settings_url = admin_url( 'admin.php?page=wp-spid-cie' );
 	$settings_link = '<a href="' . esc_url( $settings_url ) . '">' . esc_html__( 'Settings', 'wp-spid-cie' ) . '</a>';
 
 	array_unshift( $links, $settings_link );

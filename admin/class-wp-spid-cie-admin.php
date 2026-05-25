@@ -60,12 +60,14 @@ class WP_SPID_CIE_OIDC_Admin {
      * @return void
      */
     public function add_options_page() {
-        add_options_page(
-            'Configurazione SPID & CIE', // Titolo pagina browser
-            'SPID & CIE Login',          // Titolo menu (Più user friendly)
-            'manage_options', 
-            $this->plugin_name, 
-            array( $this, 'create_admin_page' )
+        add_menu_page(
+            'SPID & CIE Login',
+            'SPID & CIE Login',
+            'manage_options',
+            $this->plugin_name,
+            array($this, 'create_admin_page'),
+            'dashicons-id-alt',
+            80
         );
     }
 
@@ -80,14 +82,14 @@ class WP_SPID_CIE_OIDC_Admin {
         $tabs = $this->get_admin_tabs();
         ?>
         <div class="wrap">
-            <h1 class="wp-heading-inline">SPID & CIE Login (PNRR 1.4.4)</h1>
+            <h1 class="wp-heading-inline">SPID & CIE Login</h1>
             <hr class="wp-header-end">
             
             <?php settings_errors(); ?>
 
             <nav class="nav-tab-wrapper spid-tabs" aria-label="Sezioni configurazione SPID CIE OIDC">
                 <?php foreach ($tabs as $tab_key => $tab): ?>
-                    <?php $url = add_query_arg(['page' => $this->plugin_name, 'tab' => $tab_key], admin_url('options-general.php')); ?>
+                    <?php $url = add_query_arg(['page' => $this->plugin_name, 'tab' => $tab_key], admin_url('admin.php')); ?>
                     <a href="<?php echo esc_url($url); ?>" class="nav-tab <?php echo $current_tab === $tab_key ? 'nav-tab-active' : ''; ?>">
                         <?php echo esc_html($tab['label']); ?>
                     </a>
@@ -964,7 +966,7 @@ class WP_SPID_CIE_OIDC_Admin {
         $options['spid_saml_idp_last_sync'] = time();
         update_option($this->plugin_name . '_options', $options, false);
 
-        wp_safe_redirect(add_query_arg(['page' => $this->plugin_name, 'tab' => 'spid_saml', 'registry_refreshed' => '1'], admin_url('options-general.php')));
+        wp_safe_redirect(add_query_arg(['page' => $this->plugin_name, 'tab' => 'spid_saml', 'registry_refreshed' => '1'], admin_url('admin.php')));
         exit;
     }
 
@@ -1061,7 +1063,7 @@ class WP_SPID_CIE_OIDC_Admin {
                 $redirect_args['metadata_token_reason'] = $reason;
             }
 
-            wp_safe_redirect(add_query_arg($redirect_args, admin_url('options-general.php')));
+            wp_safe_redirect(add_query_arg($redirect_args, admin_url('admin.php')));
             exit;
         }
 
@@ -1100,7 +1102,7 @@ class WP_SPID_CIE_OIDC_Admin {
                 $redirect_args['metadata_token_reason'] = $reason;
             }
 
-            wp_safe_redirect(add_query_arg($redirect_args, admin_url('options-general.php')));
+            wp_safe_redirect(add_query_arg($redirect_args, admin_url('admin.php')));
             exit;
         }
     }
@@ -1211,7 +1213,7 @@ class WP_SPID_CIE_OIDC_Admin {
             echo '<p><strong>Ultimo aggiornamento registry:</strong> ' . esc_html(wp_date('d/m/Y H:i:s', $lastSync)) . '</p>';
         }
 
-        $refresh_url = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'spid_saml','action'=>'spid_saml_refresh_registry'], admin_url('options-general.php')), 'spid_saml_refresh_registry');
+        $refresh_url = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'spid_saml','action'=>'spid_saml_refresh_registry'], admin_url('admin.php')), 'spid_saml_refresh_registry');
         echo '<p><a class="button button-secondary" href="' . esc_url($refresh_url) . '">Aggiorna Registry IdP ora</a></p>';
 
         echo '<hr><h3>Opzioni avanzate</h3>';
@@ -1308,10 +1310,10 @@ class WP_SPID_CIE_OIDC_Admin {
             echo '<p><strong>URL protetta Aggregator (legacy):</strong> <code>' . esc_html($protected_agg_url) . '</code></p>';
         }
 
-        $toggle = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'stato','toggle_metadata_token'=>'1'], admin_url('options-general.php')), 'spid_saml_toggle_metadata_token');
+        $toggle = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'stato','toggle_metadata_token'=>'1'], admin_url('admin.php')), 'spid_saml_toggle_metadata_token');
         echo '<p><a class="button button-secondary" href="' . esc_url($toggle) . '">' . ($token_required ? 'Disattiva protezione token' : 'Attiva protezione token') . '</a></p>';
 
-        $regen = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'stato','regen_metadata_token'=>'1'], admin_url('options-general.php')), 'spid_saml_regen_token');
+        $regen = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'stato','regen_metadata_token'=>'1'], admin_url('admin.php')), 'spid_saml_regen_token');
         echo '<p><a class="button button-secondary" onclick="return confirm(\'Rigenerare il token rendera invalidi i vecchi URL protetti.\');" href="' . esc_url($regen) . '">Rigenera token metadata</a></p>';
     }
 
@@ -1333,11 +1335,11 @@ class WP_SPID_CIE_OIDC_Admin {
             try {
                 $client = WP_SPID_CIE_OIDC_Factory::get_client();
                 $client->generateKeys();
-                wp_redirect(admin_url('options-general.php?page=' . $this->plugin_name . '&tab=cie&keys-generated=true'));
+                wp_redirect(admin_url('admin.php?page=' . $this->plugin_name . '&tab=cie&keys-generated=true'));
                 exit;
             } catch (Exception $e) {
                 set_transient('spid_cie_oidc_error', $e->getMessage(), 45);
-                wp_redirect(admin_url('options-general.php?page=' . $this->plugin_name . '&tab=cie&keys-error=true'));
+                wp_redirect(admin_url('admin.php?page=' . $this->plugin_name . '&tab=cie&keys-error=true'));
                 exit;
             }
         }
@@ -1378,7 +1380,7 @@ class WP_SPID_CIE_OIDC_Admin {
         }
 
         echo '<p style="margin: 15px 0;">';
-        $generation_url = wp_nonce_url(admin_url('options-general.php?page=' . $this->plugin_name . '&action=generate_oidc_keys'), 'generate_oidc_keys_nonce');
+        $generation_url = wp_nonce_url(admin_url('admin.php?page=' . $this->plugin_name . '&action=generate_oidc_keys'), 'generate_oidc_keys_nonce');
         echo '<a href="' . esc_url($generation_url) . '" class="button button-secondary" onclick="return confirm(\'Rigenerare i certificati cambia la fingerprint e richiede l\'aggiornamento dei metadata pubblicati su AgID/CIE. Continuare?\');">'. ($keys_exist ? 'Genera/Rigenera certificati SPID' : 'Genera/Rigenera certificati SPID') .'</a>';
         echo '</p>';
 
@@ -1682,7 +1684,7 @@ class WP_SPID_CIE_OIDC_Admin {
             ],
             'impostazioni' => ['spid_enabled', 'cie_enabled', 'spid_auth_method', 'spid_saml_validator_enabled', 'disclaimer_enabled', 'disclaimer_text', 'user_provisioning_enabled', 'user_default_role'],
             'stato' => [],
-            'spid_saml' => ['spid_cert_org_name', 'spid_saml_entity_id', 'spid_saml_debug', 'spid_saml_clock_skew', 'spid_saml_level', 'spid_saml_binding', 'spid_saml_idp_entity_id', 'spid_saml_idp_sso_url', 'spid_saml_idp_slo_url', 'spid_saml_idp_x509_cert', 'spid_saml_idp_metadata_xml', 'spid_saml_idp_cert', 'spid_saml_show_advanced', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'spid_saml_idp_mode', 'spid_saml_idp_registry_selected', 'spid_saml_idp_registry_link', 'spid_saml_idp_last_sync', 'spid_saml_metadata_token', 'spid_saml_requested_attributes'],
+            'spid_saml' => ['spid_saml_entity_id', 'spid_saml_debug', 'spid_saml_clock_skew', 'spid_saml_level', 'spid_saml_binding', 'spid_saml_idp_entity_id', 'spid_saml_idp_sso_url', 'spid_saml_idp_slo_url', 'spid_saml_idp_x509_cert', 'spid_saml_idp_metadata_xml', 'spid_saml_idp_cert', 'spid_saml_show_advanced', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'spid_saml_idp_mode', 'spid_saml_idp_registry_selected', 'spid_saml_idp_registry_link', 'spid_saml_idp_last_sync', 'spid_saml_metadata_token', 'spid_saml_requested_attributes'],
         ];
 
         $new_input = $existing;
@@ -1700,7 +1702,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
         $allowed = $allowed_by_tab[$current_tab] ?? [];
 
-        $text_fields = ['organization_name', 'ipa_code', 'fiscal_number', 'contacts_email', 'spid_scope', 'cie_scope', 'spid_acr_values', 'cie_acr_values', 'spid_saml_clock_skew', 'spid_cert_org_name', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'sp_org_name', 'sp_org_display_name', 'sp_contact_ipa_code', 'sp_contact_fiscal_code', 'sp_contact_email', 'sp_contact_phone'];
+        $text_fields = ['organization_name', 'ipa_code', 'fiscal_number', 'contacts_email', 'spid_scope', 'cie_scope', 'spid_acr_values', 'cie_acr_values', 'spid_saml_clock_skew', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'sp_org_name', 'sp_org_display_name', 'sp_contact_ipa_code', 'sp_contact_fiscal_code', 'sp_contact_email', 'sp_contact_phone'];
         foreach ($text_fields as $f) {
             if (in_array($f, $allowed, true) && isset($input[$f])) {
                 $new_input[$f] = sanitize_text_field($input[$f]);
