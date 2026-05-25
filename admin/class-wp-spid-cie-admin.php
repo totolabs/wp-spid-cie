@@ -1197,20 +1197,13 @@ class WP_SPID_CIE_OIDC_Admin {
         $options = get_option($this->plugin_name . '_options', []);
         $d = $this->get_spid_saml_defaults($options);
         echo '<h2>Impostazioni SPID SAML</h2>';
-        echo '<p class="description">Se lasci vuoto, usiamo automaticamente i valori del tab A. Ente.</p>';
+        echo '<p class="description">Se lasci vuoto, usiamo automaticamente i valori del tab 1. Ente.<br>I dati anagrafici (denominazione, IPA, codice fiscale, email) vengono letti dalla Tab 1 — non è necessario reinserirli qui.</p>';
 
         $this->render_text_field(['id' => 'spid_saml_country_name', 'placeholder' => 'IT', 'desc' => 'countryName (esempio: IT)']);
         $this->render_text_field(['id' => 'spid_saml_state_or_province_name', 'placeholder' => 'Roma', 'desc' => 'stateOrProvinceName (esempio: Roma)']);
         $this->render_text_field(['id' => 'spid_saml_locality_name', 'placeholder' => 'Roma', 'desc' => 'localityName (esempio: Roma)']);
         $this->render_text_field(['id' => 'spid_saml_common_name', 'placeholder' => $d['commonName'], 'desc' => 'commonName (esempio: comune.example.it)']);
         $this->render_text_field(['id' => 'spid_saml_email_address', 'placeholder' => $d['emailAddress'], 'desc' => 'emailAddress (esempio: protocollo@ente.it)']);
-
-        $this->render_text_field(['id' => 'sp_org_name', 'placeholder' => $d['sp_org_name'], 'desc' => 'Denominazione ente']);
-        $this->render_text_field(['id' => 'sp_org_display_name', 'placeholder' => $d['sp_org_display_name'], 'desc' => 'Nome pubblico ente']);
-        $this->render_text_field(['id' => 'sp_contact_ipa_code', 'placeholder' => $d['sp_contact_ipa_code'], 'desc' => 'Codice IPA']);
-        $this->render_text_field(['id' => 'sp_contact_fiscal_code', 'placeholder' => $d['sp_contact_fiscal_code'], 'desc' => 'Codice fiscale ente']);
-        $this->render_text_field(['id' => 'sp_contact_email', 'placeholder' => $d['sp_contact_email'], 'desc' => 'Email contatto tecnico']);
-        $this->render_text_field(['id' => 'sp_contact_phone', 'placeholder' => $d['sp_contact_phone'], 'desc' => 'Telefono contatto (opzionale)']);
 
         $registryStatus = $this->get_registry_service()->get_status();
         $lastSync = (int) ($registryStatus['fetched_at'] ?? 0);
@@ -1689,7 +1682,7 @@ class WP_SPID_CIE_OIDC_Admin {
             ],
             'impostazioni' => ['spid_enabled', 'cie_enabled', 'spid_auth_method', 'spid_saml_validator_enabled', 'disclaimer_enabled', 'disclaimer_text', 'user_provisioning_enabled', 'user_default_role'],
             'stato' => [],
-            'spid_saml' => ['spid_cert_org_name', 'spid_saml_entity_id', 'spid_saml_debug', 'spid_saml_clock_skew', 'spid_saml_level', 'spid_saml_binding', 'spid_saml_idp_entity_id', 'spid_saml_idp_sso_url', 'spid_saml_idp_slo_url', 'spid_saml_idp_x509_cert', 'spid_saml_idp_metadata_xml', 'spid_saml_idp_cert', 'spid_saml_show_advanced', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'sp_org_name', 'sp_org_display_name', 'sp_contact_ipa_code', 'sp_contact_fiscal_code', 'sp_contact_email', 'sp_contact_phone', 'spid_saml_idp_mode', 'spid_saml_idp_registry_selected', 'spid_saml_idp_registry_link', 'spid_saml_idp_last_sync', 'spid_saml_metadata_token', 'spid_saml_requested_attributes'],
+            'spid_saml' => ['spid_cert_org_name', 'spid_saml_entity_id', 'spid_saml_debug', 'spid_saml_clock_skew', 'spid_saml_level', 'spid_saml_binding', 'spid_saml_idp_entity_id', 'spid_saml_idp_sso_url', 'spid_saml_idp_slo_url', 'spid_saml_idp_x509_cert', 'spid_saml_idp_metadata_xml', 'spid_saml_idp_cert', 'spid_saml_show_advanced', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'spid_saml_idp_mode', 'spid_saml_idp_registry_selected', 'spid_saml_idp_registry_link', 'spid_saml_idp_last_sync', 'spid_saml_metadata_token', 'spid_saml_requested_attributes'],
         ];
 
         $new_input = $existing;
