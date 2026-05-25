@@ -141,3 +141,26 @@ input.code {
     display: inline-block;
     margin-top: 2px;
 }
+
+.spid-idp-diagnostic-table {
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: collapse;
+    font-size: 11px;
+}
+.spid-idp-diagnostic-table td,
+.spid-idp-diagnostic-table th {
+    word-break: break-all;
+    overflow-wrap: break-word;
+    padding: 4px 6px;
+    border: 1px solid #ddd;
+    vertical-align: top;
+}
+.spid-idp-diagnostic-table th {
+    background: #f0f0f0;
+    font-weight: 600;
+}
+.spid-idp-diagnostic-table td:first-child { width: 20%; }
+.spid-idp-diagnostic-table td:nth-child(2) { width: 15%; }
+.spid-idp-diagnostic-table td:nth-child(3) { width: 32%; }
+.spid-idp-diagnostic-table td:nth-child(4) { width: 33%; }
