@@ -58,18 +58,10 @@ class WP_SPID_CIE_OIDC_Spid_Certificates {
             return ['success' => false, 'errors' => ['Codice IPA mancante: impossibile valorizzare organizationIdentifier (2.5.4.97).']];
         }
 
-        $cert_org = trim((string) ($options['spid_cert_org_name'] ?? ''));
-        if ($cert_org !== '') {
-            $org = $cert_org;
-        }
-
         $cn_default = trim((string) ($options['sp_org_display_name'] ?? $org));
         $common_name = trim((string) ($options['spid_saml_common_name'] ?? $cn_default));
         if ($common_name === '') {
             $common_name = $cn_default;
-        }
-        if ($cert_org !== '') {
-            $common_name = $cert_org;
         }
 
         $dn = [
