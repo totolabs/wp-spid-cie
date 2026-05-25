@@ -1167,7 +1167,7 @@ class WP_SPID_CIE_OIDC_Admin {
         $method->setAccessible(true);
 
         echo '<h3>IdP logos diagnostic</h3>';
-        echo '<table class="widefat striped" role="table"><thead><tr><th>entity_id</th><th>name</th><th>logo_uri (registry, host)</th><th>logo_resolved (local/remote)</th></tr></thead><tbody>';
+        echo '<table class="widefat striped spid-idp-diagnostic-table" role="table"><thead><tr><th>entity_id</th><th>name</th><th>logo_uri (registry, host)</th><th>logo_resolved (local/remote)</th></tr></thead><tbody>';
 
         foreach ($list as $item) {
             if (!is_array($item)) {
