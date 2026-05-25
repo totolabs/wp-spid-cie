@@ -1272,6 +1272,9 @@ private function extract_jwt_payload($jwt) {
         if ($modifier === 'spid') {
             $icon_url = esc_url(plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/spid-ico-circle-bb.svg');
             $inner .= '<img src="' . $icon_url . '" alt="" class="spid-ico-btn" aria-hidden="true">';
+        } elseif ($modifier === 'cie') {
+            $icon_url = esc_url(plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/cie-ico-circle.svg');
+            $inner .= '<img src="' . $icon_url . '" alt="" class="spid-ico-btn cie-ico-btn" aria-hidden="true">';
         }
         $inner .= '<span>' . esc_html($label) . '</span>';
 
