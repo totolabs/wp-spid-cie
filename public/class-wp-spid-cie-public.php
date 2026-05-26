@@ -865,10 +865,7 @@ private function extract_jwt_payload($jwt) {
         $provider = isset($_GET['provider']) ? sanitize_key(wp_unslash($_GET['provider'])) : get_query_var('provider');
         $idp = isset($_GET['idp']) ? sanitize_key(wp_unslash($_GET['idp'])) : get_query_var('idp');
 
-        error_log('[CIE_DEBUG] handle_login_flow: action=' . $action . ' provider=' . $provider);
-
         if (!in_array($action, ['login', 'callback'], true) || !in_array($provider, ['spid', 'cie'], true)) {
-            error_log('[CIE_DEBUG] handle_login_flow: early return — action/provider not valid');
             return;
         }
 
@@ -890,7 +887,6 @@ private function extract_jwt_payload($jwt) {
         $registry = WP_SPID_CIE_OIDC_Factory::get_provider_registry();
         $provider_config = $registry->resolveConfig($provider, $idp);
         if (is_wp_error($provider_config)) {
-            error_log('[CIE_DEBUG] handle_login_flow: resolveConfig FAILED — ' . $provider_config->get_error_code());
             $logger->error('OIDC provider config resolution failed', [
                 'correlation_id' => $correlation_id,
                 'provider' => $provider,
@@ -899,13 +895,10 @@ private function extract_jwt_payload($jwt) {
             $this->redirect_to_login_error($provider_config->get_error_code());
             return;
         }
-        error_log('[CIE_DEBUG] handle_login_flow: resolveConfig OK auth_ep=' . ($provider_config['authorization_endpoint'] ?? 'MISSING'));
-
         if ($action === 'login') {
             $target_url = $this->resolve_redirect_target();
             $auth_url = $oidc->buildAuthorizationUrl($provider_config, $target_url, $correlation_id);
             if (is_wp_error($auth_url)) {
-                error_log('[CIE_DEBUG] handle_login_flow: buildAuthorizationUrl FAILED — ' . $auth_url->get_error_code());
                 $logger->error('OIDC start login failed', [
                     'correlation_id' => $correlation_id,
                     'provider' => $provider,
@@ -915,7 +908,6 @@ private function extract_jwt_payload($jwt) {
                 return;
             }
 
-            error_log('[CIE_DEBUG] handle_login_flow: wp_redirect to=' . substr($auth_url, 0, 80));
             $logger->info('OIDC start login redirect', [
                 'correlation_id' => $correlation_id,
                 'provider' => $provider,
