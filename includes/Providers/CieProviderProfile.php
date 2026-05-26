@@ -27,10 +27,10 @@ class WP_SPID_CIE_OIDC_CieProviderProfile implements WP_SPID_CIE_OIDC_ProviderPr
         return [
             'provider' => 'cie',
             'provider_id' => 'cie',
-            'issuer' => untrailingslashit((string) ($options['cie_issuer'] ?? 'https://id.cie.gov.it/oidc/op')),
-            'authorization_endpoint' => (string) ($options['cie_authorization_endpoint'] ?? 'https://id.cie.gov.it/oidc/authorization'),
-            'token_endpoint' => (string) ($options['cie_token_endpoint'] ?? 'https://id.cie.gov.it/oidc/token'),
-            'jwks_uri' => (string) ($options['cie_jwks_uri'] ?? 'https://id.cie.gov.it/oidc/jwks'),
+            'issuer' => untrailingslashit(!empty($options['cie_issuer']) ? (string) $options['cie_issuer'] : 'https://id.cie.gov.it/oidc/op'),
+            'authorization_endpoint' => !empty($options['cie_authorization_endpoint']) ? (string) $options['cie_authorization_endpoint'] : 'https://id.cie.gov.it/oidc/authorization',
+            'token_endpoint' => !empty($options['cie_token_endpoint']) ? (string) $options['cie_token_endpoint'] : 'https://id.cie.gov.it/oidc/token',
+            'jwks_uri' => !empty($options['cie_jwks_uri']) ? (string) $options['cie_jwks_uri'] : 'https://id.cie.gov.it/oidc/jwks',
             'userinfo_endpoint' => (string) ($options['cie_userinfo_endpoint'] ?? ''),
             'end_session_endpoint' => (string) ($options['cie_end_session_endpoint'] ?? ''),
         ];
