@@ -27,7 +27,9 @@ class WP_SPID_CIE_OIDC_Public {
         add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_styles' ) );
         add_action( 'init', array( $this, 'setup_federation_endpoints' ) );
         add_action( 'template_redirect', array( $this, 'serve_federation_endpoints' ) );
-        add_action( 'template_redirect', array( $this, 'handle_login_flow' ) );
+        // Priority 20: fires after setup_federation_endpoints (init/10) but before
+        // template_redirect plugins (e.g. custom login-page redirectors) that strip query params.
+        add_action( 'init', array( $this, 'handle_login_flow' ), 20 );
 		add_filter('redirect_canonical', array($this, 'disable_canonical_for_federation'), 10, 2);
     }
 
