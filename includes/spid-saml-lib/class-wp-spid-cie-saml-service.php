@@ -441,13 +441,27 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         }
         error_log('[SPID_DEBUG] validate_reference_digest: target_tag=' . $target->tagName . ' target_ID=' . $target->getAttribute('ID'));
 
-        $clone = $target->cloneNode(true);
-        $sigInside = $clone->getElementsByTagNameNS('http://www.w3.org/2000/09/xmldsig#', 'Signature');
+        // C14N must run on the live document node to preserve ancestor namespace declarations.
+        // Temporarily remove all descendant <ds:Signature> elements (enveloped-signature transform),
+        // compute C14N on the original in-document element, then restore them.
+        $sigsToRestore = [];
+        $sigInside = $target->getElementsByTagNameNS('http://www.w3.org/2000/09/xmldsig#', 'Signature');
         while ($sigInside->length > 0) {
-            $sigInside->item(0)->parentNode->removeChild($sigInside->item(0));
+            $sig = $sigInside->item(0);
+            $sigsToRestore[] = ['node' => $sig, 'parent' => $sig->parentNode, 'next' => $sig->nextSibling];
+            $sig->parentNode->removeChild($sig);
         }
 
-        $canon = $clone->C14N(true, false);
+        $canon = $target->C14N(true, false);
+
+        foreach ($sigsToRestore as $info) {
+            if ($info['next']) {
+                $info['parent']->insertBefore($info['node'], $info['next']);
+            } else {
+                $info['parent']->appendChild($info['node']);
+            }
+        }
+
         error_log('[SPID_DEBUG] validate_reference_digest: canon_len=' . strlen($canon) . ' canon_preview=' . substr($canon, 0, 100));
         $digestAlgo = $this->resolve_digest_algo($digestMethodNode instanceof DOMElement ? (string) $digestMethodNode->getAttribute('Algorithm') : '');
         $computed = base64_encode(hash($digestAlgo, $canon, true));
