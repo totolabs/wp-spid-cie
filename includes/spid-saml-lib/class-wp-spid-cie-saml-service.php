@@ -306,10 +306,16 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         $this->validate_not_on_or_after((string) $xp->evaluate('string(//saml:SubjectConfirmationData/@NotOnOrAfter)'), (int) $sp['clock_skew']);
 
         $signatureNodes = $xp->query('//ds:Signature');
-        if (!$signatureNodes || $signatureNodes->length !== 1) {
+        if (!$signatureNodes || $signatureNodes->length === 0) {
+            return new WP_Error('saml_missing_signature', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
+        }
+        if ($signatureNodes->length > 2) {
             return new WP_Error('saml_signature_ambiguous', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
-        $sigNode = $signatureNodes->item(0);
+        $responseSignatureNodes = $xp->query('/samlp:Response/ds:Signature');
+        $sigNode = ($responseSignatureNodes && $responseSignatureNodes->length > 0)
+            ? $responseSignatureNodes->item(0)
+            : $signatureNodes->item(0);
         if (!$sigNode instanceof DOMElement) {
             return new WP_Error('saml_missing_signature', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
