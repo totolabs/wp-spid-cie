@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Validates OIDC id_tokens received from SPID and CIE providers.

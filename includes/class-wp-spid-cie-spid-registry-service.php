@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Fetches and caches the SPID IdP list and details from the AgID registry.

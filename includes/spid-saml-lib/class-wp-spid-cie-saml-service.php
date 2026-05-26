@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Handles SPID SAML2 SP operations: config, AuthnRequest, ACS response parsing.

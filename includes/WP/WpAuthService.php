@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Resolves or auto-provisions a WordPress user from a verified OIDC identity.

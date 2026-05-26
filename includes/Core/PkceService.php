@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * PKCE (Proof Key for Code Exchange) helper for OIDC authorization flows.
