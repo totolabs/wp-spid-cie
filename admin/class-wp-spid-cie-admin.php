@@ -1,7 +1,7 @@
 <?php
 
 /**
- * La funzionalità specifica dell'area di amministrazione del plugin.
+ * Plugin-specific functionality for the administration area.
  *
  * @since      1.0.0
  * @package    WP_SPID_CIE_OIDC
@@ -14,6 +14,11 @@ class WP_SPID_CIE_OIDC_Admin {
     private $plugin_name;
     private $version;
 
+    /**
+     * @since 1.0.0
+     * @param string $plugin_name Plugin slug.
+     * @param string $version     Plugin version string.
+     */
     public function __construct( $plugin_name, $version ) {
         $this->plugin_name = $plugin_name;
         $this->version = $version;
@@ -28,7 +33,11 @@ class WP_SPID_CIE_OIDC_Admin {
     }
 
     /**
-     * Carica gli stili CSS per il pannello di amministrazione.
+     * Enqueues CSS styles for the administration panel.
+     *
+     * @since  1.0.0
+     * @param  string $hook Current admin page hook suffix.
+     * @return void
      */
     public function enqueue_admin_styles($hook) {
         if (strpos($hook, $this->plugin_name) === false) {
@@ -44,29 +53,43 @@ class WP_SPID_CIE_OIDC_Admin {
         );
     }
 
+    /**
+     * Registers the plugin settings page under Settings in wp-admin.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function add_options_page() {
-        add_options_page(
-            'Configurazione SPID & CIE', // Titolo pagina browser
-            'SPID & CIE Login',          // Titolo menu (Più user friendly)
-            'manage_options', 
-            $this->plugin_name, 
-            array( $this, 'create_admin_page' )
+        add_menu_page(
+            'SPID & CIE Login',
+            'SPID & CIE Login',
+            'manage_options',
+            $this->plugin_name,
+            array($this, 'create_admin_page'),
+            'dashicons-id-alt',
+            80
         );
     }
 
+    /**
+     * Renders the main plugin settings page with tabbed navigation.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function create_admin_page() {
         $current_tab = $this->get_current_tab();
         $tabs = $this->get_admin_tabs();
         ?>
         <div class="wrap">
-            <h1 class="wp-heading-inline">SPID & CIE Login (PNRR 1.4.4)</h1>
+            <h1 class="wp-heading-inline">SPID & CIE Login</h1>
             <hr class="wp-header-end">
             
             <?php settings_errors(); ?>
 
             <nav class="nav-tab-wrapper spid-tabs" aria-label="Sezioni configurazione SPID CIE OIDC">
                 <?php foreach ($tabs as $tab_key => $tab): ?>
-                    <?php $url = add_query_arg(['page' => $this->plugin_name, 'tab' => $tab_key], admin_url('options-general.php')); ?>
+                    <?php $url = add_query_arg(['page' => $this->plugin_name, 'tab' => $tab_key], admin_url('admin.php')); ?>
                     <a href="<?php echo esc_url($url); ?>" class="nav-tab <?php echo $current_tab === $tab_key ? 'nav-tab-active' : ''; ?>">
                         <?php echo esc_html($tab['label']); ?>
                     </a>
@@ -155,6 +178,12 @@ class WP_SPID_CIE_OIDC_Admin {
         <?php
     }
 
+    /**
+     * Registers plugin settings and settings sections/fields.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function register_settings() {
         register_setting(
             $this->plugin_name . '_options_group', 
@@ -162,10 +191,10 @@ class WP_SPID_CIE_OIDC_Admin {
             array( $this, 'sanitize_options' )
         );
 
-        // --- 1. DATI ANAGRAFICI ---
+        // --- 1. ENTITY DATA ---
         add_settings_section('ente_section', '1. Dati Anagrafici Ente', null, $this->plugin_name . '_ente');
         add_settings_field('organization_name', 'Denominazione Ente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section', 
-            ['id' => 'organization_name', 'desc' => 'Es. Comune di Roma', 'placeholder' => 'Es. Comune di Roma']
+            ['id' => 'organization_name', 'desc' => 'Denominazione ufficiale dell\'ente come registrata su IPA (max 64 caratteri). Se superiore ai 64 caratteri è necessario aggiornare la denominazione AOO su IPA prima di procedere.', 'placeholder' => 'Es. Comune di Roma']
         );
         add_settings_field('ipa_code', 'Codice IPA', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section', 
             ['id' => 'ipa_code', 'desc' => 'Codice univoco IPA (es. c_h501)', 'placeholder' => 'c_h501']
@@ -173,8 +202,11 @@ class WP_SPID_CIE_OIDC_Admin {
         add_settings_field('fiscal_number', 'Codice Fiscale Ente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section', 
             ['id' => 'fiscal_number', 'desc' => 'Codice Fiscale numerico (es. 80012345678)', 'placeholder' => '01234567890']
         );
-        add_settings_field('contacts_email', 'Email Contatto Tecnico', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section', 
+        add_settings_field('contacts_email', 'Email Contatto Tecnico', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
             ['id' => 'contacts_email', 'type' => 'email', 'desc' => 'Email per comunicazioni tecniche.', 'placeholder' => 'ced@ente.it']
+        );
+        add_settings_field('logo_uri', 'URL Logo Ente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
+            ['id' => 'logo_uri', 'desc' => 'URL pubblico del logo dell\'ente in formato SVG (es. https://www.ente.it/logo.svg). Dimensioni consigliate: 200×200px. Obbligatorio per la federazione CIE OIDC.', 'placeholder' => 'https://www.ente.it/logo.svg']
         );
         add_settings_field('issuer_override', 'Issuer / Identificativo componente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
             ['id' => 'issuer_override', 'desc' => 'URL base HTTPS usato per endpoint e fallback metadata OIDC Federation.', 'placeholder' => 'https://demo.ente.it']
@@ -183,7 +215,7 @@ class WP_SPID_CIE_OIDC_Admin {
             ['id' => 'entity_id', 'desc' => 'Identificativo entità usato come iss/sub/client_id. Mantiene lo slash finale se presente (es. https://demo.ente.it/).', 'placeholder' => 'https://demo.ente.it/']
         );
 
-        // --- 2. CRITTOGRAFIA ---
+        // --- 2. CRYPTOGRAPHY ---
         add_settings_section('keys_section', '2. Crittografia e Federazione', array($this, 'print_keys_section_info'), $this->plugin_name . '_keys');
         add_settings_field('oidc_keys_manager', 'Stato Chiavi', array($this, 'render_keys_manager'), $this->plugin_name . '_keys', 'keys_section');
 		add_settings_field(
@@ -234,34 +266,26 @@ class WP_SPID_CIE_OIDC_Admin {
 		  ['id' => 'cie_trust_mark_prod', 'desc' => 'Incolla qui il JWT Trust Mark rilasciato dal portale CIE prod.']
 		);
 		add_settings_field(
-		  'public_key_pem',
-		  'Chiave pubblica di federazione (PEM)',
-		  array($this, 'render_public_key_field'),
-		  $this->plugin_name . '_keys',
-		  'keys_section'
-		);
-		add_settings_field(
 		  'cie_certificate_pem',
-		  'Certificato pubblico (X.509) per portale CIE',
+		  'Certificato pubblico (X.509)',
 		  array($this, 'render_cie_certificate_field'),
 		  $this->plugin_name . '_keys',
 		  'keys_section'
 		);
-
 		add_settings_field(
-		  'public_key_raw_pem',
-		  'Chiave pubblica (PEM) – raw',
-		  array($this, 'render_public_key_raw_field'),
+		  'jwks_json_viewer',
+		  'Chiave pubblica JWKS (JSON)',
+		  array($this, 'render_jwks_json_field'),
 		  $this->plugin_name . '_keys',
 		  'keys_section'
 		);
-        // --- 3. ATTIVAZIONE SERVIZI ---
+        // --- 3. SERVICE ACTIVATION ---
         add_settings_section('providers_section', '3. Attivazione Servizi', null, $this->plugin_name . '_providers');
         
-        // SPID e relativo test
+        // SPID and related test
         add_settings_field('spid_enabled', 'Abilita SPID', array($this, 'render_checkbox_field'), $this->plugin_name . '_providers', 'providers_section', ['id' => 'spid_enabled', 'desc' => 'Mostra il pulsante "Entra con SPID".']);
         
-        // Spostiamo qui sotto il Test Environment (logicamente collegato a SPID)
+        // Test Environment below (logically linked to SPID)
         add_settings_field('spid_test_env', 'Ambiente di Test (Validator)', array($this, 'render_checkbox_field'), $this->plugin_name . '_providers', 'providers_section', 
             ['id' => 'spid_test_env', 'desc' => 'Abilita il provider "SPID Validator" (solo per collaudo tecnico AgID).']
         );
@@ -310,12 +334,12 @@ class WP_SPID_CIE_OIDC_Admin {
         add_settings_field('cie_userinfo_endpoint', 'CIE UserInfo endpoint', array($this, 'render_text_field'), $this->plugin_name . '_providers', 'providers_section', ['id' => 'cie_userinfo_endpoint', 'placeholder' => 'https://...', 'desc' => 'Opzionale.']);
         add_settings_field('cie_end_session_endpoint', 'CIE End Session endpoint', array($this, 'render_text_field'), $this->plugin_name . '_providers', 'providers_section', ['id' => 'cie_end_session_endpoint', 'placeholder' => 'https://...', 'desc' => 'Opzionale.']);
 
-        // --- 4. DISCLAIMER ---
+        // --- 4. NOTICES ---
         add_settings_section('disclaimer_section', '4. Gestione Avvisi (Disclaimer)', null, $this->plugin_name . '_disclaimer');
         add_settings_field('disclaimer_enabled', 'Attiva Messaggio Avviso', array($this, 'render_checkbox_field'), $this->plugin_name . '_disclaimer', 'disclaimer_section', 
             ['id' => 'disclaimer_enabled', 'desc' => 'Mostra un box di avviso sopra i pulsanti di login.']
         );
-        $default_msg = "⚠️ <strong>Avviso Tecnico:</strong><br>I servizi di accesso SPID e CIE sono in fase di <strong>aggiornamento programmato</strong>. Il login potrebbe essere temporaneamente non disponibile.";
+        $default_msg = "⚠️ <strong>Avviso Tecnico:</strong> Il servizio \"Entra con CIE\" è temporaneamente non disponibile per aggiornamento tecnico. Il login con SPID è regolarmente operativo.";
         add_settings_field('disclaimer_text', 'Testo dell\'Avviso', array($this, 'render_textarea_field'), $this->plugin_name . '_disclaimer', 'disclaimer_section', 
             ['id' => 'disclaimer_text', 'default' => $default_msg, 'desc' => 'HTML consentito (es. &lt;strong&gt;, &lt;br&gt;).']
         );
@@ -461,7 +485,7 @@ class WP_SPID_CIE_OIDC_Admin {
         $checks = [
             'Chiavi SP presenti' => $this->spid_saml_keys_exist(),
             'Metadata URL ufficiale stabile' => true,
-            'Registry IdP selezionato' => !empty($options['spid_saml_idp_registry_selected']) || !empty($options['spid_saml_idp_entity_id']),
+            'Registry IdP' => $this->get_registry_service()->get_status()['count'] > 0,
             'SPID SAML enabled (effective)' => $spid_saml_effective_enabled,
         ];
         echo '<h2>Dashboard stato</h2><ul class="spid-readonly-list">';
@@ -559,7 +583,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
     private function render_disclaimer_preview(): void {
         $options = get_option($this->plugin_name . '_options', []);
-        $default_msg = "⚠️ <strong>Avviso Tecnico:</strong><br>I servizi di accesso SPID e CIE sono in fase di <strong>aggiornamento programmato</strong>. Il login potrebbe essere temporaneamente non disponibile.";
+        $default_msg = "⚠️ <strong>Avviso Tecnico:</strong> Il servizio \"Entra con CIE\" è temporaneamente non disponibile per aggiornamento tecnico. Il login con SPID è regolarmente operativo.";
         $text = !empty($options['disclaimer_text']) ? (string) $options['disclaimer_text'] : $default_msg;
 
         echo '<h3>Anteprima disclaimer</h3>';
@@ -579,6 +603,12 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '<p class="description">Compatibilità login: se il path standard di WordPress è nascosto (es. WPS Hide Login), lo shortcode resta il fallback supportato.</p>';
     }
 
+    /**
+     * Renders the read-only SPID SAML endpoint URL list.
+     *
+     * @since  1.3.0
+     * @return void
+     */
     public function render_spid_saml_endpoints_preview() {
         $metadata = home_url('/sp-metadata.xml');
         $acs = home_url('/spid/saml/acs');
@@ -594,6 +624,12 @@ class WP_SPID_CIE_OIDC_Admin {
     }
 
 
+    /**
+     * Renders a quick configuration check summary for the SPID SAML module.
+     *
+     * @since  1.3.0
+     * @return void
+     */
     public function render_spid_saml_test_config() {
         $options = get_option($this->plugin_name . '_options', []);
         $missing = [];
@@ -638,6 +674,12 @@ class WP_SPID_CIE_OIDC_Admin {
         ];
     }
 
+    /**
+     * Syncs legacy SPID SAML option flags after settings are saved.
+     *
+     * @since  1.3.0
+     * @return void
+     */
     public function normalize_spid_saml_options(): void {
         if (!is_admin()) {
             return;
@@ -897,6 +939,12 @@ class WP_SPID_CIE_OIDC_Admin {
         return $options;
     }
 
+    /**
+     * Handles the admin action to force-refresh the SPID IdP registry cache.
+     *
+     * @since  1.3.0
+     * @return void
+     */
     public function handle_spid_saml_registry_refresh(): void {
         if (!is_admin() || !current_user_can('manage_options')) {
             return;
@@ -918,10 +966,16 @@ class WP_SPID_CIE_OIDC_Admin {
         $options['spid_saml_idp_last_sync'] = time();
         update_option($this->plugin_name . '_options', $options, false);
 
-        wp_safe_redirect(add_query_arg(['page' => $this->plugin_name, 'tab' => 'spid_saml', 'registry_refreshed' => '1'], admin_url('options-general.php')));
+        wp_safe_redirect(add_query_arg(['page' => $this->plugin_name, 'tab' => 'spid_saml', 'registry_refreshed' => '1'], admin_url('admin.php')));
         exit;
     }
 
+    /**
+     * Handles admin actions for SPID SAML metadata protection (token toggle/regenerate).
+     *
+     * @since  1.3.0
+     * @return void
+     */
     public function handle_spid_saml_metadata_actions(): void {
         if (!is_admin()) {
             return;
@@ -1009,7 +1063,7 @@ class WP_SPID_CIE_OIDC_Admin {
                 $redirect_args['metadata_token_reason'] = $reason;
             }
 
-            wp_safe_redirect(add_query_arg($redirect_args, admin_url('options-general.php')));
+            wp_safe_redirect(add_query_arg($redirect_args, admin_url('admin.php')));
             exit;
         }
 
@@ -1048,7 +1102,7 @@ class WP_SPID_CIE_OIDC_Admin {
                 $redirect_args['metadata_token_reason'] = $reason;
             }
 
-            wp_safe_redirect(add_query_arg($redirect_args, admin_url('options-general.php')));
+            wp_safe_redirect(add_query_arg($redirect_args, admin_url('admin.php')));
             exit;
         }
     }
@@ -1113,7 +1167,7 @@ class WP_SPID_CIE_OIDC_Admin {
         $method->setAccessible(true);
 
         echo '<h3>IdP logos diagnostic</h3>';
-        echo '<table class="widefat striped" role="table"><thead><tr><th>entity_id</th><th>name</th><th>logo_uri (registry, host)</th><th>logo_resolved (local/remote)</th></tr></thead><tbody>';
+        echo '<table class="widefat striped spid-idp-diagnostic-table" role="table"><thead><tr><th>entity_id</th><th>name</th><th>logo_uri (registry, host)</th><th>logo_resolved (local/remote)</th></tr></thead><tbody>';
 
         foreach ($list as $item) {
             if (!is_array($item)) {
@@ -1145,7 +1199,7 @@ class WP_SPID_CIE_OIDC_Admin {
         $options = get_option($this->plugin_name . '_options', []);
         $d = $this->get_spid_saml_defaults($options);
         echo '<h2>Impostazioni SPID SAML</h2>';
-        echo '<p class="description">Se lasci vuoto, usiamo automaticamente i valori del tab A. Ente.</p>';
+        echo '<p class="description">Se lasci vuoto, usiamo automaticamente i valori del tab 1. Ente.<br>I dati anagrafici (denominazione, IPA, codice fiscale, email) vengono letti dalla Tab 1 — non è necessario reinserirli qui.</p>';
 
         $this->render_text_field(['id' => 'spid_saml_country_name', 'placeholder' => 'IT', 'desc' => 'countryName (esempio: IT)']);
         $this->render_text_field(['id' => 'spid_saml_state_or_province_name', 'placeholder' => 'Roma', 'desc' => 'stateOrProvinceName (esempio: Roma)']);
@@ -1153,19 +1207,13 @@ class WP_SPID_CIE_OIDC_Admin {
         $this->render_text_field(['id' => 'spid_saml_common_name', 'placeholder' => $d['commonName'], 'desc' => 'commonName (esempio: comune.example.it)']);
         $this->render_text_field(['id' => 'spid_saml_email_address', 'placeholder' => $d['emailAddress'], 'desc' => 'emailAddress (esempio: protocollo@ente.it)']);
 
-        $this->render_text_field(['id' => 'sp_org_name', 'placeholder' => $d['sp_org_name'], 'desc' => 'Denominazione ente']);
-        $this->render_text_field(['id' => 'sp_org_display_name', 'placeholder' => $d['sp_org_display_name'], 'desc' => 'Nome pubblico ente']);
-        $this->render_text_field(['id' => 'sp_contact_ipa_code', 'placeholder' => $d['sp_contact_ipa_code'], 'desc' => 'Codice IPA']);
-        $this->render_text_field(['id' => 'sp_contact_fiscal_code', 'placeholder' => $d['sp_contact_fiscal_code'], 'desc' => 'Codice fiscale ente']);
-        $this->render_text_field(['id' => 'sp_contact_email', 'placeholder' => $d['sp_contact_email'], 'desc' => 'Email contatto tecnico']);
-        $this->render_text_field(['id' => 'sp_contact_phone', 'placeholder' => $d['sp_contact_phone'], 'desc' => 'Telefono contatto (opzionale)']);
-
         $registryStatus = $this->get_registry_service()->get_status();
         $lastSync = (int) ($registryStatus['fetched_at'] ?? 0);
         if ($lastSync > 0) {
             echo '<p><strong>Ultimo aggiornamento registry:</strong> ' . esc_html(wp_date('d/m/Y H:i:s', $lastSync)) . '</p>';
         }
-        $refresh_url = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'spid_saml','action'=>'spid_saml_refresh_registry'], admin_url('options-general.php')), 'spid_saml_refresh_registry');
+
+        $refresh_url = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'spid_saml','action'=>'spid_saml_refresh_registry'], admin_url('admin.php')), 'spid_saml_refresh_registry');
         echo '<p><a class="button button-secondary" href="' . esc_url($refresh_url) . '">Aggiorna Registry IdP ora</a></p>';
 
         echo '<hr><h3>Opzioni avanzate</h3>';
@@ -1262,15 +1310,21 @@ class WP_SPID_CIE_OIDC_Admin {
             echo '<p><strong>URL protetta Aggregator (legacy):</strong> <code>' . esc_html($protected_agg_url) . '</code></p>';
         }
 
-        $toggle = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'stato','toggle_metadata_token'=>'1'], admin_url('options-general.php')), 'spid_saml_toggle_metadata_token');
+        $toggle = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'stato','toggle_metadata_token'=>'1'], admin_url('admin.php')), 'spid_saml_toggle_metadata_token');
         echo '<p><a class="button button-secondary" href="' . esc_url($toggle) . '">' . ($token_required ? 'Disattiva protezione token' : 'Attiva protezione token') . '</a></p>';
 
-        $regen = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'stato','regen_metadata_token'=>'1'], admin_url('options-general.php')), 'spid_saml_regen_token');
+        $regen = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'stato','regen_metadata_token'=>'1'], admin_url('admin.php')), 'spid_saml_regen_token');
         echo '<p><a class="button button-secondary" onclick="return confirm(\'Rigenerare il token rendera invalidi i vecchi URL protetti.\');" href="' . esc_url($regen) . '">Rigenera token metadata</a></p>';
     }
 
     // --- CALLBACK RENDERING ---
 
+    /**
+     * Handles the admin action to generate SPID/CIE cryptographic keys.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function handle_key_generation() {
         if ( isset( $_GET['action'], $_GET['_wpnonce'] ) && $_GET['action'] === 'generate_oidc_keys' ) {
             if ( ! wp_verify_nonce( $_GET['_wpnonce'], 'generate_oidc_keys_nonce' ) ) { wp_die('Security check failed'); }
@@ -1281,16 +1335,22 @@ class WP_SPID_CIE_OIDC_Admin {
             try {
                 $client = WP_SPID_CIE_OIDC_Factory::get_client();
                 $client->generateKeys();
-                wp_redirect(admin_url('options-general.php?page=' . $this->plugin_name . '&keys-generated=true'));
+                wp_redirect(admin_url('admin.php?page=' . $this->plugin_name . '&tab=cie&keys-generated=true'));
                 exit;
             } catch (Exception $e) {
                 set_transient('spid_cie_oidc_error', $e->getMessage(), 45);
-                wp_redirect(admin_url('options-general.php?page=' . $this->plugin_name . '&keys-error=true'));
+                wp_redirect(admin_url('admin.php?page=' . $this->plugin_name . '&tab=cie&keys-error=true'));
                 exit;
             }
         }
     }
 
+    /**
+     * Renders the key/certificate status panel and generation button.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function render_keys_manager() {
         $options = get_option($this->plugin_name . '_options', []);
         $status = WP_SPID_CIE_OIDC_Spid_Certificates::describe_status(is_array($options) ? $options : []);
@@ -1320,7 +1380,7 @@ class WP_SPID_CIE_OIDC_Admin {
         }
 
         echo '<p style="margin: 15px 0;">';
-        $generation_url = wp_nonce_url(admin_url('options-general.php?page=' . $this->plugin_name . '&action=generate_oidc_keys'), 'generate_oidc_keys_nonce');
+        $generation_url = wp_nonce_url(admin_url('admin.php?page=' . $this->plugin_name . '&action=generate_oidc_keys'), 'generate_oidc_keys_nonce');
         echo '<a href="' . esc_url($generation_url) . '" class="button button-secondary" onclick="return confirm(\'Rigenerare i certificati cambia la fingerprint e richiede l\'aggiornamento dei metadata pubblicati su AgID/CIE. Continuare?\');">'. ($keys_exist ? 'Genera/Rigenera certificati SPID' : 'Genera/Rigenera certificati SPID') .'</a>';
         echo '</p>';
 
@@ -1336,6 +1396,12 @@ class WP_SPID_CIE_OIDC_Admin {
         }
     }
 
+    /**
+     * Renders the key section description and generation notices.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function print_keys_section_info() {
         if (isset($_GET['keys-generated'])) { echo '<div class="notice notice-success inline"><p>Certificati SPID generati con successo.</p></div>'; }
         if (isset($_GET['keys-error'])) {
@@ -1345,6 +1411,13 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '<p>Generazione one-click certificati SPID (profilo SP pubblico): RSA>=2048, SHA-256, Subject con OID 2.5.4.83 e 2.5.4.97, estensioni SPID-compliant.</p>';
     }
 
+    /**
+     * Renders a text input field for a settings entry.
+     *
+     * @since  1.0.0
+     * @param  array $args Field arguments: id, desc, placeholder, type.
+     * @return void
+     */
     public function render_text_field( $args ) {
         $options = get_option( $this->plugin_name . '_options' );
         $id = $args['id'];
@@ -1356,6 +1429,13 @@ class WP_SPID_CIE_OIDC_Admin {
         if ($desc) { echo "<p class='description'>$desc</p>"; }
     }
 
+    /**
+     * Renders a textarea field for a settings entry.
+     *
+     * @since  1.0.0
+     * @param  array $args Field arguments: id, desc, default.
+     * @return void
+     */
     public function render_textarea_field( $args ) {
         $options = get_option( $this->plugin_name . '_options' );
         $id = $args['id'];
@@ -1368,6 +1448,13 @@ class WP_SPID_CIE_OIDC_Admin {
         if ($desc) echo "<p class='description'>$desc</p>";
     }
 
+    /**
+     * Renders a checkbox field for a settings entry.
+     *
+     * @since  1.0.0
+     * @param  array $args Field arguments: id, desc.
+     * @return void
+     */
     public function render_checkbox_field( $args ) {
         $options = get_option( $this->plugin_name . '_options' );
         $id = $args['id'];
@@ -1376,6 +1463,13 @@ class WP_SPID_CIE_OIDC_Admin {
         echo "<label><input type='checkbox' name='{$this->plugin_name}_options[$id]' value='1' $checked> $desc</label>";
     }
 	
+    /**
+     * Renders a select dropdown field for a settings entry.
+     *
+     * @since  1.0.0
+     * @param  array $args Field arguments: id, options, default, desc.
+     * @return void
+     */
     public function render_select_field( $args ) {
         $options = get_option( $this->plugin_name . '_options' );
         $id = $args['id'];
@@ -1395,6 +1489,12 @@ class WP_SPID_CIE_OIDC_Admin {
         }
     }
 
+    /**
+     * Renders a read-only textarea containing the public certificate (PEM).
+     *
+     * @since  1.0.0
+     * @return void
+     */
 	public function render_public_key_field() {
 		$keys_dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir();
 
@@ -1422,6 +1522,12 @@ class WP_SPID_CIE_OIDC_Admin {
 		echo '<p class="description"><strong>Nota:</strong> se rigeneri le chiavi, devi aggiornare questa chiave anche sul portale CIE.</p>';
 	}
 	
+    /**
+     * Renders a read-only list of the configured trust anchor URLs.
+     *
+     * @since  1.3.0
+     * @return void
+     */
 	public function render_trust_anchor_preview_field() {
 		$options = get_option($this->plugin_name . '_options', []);
 		$rows = [
@@ -1454,6 +1560,12 @@ class WP_SPID_CIE_OIDC_Admin {
 		}
 	}
 
+    /**
+     * Renders a read-only textarea containing the X.509 certificate for CIE federation.
+     *
+     * @since  1.3.0
+     * @return void
+     */
 	public function render_cie_certificate_field() {
 		$keys_dir = $this->get_keys_dir_path();
 		$cert_file = $keys_dir . '/public.crt';
@@ -1486,6 +1598,35 @@ class WP_SPID_CIE_OIDC_Admin {
 		);
 	}
 
+    /**
+     * Renders the JWKS JSON viewer with a direct URL link and copyable content.
+     *
+     * @since  1.3.0
+     * @return void
+     */
+	public function render_jwks_json_field(): void {
+		$jwks_url = home_url('/jwks.json');
+
+		echo '<p class="description">URL diretto: <code><a href="' . esc_url($jwks_url) . '" target="_blank">' . esc_html($jwks_url) . '</a></code></p>';
+		echo '<button type="button" class="button" style="margin-bottom:8px;" onclick="navigator.clipboard.writeText(\'' . esc_js($jwks_url) . '\')">Copia URL</button>';
+
+		$jwks_content = @file_get_contents($jwks_url); // phpcs:ignore WordPress.WP.AlternativeFunctions
+		if ($jwks_content !== false && $jwks_content !== '') {
+			echo '<br><textarea id="jwks-json-content" class="large-text code" rows="4" style="font-family:monospace;font-size:11px;" readonly>' . esc_textarea($jwks_content) . '</textarea>';
+			echo '<p><button type="button" class="button" onclick="(function(){const el=document.getElementById(\'jwks-json-content\'); el.select(); document.execCommand(\'copy\');})();">Copia JSON</button></p>';
+		} else {
+			echo '<p class="description" style="color:#996600;">Contenuto JWKS non disponibile in anteprima. Apri il link sopra per visualizzarlo.</p>';
+		}
+
+		echo '<p class="description">Contiene la chiave pubblica EC usata per la federazione CIE OIDC. Da comunicare al portale di federazione.</p>';
+	}
+
+    /**
+     * Renders a read-only textarea containing the raw public key (PEM).
+     *
+     * @since  1.0.0
+     * @return void
+     */
 	public function render_public_key_raw_field() {
 		$keys_dir = $this->get_keys_dir_path();
 		$pub_file = $keys_dir . '/public.key';
@@ -1520,6 +1661,13 @@ class WP_SPID_CIE_OIDC_Admin {
         return $out;
     }
 
+    /**
+     * Sanitizes and persists plugin options submitted via the settings form.
+     *
+     * @since  1.0.0
+     * @param  array $input Raw submitted values.
+     * @return array Sanitized options merged with existing values.
+     */
     public function sanitize_options( $input ) {
         $existing = get_option($this->plugin_name . '_options', []);
         if (!is_array($existing)) {
@@ -1528,7 +1676,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
         $current_tab = isset($input['_current_tab']) ? sanitize_key($input['_current_tab']) : 'ente';
         $allowed_by_tab = [
-            'ente' => ['organization_name', 'ipa_code', 'fiscal_number', 'contacts_email', 'issuer_override', 'entity_id'],
+            'ente' => ['organization_name', 'ipa_code', 'fiscal_number', 'contacts_email', 'logo_uri', 'issuer_override', 'entity_id'],
             'cie' => ['cie_trust_anchor_preprod', 'cie_trust_anchor_prod', 'spid_trust_anchor', 'cie_trust_mark_preprod', 'cie_trust_mark_prod'],
             'spid_oidc' => [
                 'discovery_mode', 'min_loa', 'spid_issuer', 'spid_scope', 'spid_acr_values',
@@ -1536,7 +1684,7 @@ class WP_SPID_CIE_OIDC_Admin {
             ],
             'impostazioni' => ['spid_enabled', 'cie_enabled', 'spid_auth_method', 'spid_saml_validator_enabled', 'disclaimer_enabled', 'disclaimer_text', 'user_provisioning_enabled', 'user_default_role'],
             'stato' => [],
-            'spid_saml' => ['spid_saml_entity_id', 'spid_saml_debug', 'spid_saml_clock_skew', 'spid_saml_level', 'spid_saml_binding', 'spid_saml_idp_entity_id', 'spid_saml_idp_sso_url', 'spid_saml_idp_slo_url', 'spid_saml_idp_x509_cert', 'spid_saml_idp_metadata_xml', 'spid_saml_idp_cert', 'spid_saml_show_advanced', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'sp_org_name', 'sp_org_display_name', 'sp_contact_ipa_code', 'sp_contact_fiscal_code', 'sp_contact_email', 'sp_contact_phone', 'spid_saml_idp_mode', 'spid_saml_idp_registry_selected', 'spid_saml_idp_registry_link', 'spid_saml_idp_last_sync', 'spid_saml_metadata_token', 'spid_saml_requested_attributes'],
+            'spid_saml' => ['spid_saml_entity_id', 'spid_saml_debug', 'spid_saml_clock_skew', 'spid_saml_level', 'spid_saml_binding', 'spid_saml_idp_entity_id', 'spid_saml_idp_sso_url', 'spid_saml_idp_slo_url', 'spid_saml_idp_x509_cert', 'spid_saml_idp_metadata_xml', 'spid_saml_idp_cert', 'spid_saml_show_advanced', 'spid_saml_country_name', 'spid_saml_state_or_province_name', 'spid_saml_locality_name', 'spid_saml_common_name', 'spid_saml_email_address', 'spid_saml_idp_mode', 'spid_saml_idp_registry_selected', 'spid_saml_idp_registry_link', 'spid_saml_idp_last_sync', 'spid_saml_metadata_token', 'spid_saml_requested_attributes'],
         ];
 
         $new_input = $existing;
@@ -1558,6 +1706,13 @@ class WP_SPID_CIE_OIDC_Admin {
         foreach ($text_fields as $f) {
             if (in_array($f, $allowed, true) && isset($input[$f])) {
                 $new_input[$f] = sanitize_text_field($input[$f]);
+            }
+        }
+
+        $url_fields = ['logo_uri'];
+        foreach ($url_fields as $f) {
+            if (in_array($f, $allowed, true) && isset($input[$f])) {
+                $new_input[$f] = esc_url_raw(trim((string) $input[$f]));
             }
         }
 

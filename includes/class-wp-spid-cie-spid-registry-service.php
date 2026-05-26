@@ -1,15 +1,28 @@
 <?php
 
+/**
+ * Fetches and caches the SPID IdP list and details from the AgID registry.
+ *
+ * @since   1.0.0
+ * @package WP_SPID_CIE_OIDC
+ */
 class WP_SPID_CIE_OIDC_Spid_Registry_Service {
-    const LIST_TRANSIENT = 'spid_saml_registry_idp_list_v2';
-    const LIST_LKG_TRANSIENT = 'spid_saml_registry_idp_list_lkg_v2';
-    const DETAIL_PREFIX = 'spid_saml_registry_idp_detail_v2_';
-    const DETAIL_LKG_PREFIX = 'spid_saml_registry_idp_detail_lkg_v2_';
-    const STATUS_TRANSIENT = 'spid_saml_registry_status_v2';
+    const LIST_TRANSIENT = 'spid_saml_registry_idp_list_v3';
+    const LIST_LKG_TRANSIENT = 'spid_saml_registry_idp_list_lkg_v3';
+    const DETAIL_PREFIX = 'spid_saml_registry_idp_detail_v3_';
+    const DETAIL_LKG_PREFIX = 'spid_saml_registry_idp_detail_lkg_v3_';
+    const STATUS_TRANSIENT = 'spid_saml_registry_status_v3';
     const REGISTRY_JSON_LIST = 'https://registry.spid.gov.it/entities-idp?custom=info_display_base&output=json';
     const REGISTRY_JSON_LIST_FALLBACK = 'https://registry.spid.gov.it/entities-idp?output=json';
     const REGISTRY_XML_LIST = 'https://registry.spid.gov.it/entities?entity_type=idp';
 
+    /**
+     * Returns the normalized list of SPID IdPs, using transient cache.
+     *
+     * @since  1.0.0
+     * @param  bool $force Bypass cache and force a fresh fetch.
+     * @return array|WP_Error Indexed array of IdP records, or error.
+     */
     public function get_idp_list(bool $force = false) {
         if (!$force) {
             $cached = get_transient(self::LIST_TRANSIENT);
@@ -93,6 +106,15 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
         return $normalized;
     }
 
+    /**
+     * Returns runtime configuration (SSO URL, certificate) for a single IdP.
+     *
+     * @since  1.0.0
+     * @param  string $entityId      IdP entity identifier.
+     * @param  string $registryLink  Optional direct link to the IdP's registry detail endpoint.
+     * @param  bool   $force         Bypass cache and force a fresh fetch.
+     * @return array|WP_Error IdP config map, or error.
+     */
     public function get_idp_detail(string $entityId, string $registryLink = '', bool $force = false) {
         $entityId = trim($entityId);
         if ($entityId === '') {
@@ -136,11 +158,23 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
         return $parsed;
     }
 
+    /**
+     * Clears the IdP list cache and triggers a fresh fetch.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function refresh_all(): void {
         delete_transient(self::LIST_TRANSIENT);
         $this->get_idp_list(true);
     }
 
+    /**
+     * Returns the last known registry fetch status (count, source, timestamp).
+     *
+     * @since  1.0.0
+     * @return array Status map with keys: count (int), source (string), fetched_at (int).
+     */
     public function get_status(): array {
         $status = get_transient(self::STATUS_TRANSIENT);
         if (!is_array($status)) {
@@ -221,9 +255,9 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
             }
         }
 
-        // Alcuni payload del Registry arrivano come mappa associativa:
+        // Some Registry payloads arrive as an associative map:
         // {"<entityID>": { ... info_display_base ... }}
-        // In quel caso preserviamo la chiave come entity_id.
+        // In that case preserve the key as entity_id.
         if (empty($rows)) {
             foreach ($payload as $k => $v) {
                 if (!is_array($v)) {
@@ -470,8 +504,11 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
             if (!is_array($node)) {
                 return;
             }
+            // Registry API returns CamelCase keys — normalize at every level of recursion.
+            $node = array_change_key_case($node, CASE_LOWER);
+
             if ($entity === '') {
-                $entity = (string) ($node['entity_id'] ?? $node['entityID'] ?? $node['issuer'] ?? '');
+                $entity = (string) ($node['entity_id'] ?? $node['entityid'] ?? $node['issuer'] ?? '');
             }
             if ($sso === '') {
                 $sso = $this->extract_url_value($node['sso_url'] ?? '');
@@ -485,8 +522,8 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
                     $slo = $this->extract_url_value($node['single_logout_service'] ?? '');
                 }
             }
-            $cert = (string) ($node['signing_certificate_x509'] ?? $node['x509_certificate'] ?? '');
-            if ($cert !== '') {
+            $cert = $node['signing_certificate_x509'] ?? $node['x509_certificate'] ?? '';
+            if (is_string($cert) && trim($cert) !== '') {
                 $certs[] = trim($cert);
             }
 
@@ -496,6 +533,7 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
                         if (!is_array($svc)) {
                             continue;
                         }
+                        $svc = array_change_key_case($svc, CASE_LOWER);
                         $loc = (string) ($svc['location'] ?? $svc['url'] ?? $svc['response_location'] ?? '');
                         $binding = strtolower((string) ($svc['binding'] ?? ''));
                         if ($loc !== '' && $sso === '') {
@@ -514,6 +552,7 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
                         if (!is_array($svc)) {
                             continue;
                         }
+                        $svc = array_change_key_case($svc, CASE_LOWER);
                         $loc = (string) ($svc['location'] ?? $svc['url'] ?? $svc['response_location'] ?? '');
                         if ($loc !== '') {
                             $slo = $loc;
@@ -558,19 +597,24 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
         }
 
         if (is_array($value)) {
-            if (isset($value['location']) && is_string($value['location'])) {
-                return trim($value['location']);
+            // Registry API returns CamelCase keys (e.g. "Location", "Binding") — normalize.
+            $v = array_change_key_case($value, CASE_LOWER);
+            if (isset($v['location']) && is_string($v['location'])) {
+                return trim($v['location']);
             }
-            if (isset($value['url']) && is_string($value['url'])) {
-                return trim($value['url']);
+            if (isset($v['url']) && is_string($v['url'])) {
+                return trim($v['url']);
             }
-            if (isset($value['response_location']) && is_string($value['response_location'])) {
-                return trim($value['response_location']);
+            if (isset($v['response_location']) && is_string($v['response_location'])) {
+                return trim($v['response_location']);
             }
-            foreach ($value as $item) {
-                $candidate = $this->extract_url_value($item);
-                if ($candidate !== '') {
-                    return $candidate;
+            // For list-like arrays, recurse only into sub-arrays (skip bare strings like binding URNs).
+            foreach ($v as $item) {
+                if (is_array($item)) {
+                    $candidate = $this->extract_url_value($item);
+                    if ($candidate !== '') {
+                        return $candidate;
+                    }
                 }
             }
         }

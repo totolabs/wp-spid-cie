@@ -50,3 +50,10 @@ wp-config.php
 
 #OIDC library
 #/vendor/
+
+# AI assistant context files
+CLAUDE.md
+.cursorrules
+.aider*
+copilot-instructions.md
+/docs/STATO_PROGETTO.md

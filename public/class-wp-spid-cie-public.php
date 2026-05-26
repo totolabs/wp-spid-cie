@@ -1,7 +1,7 @@
 <?php
 
 /**
- * La funzionalità specifica dell'area pubblica del plugin.
+ * Plugin-specific functionality for the public-facing area.
  *
  * @package    WP_SPID_CIE_OIDC
  * @subpackage WP_SPID_CIE_OIDC/public
@@ -11,6 +11,11 @@ class WP_SPID_CIE_OIDC_Public {
     private $plugin_name;
     private $version;
 
+    /**
+     * @since 1.0.0
+     * @param string $plugin_name Plugin slug.
+     * @param string $version     Plugin version string.
+     */
     public function __construct( $plugin_name, $version ) {
         $this->plugin_name = $plugin_name;
         $this->version = $version;
@@ -26,6 +31,12 @@ class WP_SPID_CIE_OIDC_Public {
 		add_filter('redirect_canonical', array($this, 'disable_canonical_for_federation'), 10, 2);
     }
 
+    /**
+     * Enqueues front-end CSS and JS assets for the login buttons.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function enqueue_styles() {
         $public_style_deps = array();
 
@@ -96,6 +107,12 @@ class WP_SPID_CIE_OIDC_Public {
         require_once $activation_file;
         return class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation');
     }
+    /**
+     * Registers custom rewrite rules for federation and SAML endpoints.
+     *
+     * @since  1.0.0
+     * @return void
+     */
 	public function setup_federation_endpoints() {
 		add_rewrite_rule('^sp-metadata\.xml/?$',               'index.php?spid_saml_route=metadata', 'top');
 		add_rewrite_rule('^spid/saml/metadata/?$',              'index.php?spid_saml_route=metadata', 'top');
@@ -103,7 +120,7 @@ class WP_SPID_CIE_OIDC_Public {
 		add_rewrite_rule('^spid/saml/acs/?$',                   'index.php?spid_saml_route=acs',      'top');
 		add_rewrite_rule('^spid/saml/sls/?$',                   'index.php?spid_saml_route=sls',      'top');
 		add_rewrite_rule('^\.well-known/openid-federation/?$', 'index.php?oidc_federation=config', 'top');
-		add_rewrite_rule('^\.wellknown/openid-federation/?$',   'index.php?oidc_federation=config', 'top'); // alias (senza "-")
+		add_rewrite_rule('^\.wellknown/openid-federation/?$',   'index.php?oidc_federation=config', 'top'); // alias (without "-")
 		add_rewrite_rule('^jwks.json/?$',                       'index.php?oidc_federation=jwks',   'top');
 		add_rewrite_rule('^resolve/?$',                         'index.php?oidc_federation=resolve','top');
 
@@ -117,6 +134,14 @@ class WP_SPID_CIE_OIDC_Public {
         });
     }
 	
+    /**
+     * Prevents WordPress canonical redirects on federation and SAML endpoint paths.
+     *
+     * @since  1.3.0
+     * @param  string $redirect_url  The redirect URL WordPress would normally use.
+     * @param  string $requested_url The originally requested URL.
+     * @return string|false Original redirect URL, or false to cancel the redirect.
+     */
 	public function disable_canonical_for_federation($redirect_url, $requested_url) {
 			if (strpos($requested_url, '/sp-metadata.xml') !== false) return false;
 			if (strpos($requested_url, '/spid/saml/metadata') !== false) return false;
@@ -130,6 +155,12 @@ class WP_SPID_CIE_OIDC_Public {
 			return $redirect_url;
 	}	
 
+    /**
+     * Detects and serves federation (OIDC/.well-known, JWKS, /resolve) and SAML endpoints.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function serve_federation_endpoints() {
 		global $wp_query;
 
@@ -167,18 +198,18 @@ class WP_SPID_CIE_OIDC_Public {
 			}
 		}
 
-		// Per questi endpoint l'output deve essere "pulito":
-		// niente Notice/Deprecated/HTML che romperebbero JWT/JSON
+		// These endpoints must produce clean output:
+		// no Notice/Deprecated/HTML that would break JWT/JSON
 		@ini_set('display_errors', '0');
 		@ini_set('log_errors', '1');
 		error_reporting(0);
 
-		// Svuota qualsiasi buffer già aperto (tema/plugin)
+		// Flush any output buffer already opened (theme/plugin)
 		while (ob_get_level() > 0) {
 			@ob_end_clean();
 		}
 
-		// Log hits (senza dipendere dal Factory)
+		// Log hits (without depending on Factory)
 		$uploads = wp_upload_dir();
 		$keyDir  = trailingslashit($uploads['basedir']) . 'spid-cie-oidc-keys';
 		if ( ! is_dir($keyDir) ) {
@@ -204,7 +235,7 @@ class WP_SPID_CIE_OIDC_Public {
 			nocache_headers();
 			status_header(200);
 
-			// evita che venga trattato come download
+			// prevent browser from treating the response as a download
 			header_remove('Content-Disposition');
 			header('Content-Disposition: inline');
 			header('X-Content-Type-Options: nosniff');
@@ -244,7 +275,7 @@ class WP_SPID_CIE_OIDC_Public {
 
 				header('Content-Type: application/jwk-set+json; charset=utf-8');
 
-				// se getJwks ritorna array, lo serializziamo in JSON
+				// if getJwks returns an array, serialize it to JSON
 				if (is_array($jwks) || is_object($jwks)) {
 					echo wp_json_encode($jwks);
 				} else {
@@ -263,7 +294,7 @@ class WP_SPID_CIE_OIDC_Public {
 				exit;
 			}
 
-			// azione non supportata
+			// unsupported action
 			status_header(404);
 			header('Content-Type: text/plain; charset=utf-8');
 			echo 'Not found';
@@ -388,7 +419,7 @@ class WP_SPID_CIE_OIDC_Public {
 	private function is_official_sp_metadata_request(): bool {
 		$path = parse_url((string) ($_SERVER['REQUEST_URI'] ?? '/'), PHP_URL_PATH);
 		$path = '/' . ltrim((string) $path, '/');
-		// L'endpoint ufficiale pubblico /sp-metadata.xml deve restare riconosciuto anche con slash finale.
+		// The official public endpoint /sp-metadata.xml must be recognized even with a trailing slash.
 		if ($path !== '/') {
 			$path = rtrim($path, '/');
 		}
@@ -396,6 +427,13 @@ class WP_SPID_CIE_OIDC_Public {
 		return $path === '/sp-metadata.xml';
 	}
 
+    /**
+     * Builds the signed SPID SAML SP metadata XML string.
+     *
+     * @since  1.3.0
+     * @param  array $options Plugin options.
+     * @return string Serialized XML metadata document.
+     */
 	public function build_spid_saml_metadata_xml(array $options): string {
 		$svc = $this->get_saml_service();
 		$sp = $svc->build_sp_config($options);
@@ -814,6 +852,12 @@ private function extract_jwt_payload($jwt) {
         return is_array($payload) ? $payload : null;
     }
 
+    /**
+     * Handles OIDC login and callback flows triggered by oidc_action query parameter.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function handle_login_flow() {
         $action = isset($_GET['oidc_action']) ? sanitize_key(wp_unslash($_GET['oidc_action'])) : get_query_var('oidc_action');
         $provider = isset($_GET['provider']) ? sanitize_key(wp_unslash($_GET['provider'])) : get_query_var('provider');
@@ -964,6 +1008,25 @@ private function extract_jwt_payload($jwt) {
         exit;
     }
 
+    private function get_spid_error_message(string $code): string {
+        // Mappa test AgID: 104→19, 105→20, 106→21, 107→22, 108→23, 111→25
+        $messages = [
+            'spid_error_19'                => 'Autenticazione fallita per ripetuta sottomissione di credenziali errate.',
+            'spid_error_20'                => 'Utente privo di credenziali compatibili con il livello richiesto dal fornitore del servizio.',
+            'spid_error_21'                => 'Timeout durante l\'autenticazione utente.',
+            'spid_error_22'                => 'Utente nega il consenso all\'invio di dati al SP in caso di sessione vigente.',
+            'spid_error_23'                => 'Utente con identità sospesa/revocata o con credenziali bloccate.',
+            'spid_error_25'                => 'Processo di autenticazione annullato dall\'utente.',
+            'saml_status_not_success'      => 'Autenticazione non completata.',
+            'saml_config_incomplete'       => 'Configurazione SPID incompleta. Contattare il gestore del servizio.',
+            'saml_missing_response'        => 'Risposta SPID non ricevuta. Riprovare.',
+            'saml_replay_detected'         => 'Richiesta già elaborata. Riprovare.',
+            'saml_missing_required_claims' => 'Dati utente incompleti nella risposta SPID.',
+            'saml_invalid_email'           => 'Indirizzo email non valido nella risposta SPID.',
+            'oidc_start_failed'            => 'Impossibile avviare l\'autenticazione. Riprovare.',
+        ];
+        return $messages[$code] ?? 'Autenticazione non completata. Riprovare o contattare il gestore del servizio.';
+    }
 
     private function resolve_login_entry_url(): string {
         if (function_exists('wp_login_url') && did_action('login_init')) {
@@ -981,13 +1044,20 @@ private function extract_jwt_payload($jwt) {
 
     private static $buttons_printed = false;
 
+    /**
+     * Injects SPID/CIE login buttons into the WordPress login page.
+     *
+     * @since  1.0.0
+     * @param  string|null $arg Passed-through login_message content.
+     * @return string|null Original arg value (for login_message filter), or null.
+     */
     public function print_login_buttons_on_login_page($arg = null) {
         if (self::$buttons_printed) return $arg;
         if (is_string($arg) && !empty($arg)) echo $arg;
 
         if (!empty($_GET['spid_cie_error'])) {
-            $code = sanitize_key(wp_unslash($_GET['spid_cie_error']));
-            echo '<p class="message" style="border-left-color:#d63638;">' . esc_html__('Autenticazione SPID/CIE non completata. Riprova.', 'wp-spid-cie') . ' (' . esc_html($code) . ')</p>';
+            $error_code = sanitize_key(wp_unslash($_GET['spid_cie_error']));
+            echo '<p class="message" style="border-left-color:#d63638;">' . esc_html($this->get_spid_error_message($error_code)) . '</p>';
         }
 
         echo $this->render_login_buttons();
@@ -995,6 +1065,12 @@ private function extract_jwt_payload($jwt) {
         return null;
     }
 
+    /**
+     * Renders the SPID and CIE login button HTML (used by [spid_cie_login] shortcode).
+     *
+     * @since  1.0.0
+     * @return string HTML markup, or empty string when both providers are disabled.
+     */
     public function render_login_buttons() {
         $options = get_option( $this->plugin_name . '_options' ); 
         
@@ -1043,6 +1119,10 @@ private function extract_jwt_payload($jwt) {
 
         ob_start();
         ?>
+        <?php if (!empty($_GET['spid_cie_error'])): ?>
+        <?php $error_code = sanitize_key(wp_unslash($_GET['spid_cie_error'])); ?>
+        <p class="message" style="border-left-color:#d63638;"><?php echo esc_html($this->get_spid_error_message($error_code)); ?></p>
+        <?php endif; ?>
         <div class="wp-spid-cie-auth">
         <div class="spid-cie-container">
             
@@ -1081,8 +1161,10 @@ private function extract_jwt_payload($jwt) {
                         <?php endforeach; ?>
                         <li class="spid-dropdown-footer">
                             <a href="https://www.spid.gov.it/cos-e-spid/come-attivare-spid/" target="_blank" rel="noopener noreferrer">Non hai SPID?</a>
-                            &nbsp;|&nbsp; 
+                            &nbsp;|&nbsp;
                             <a href="https://www.spid.gov.it/" target="_blank" rel="noopener noreferrer">Maggiori informazioni</a>
+                            &nbsp;|&nbsp;
+                            <a href="https://helpdesk.spid.gov.it/" target="_blank" rel="noopener noreferrer">Serve aiuto?</a>
                         </li>
                     </ul>
                 </div>
@@ -1153,6 +1235,12 @@ private function extract_jwt_payload($jwt) {
                     'href' => $login_url_cie,
                 ]); ?>
             <?php endif; ?>
+
+            <div class="spid-agid-footer">
+                <img src="<?php echo esc_url(plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/spid-agid-logo-lb.png'); ?>"
+                     alt="SPID - AgID Agenzia per l'Italia Digitale"
+                     class="spid-agid-logo">
+            </div>
         </div>
         </div>
         <?php
@@ -1200,7 +1288,17 @@ private function extract_jwt_payload($jwt) {
             $attrs[] = $attr_name . '="' . esc_attr((string) $value) . '"';
         }
 
-        return '<' . $tag . ' ' . implode(' ', $attrs) . '>' . esc_html($label) . '</' . $tag . '>';
+        $inner = '';
+        if ($modifier === 'spid') {
+            $icon_url = esc_url(plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/spid-ico-circle-bb.svg');
+            $inner .= '<img src="' . $icon_url . '" alt="" class="spid-ico-btn" aria-hidden="true">';
+        } elseif ($modifier === 'cie') {
+            $icon_url = esc_url(plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/cie-ico-circle.svg');
+            $inner .= '<img src="' . $icon_url . '" alt="" class="spid-ico-btn cie-ico-btn" aria-hidden="true">';
+        }
+        $inner .= '<span>' . esc_html($label) . '</span>';
+
+        return '<' . $tag . ' ' . implode(' ', $attrs) . '>' . $inner . '</' . $tag . '>';
     }
 
     private function get_registry_service() {
