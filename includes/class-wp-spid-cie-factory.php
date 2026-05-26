@@ -276,7 +276,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
             "jwks" => $jwks_structure,
             "client_name" => $this->config['organization_name'],
             "contacts" => [$this->config['contacts_email']],
-            "grant_types" => ["authorization_code"],
+            "grant_types" => ["authorization_code", "refresh_token"],
             "redirect_uris" => [
                 add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], trailingslashit($endpoint_base)),
                 add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], trailingslashit($endpoint_base))
@@ -364,7 +364,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
                     'jwks' => $jwks_structure,
                     'client_name' => $this->config['organization_name'],
                     'contacts' => [$this->config['contacts_email']],
-                    'grant_types' => ['authorization_code'],
+                    'grant_types' => ['authorization_code', 'refresh_token'],
                     'redirect_uris' => [
                         add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], trailingslashit($endpoint_base)),
                         add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], trailingslashit($endpoint_base))
