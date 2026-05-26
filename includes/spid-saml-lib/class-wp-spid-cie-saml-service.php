@@ -328,7 +328,6 @@ class WP_SPID_CIE_OIDC_Saml_Service {
             $certForValidation = (string) $idp['x509_cert'];
             $certSource = 'idp';
         }
-        error_log('[SPID_DEBUG] parse_and_validate_response: cert_source=' . $certSource . ' cert_preview=' . substr($certForValidation, 0, 30));
         $sigValid = $this->verify_signature_strict($dom, $sigNode, $certForValidation);
         if (!$sigValid) {
             return new WP_Error('saml_signature_invalid', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
@@ -390,17 +389,13 @@ class WP_SPID_CIE_OIDC_Saml_Service {
             return false;
         }
 
-        error_log('[SPID_DEBUG] verify_signature_strict: cert_candidates_count=' . count($certCandidates));
         $verified = false;
-        foreach ($certCandidates as $i => $candidate) {
-            $preview = substr(preg_replace('/\s+/', '', str_replace(['-----BEGIN CERTIFICATE-----', '-----END CERTIFICATE-----'], '', $candidate)), 0, 20);
+        foreach ($certCandidates as $candidate) {
             $publicKey = openssl_pkey_get_public($candidate);
             if (!$publicKey) {
-                error_log('[SPID_DEBUG] verify_signature_strict: cert[' . $i . '] preview=' . $preview . ' openssl_pkey=FAIL');
                 continue;
             }
             $check = openssl_verify($canonical, $signatureValue, $publicKey, $algo);
-            error_log('[SPID_DEBUG] verify_signature_strict: cert[' . $i . '] preview=' . $preview . ' openssl_verify=' . $check);
             if ($check === 1) {
                 $verified = true;
                 break;
@@ -412,7 +407,6 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         }
 
         $digestOk = $this->validate_reference_digest($dom, $signatureNode);
-        error_log('[SPID_DEBUG] verify_signature_strict: validate_reference_digest=' . ($digestOk ? 'OK' : 'FAIL'));
         return $digestOk;
     }
 
@@ -426,22 +420,12 @@ class WP_SPID_CIE_OIDC_Saml_Service {
             return false;
         }
 
-        $transformNodes = $xp->query('ds:SignedInfo/ds:Reference/ds:Transforms/ds:Transform', $signatureNode);
-        $transforms = [];
-        if ($transformNodes) {
-            foreach ($transformNodes as $t) {
-                $transforms[] = ($t instanceof DOMElement) ? $t->getAttribute('Algorithm') : '';
-            }
-        }
-        error_log('[SPID_DEBUG] validate_reference_digest: transforms=[' . implode(',', $transforms) . ']');
-
         $uri = ltrim((string) $refNode->getAttribute('URI'), '#');
         if ($uri === '') {
             return false;
         }
 
         $targetNodes = $xp->query('//*[@ID="' . $uri . '"]');
-        error_log('[SPID_DEBUG] validate_reference_digest: uri=' . $uri . ' target_count=' . ($targetNodes ? $targetNodes->length : 'false'));
         if (!$targetNodes || $targetNodes->length !== 1) {
             return false;
         }
@@ -450,7 +434,6 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         if (!$target instanceof DOMElement) {
             return false;
         }
-        error_log('[SPID_DEBUG] validate_reference_digest: target_tag=' . $target->tagName . ' target_ID=' . $target->getAttribute('ID'));
 
         // C14N must run on the live document node to preserve ancestor namespace declarations.
         // Enveloped-signature transform: remove only THIS signature node (not all signatures inside
@@ -484,11 +467,9 @@ class WP_SPID_CIE_OIDC_Saml_Service {
             }
         }
 
-        error_log('[SPID_DEBUG] validate_reference_digest: canon_len=' . strlen($canon) . ' canon_preview=' . substr($canon, 0, 100));
         $digestAlgo = $this->resolve_digest_algo($digestMethodNode instanceof DOMElement ? (string) $digestMethodNode->getAttribute('Algorithm') : '');
         $computed = base64_encode(hash($digestAlgo, $canon, true));
         $expected = trim((string) $digestNode->textContent);
-        error_log('[SPID_DEBUG] validate_reference_digest: uri=' . $uri . ' algo=' . $digestAlgo . ' computed=' . substr($computed, 0, 20) . ' expected=' . substr($expected, 0, 20));
         return hash_equals($expected, $computed);
     }
 
