@@ -587,7 +587,10 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
             'entity_id' => trim($entity),
             'sso_url' => esc_url_raw(trim($sso)),
             'slo_url' => esc_url_raw(trim($slo)),
-            'x509_cert' => implode("\n", array_values(array_unique(array_filter($certs)))),
+            'x509_cert' => implode("\n", array_map(
+                fn($c) => "-----BEGIN CERTIFICATE-----\n" . $c . "\n-----END CERTIFICATE-----",
+                array_values(array_unique(array_filter($certs)))
+            )),
         ];
     }
 
