@@ -911,7 +911,7 @@ private function extract_jwt_payload($jwt) {
                 'idp' => $idp,
             ]);
 
-            wp_safe_redirect($auth_url);
+            wp_redirect($auth_url);
             exit;
         }
 
