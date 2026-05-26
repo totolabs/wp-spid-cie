@@ -430,6 +430,7 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         }
 
         $targetNodes = $xp->query('//*[@ID="' . $uri . '"]');
+        error_log('[SPID_DEBUG] validate_reference_digest: uri=' . $uri . ' target_count=' . ($targetNodes ? $targetNodes->length : 'false'));
         if (!$targetNodes || $targetNodes->length !== 1) {
             return false;
         }
@@ -438,6 +439,7 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         if (!$target instanceof DOMElement) {
             return false;
         }
+        error_log('[SPID_DEBUG] validate_reference_digest: target_tag=' . $target->tagName . ' target_ID=' . $target->getAttribute('ID'));
 
         $clone = $target->cloneNode(true);
         $sigInside = $clone->getElementsByTagNameNS('http://www.w3.org/2000/09/xmldsig#', 'Signature');
@@ -446,6 +448,7 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         }
 
         $canon = $clone->C14N(true, false);
+        error_log('[SPID_DEBUG] validate_reference_digest: canon_len=' . strlen($canon) . ' canon_preview=' . substr($canon, 0, 100));
         $digestAlgo = $this->resolve_digest_algo($digestMethodNode instanceof DOMElement ? (string) $digestMethodNode->getAttribute('Algorithm') : '');
         $computed = base64_encode(hash($digestAlgo, $canon, true));
         $expected = trim((string) $digestNode->textContent);
