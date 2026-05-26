@@ -3,7 +3,7 @@ Contributors: totolabs
 Tags: spid, cie, oidc, login, pnrr, pa, openid connect, italia
 Requires at least: 6.0
 Tested up to: 6.7
-Stable tag: 1.2.1
+Stable tag: 1.3.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -39,6 +39,13 @@ Sviluppato pensando alle esigenze delle Pubbliche Amministrazioni italiane (Comu
 7. Una volta attivati i servizi sui portali istituzionali, abilita i pulsanti di login nelle impostazioni del plugin.
 
 == Changelog ==
+
+= 1.3.1 =
+* Fix compatibilità IdP dual-signature (Poste Italiane e altri)
+* Fix parsing certificati multipli nel registry AgID
+* Fix calcolo digest C14N per risposte SAML pretty-printed
+* Collegamento automatico utente WordPress esistente per email
+* Username generato dal codice fiscale SPID
 
 = 1.2.1 =
 * Allineamento UI/UX pulsanti “Entra con SPID” e “Entra con CIE” con base grafica comune.

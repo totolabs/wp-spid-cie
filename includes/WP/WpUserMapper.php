@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Maps raw OIDC provider claims to the normalized internal identity schema.
