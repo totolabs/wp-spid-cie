@@ -321,9 +321,12 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         }
 
         $certForValidation = !empty($ctx['idp_x509_cert']) ? (string) $ctx['idp_x509_cert'] : '';
+        $certSource = 'ctx';
         if ($certForValidation === '' && !empty($idp['x509_cert'])) {
             $certForValidation = (string) $idp['x509_cert'];
+            $certSource = 'idp';
         }
+        error_log('[SPID_DEBUG] parse_and_validate_response: cert_source=' . $certSource . ' cert_preview=' . substr($certForValidation, 0, 30));
         $sigValid = $this->verify_signature_strict($dom, $sigNode, $certForValidation);
         if (!$sigValid) {
             return new WP_Error('saml_signature_invalid', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
@@ -385,13 +388,17 @@ class WP_SPID_CIE_OIDC_Saml_Service {
             return false;
         }
 
+        error_log('[SPID_DEBUG] verify_signature_strict: cert_candidates_count=' . count($certCandidates));
         $verified = false;
-        foreach ($certCandidates as $candidate) {
+        foreach ($certCandidates as $i => $candidate) {
+            $preview = substr(preg_replace('/\s+/', '', str_replace(['-----BEGIN CERTIFICATE-----', '-----END CERTIFICATE-----'], '', $candidate)), 0, 20);
             $publicKey = openssl_pkey_get_public($candidate);
             if (!$publicKey) {
+                error_log('[SPID_DEBUG] verify_signature_strict: cert[' . $i . '] preview=' . $preview . ' openssl_pkey=FAIL');
                 continue;
             }
             $check = openssl_verify($canonical, $signatureValue, $publicKey, $algo);
+            error_log('[SPID_DEBUG] verify_signature_strict: cert[' . $i . '] preview=' . $preview . ' openssl_verify=' . $check);
             if ($check === 1) {
                 $verified = true;
                 break;
