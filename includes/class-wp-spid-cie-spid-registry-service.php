@@ -159,13 +159,22 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
     }
 
     /**
-     * Clears the IdP list cache and triggers a fresh fetch.
+     * Clears all registry transients (list, LKG, all per-IdP details) and triggers a fresh fetch.
      *
      * @since  1.0.0
      * @return void
      */
     public function refresh_all(): void {
         delete_transient(self::LIST_TRANSIENT);
+        delete_transient(self::LIST_LKG_TRANSIENT);
+
+        global $wpdb;
+        $wpdb->query(
+            "DELETE FROM {$wpdb->options}
+             WHERE option_name LIKE '_transient_spid\_saml\_registry\_%'
+                OR option_name LIKE '_transient\_timeout\_spid\_saml\_registry\_%'"
+        );
+
         $this->get_idp_list(true);
     }
 
@@ -587,7 +596,10 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
             'entity_id' => trim($entity),
             'sso_url' => esc_url_raw(trim($sso)),
             'slo_url' => esc_url_raw(trim($slo)),
-            'x509_cert' => implode("\n", array_values(array_unique(array_filter($certs)))),
+            'x509_cert' => implode("\n", array_map(
+                fn($c) => "-----BEGIN CERTIFICATE-----\n" . $c . "\n-----END CERTIFICATE-----",
+                array_values(array_unique(array_filter($certs)))
+            )),
         ];
     }
 

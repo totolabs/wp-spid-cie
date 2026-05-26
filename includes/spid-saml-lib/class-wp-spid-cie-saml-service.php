@@ -213,7 +213,9 @@ class WP_SPID_CIE_OIDC_Saml_Service {
 
         libxml_use_internal_errors(true);
         $dom = new DOMDocument();
-        $ok = $dom->loadXML($xmlRaw, LIBXML_NONET | LIBXML_NOBLANKS | LIBXML_NOCDATA);
+        // LIBXML_NOBLANKS strips whitespace-only text nodes, which corrupts the C14N digest
+        // when the IdP signed a pretty-printed response (e.g. Poste Italiane).
+        $ok = $dom->loadXML($xmlRaw, LIBXML_NONET | LIBXML_NOCDATA);
         if (!$ok) {
             return new WP_Error('saml_invalid_xml', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
@@ -306,17 +308,25 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         $this->validate_not_on_or_after((string) $xp->evaluate('string(//saml:SubjectConfirmationData/@NotOnOrAfter)'), (int) $sp['clock_skew']);
 
         $signatureNodes = $xp->query('//ds:Signature');
-        if (!$signatureNodes || $signatureNodes->length !== 1) {
+        if (!$signatureNodes || $signatureNodes->length === 0) {
+            return new WP_Error('saml_missing_signature', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
+        }
+        if ($signatureNodes->length > 2) {
             return new WP_Error('saml_signature_ambiguous', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
-        $sigNode = $signatureNodes->item(0);
+        $responseSignatureNodes = $xp->query('/samlp:Response/ds:Signature');
+        $sigNode = ($responseSignatureNodes && $responseSignatureNodes->length > 0)
+            ? $responseSignatureNodes->item(0)
+            : $signatureNodes->item(0);
         if (!$sigNode instanceof DOMElement) {
             return new WP_Error('saml_missing_signature', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $certForValidation = !empty($ctx['idp_x509_cert']) ? (string) $ctx['idp_x509_cert'] : '';
+        $certSource = 'ctx';
         if ($certForValidation === '' && !empty($idp['x509_cert'])) {
             $certForValidation = (string) $idp['x509_cert'];
+            $certSource = 'idp';
         }
         $sigValid = $this->verify_signature_strict($dom, $sigNode, $certForValidation);
         if (!$sigValid) {
@@ -396,7 +406,8 @@ class WP_SPID_CIE_OIDC_Saml_Service {
             return false;
         }
 
-        return $this->validate_reference_digest($dom, $signatureNode);
+        $digestOk = $this->validate_reference_digest($dom, $signatureNode);
+        return $digestOk;
     }
 
     private function validate_reference_digest(DOMDocument $dom, DOMElement $signatureNode): bool {
@@ -424,13 +435,38 @@ class WP_SPID_CIE_OIDC_Saml_Service {
             return false;
         }
 
-        $clone = $target->cloneNode(true);
-        $sigInside = $clone->getElementsByTagNameNS('http://www.w3.org/2000/09/xmldsig#', 'Signature');
-        while ($sigInside->length > 0) {
-            $sigInside->item(0)->parentNode->removeChild($sigInside->item(0));
+        // C14N must run on the live document node to preserve ancestor namespace declarations.
+        // Enveloped-signature transform: remove only THIS signature node (not all signatures inside
+        // target). Other signatures (e.g. Assertion-level) must remain because they were present
+        // when the IdP computed the digest.
+        $sigParent = $signatureNode->parentNode;
+        $sigNext   = $signatureNode->nextSibling;
+        $sigIsInsideTarget = false;
+
+        // Walk up from signatureNode to check it's inside $target
+        $node = $sigParent;
+        while ($node !== null) {
+            if ($node->isSameNode($target)) {
+                $sigIsInsideTarget = true;
+                break;
+            }
+            $node = $node->parentNode;
         }
 
-        $canon = $clone->C14N(true, false);
+        if ($sigIsInsideTarget && $sigParent !== null) {
+            $sigParent->removeChild($signatureNode);
+        }
+
+        $canon = $target->C14N(true, false);
+
+        if ($sigIsInsideTarget && $sigParent !== null) {
+            if ($sigNext) {
+                $sigParent->insertBefore($signatureNode, $sigNext);
+            } else {
+                $sigParent->appendChild($signatureNode);
+            }
+        }
+
         $digestAlgo = $this->resolve_digest_algo($digestMethodNode instanceof DOMElement ? (string) $digestMethodNode->getAttribute('Algorithm') : '');
         $computed = base64_encode(hash($digestAlgo, $canon, true));
         $expected = trim((string) $digestNode->textContent);

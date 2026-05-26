@@ -65,6 +65,19 @@ class WP_SPID_CIE_OIDC_WpAuthService {
 
         $user = $userFromSub ?: $userFromFiscal;
 
+        if (!$user && !empty($identity['email'])) {
+            $userFromEmail = get_user_by('email', $identity['email']);
+            if ($userFromEmail instanceof WP_User) {
+                $this->logger->info('OIDC user linked by email', [
+                    'correlation_id' => $correlationId,
+                    'provider'       => $provider,
+                    'user_id'        => $userFromEmail->ID,
+                ]);
+                $this->updateIdentityMeta($userFromEmail->ID, $identity, $providerConfig);
+                return $userFromEmail;
+            }
+        }
+
         if (!$user) {
             $autoProvision = !empty($options['auto_provisioning']) && $options['auto_provisioning'] === '1';
             if (!$autoProvision) {
@@ -87,8 +100,11 @@ class WP_SPID_CIE_OIDC_WpAuthService {
 
     private function provisionUser(array $identity, array $options, string $correlationId) {
         $provider = sanitize_key((string) $identity['provider']);
-        $hash = substr(hash('sha256', $identity['sub']), 0, 12);
-        $usernameBase = sanitize_user($provider . '_' . $hash, true);
+        $usernameBase = sanitize_user(strtoupper((string) $identity['fiscal_code']), true);
+        if ($usernameBase === '') {
+            $hash = substr(hash('sha256', $identity['sub']), 0, 12);
+            $usernameBase = sanitize_user($provider . '_' . $hash, true);
+        }
         $username = $usernameBase;
         $i = 1;
         while (username_exists($username)) {
