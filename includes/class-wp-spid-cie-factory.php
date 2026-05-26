@@ -278,8 +278,8 @@ class WP_SPID_CIE_OIDC_Wrapper {
             "contacts" => [$this->config['contacts_email']],
             "grant_types" => ["authorization_code"],
             "redirect_uris" => [
-                add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], $endpoint_base),
-                add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], $endpoint_base)
+                add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], trailingslashit($endpoint_base)),
+                add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], trailingslashit($endpoint_base))
             ],
             "response_types" => ["code"],
             "subject_type" => "pairwise",
@@ -366,8 +366,8 @@ class WP_SPID_CIE_OIDC_Wrapper {
                     'contacts' => [$this->config['contacts_email']],
                     'grant_types' => ['authorization_code'],
                     'redirect_uris' => [
-                        add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], $endpoint_base),
-                        add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], $endpoint_base)
+                        add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], trailingslashit($endpoint_base)),
+                        add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], trailingslashit($endpoint_base))
                     ],
                     'response_types' => ['code'],
                     'subject_type' => 'pairwise',
@@ -473,7 +473,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
             'client_id' => $this->config['base_url'],
             'response_type' => 'code',
             'scope' => $scope,
-            'redirect_uri' => add_query_arg(['oidc_action' => 'callback', 'provider' => $provider_param], $this->config['base_url']),
+            'redirect_uri' => add_query_arg(['oidc_action' => 'callback', 'provider' => $provider_param], trailingslashit($this->config['base_url'])),
             'state' => $state,
             'nonce' => $nonce,
             'code_challenge' => $code_challenge,
