@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.3.1 — 2026-05-26
+
+### Fix SAML — compatibilità IdP dual-signature
+- fix(spid-saml): supporto a IdP che firmano sia Response che Assertion (es. Poste Italiane) — gestione 1-2 nodi ds:Signature con preferenza per la firma a livello Response
+- fix(spid-saml): rimosso LIBXML_NOBLANKS dal parsing XML per preservare whitespace nel calcolo digest C14N
+- fix(spid-saml): C14N eseguito sul nodo live del documento per preservare il contesto namespace
+- fix(spid-saml): enveloped-signature transform rimuove solo la firma in validazione
+
+### Fix Registry
+- fix(spid-registry): parsing corretto di IdP con più certificati — aggiunta intestazione PEM in extract_runtime_values()
+- fix(spid-registry): refresh_all() cancella tutti i transient del registry inclusa la cache per-IdP
+
+### Provisioning utenti
+- feat(spid-saml): username WordPress generato dal codice fiscale SPID invece di hash opaco
+- fix(spid-saml): collegamento automatico utente esistente per email se sub e codice fiscale non trovano corrispondenza
+
 ## [1.3.0] - 2026-05-26
 
 ### Added
