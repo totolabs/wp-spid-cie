@@ -214,17 +214,11 @@ body.login .italia-it-button .italia-it-button-text {
 }
 
 .wp-spid-cie-auth .spid-ico-btn {
-    height: 24px;
-    width: 24px;
+    height: 32px;
+    width: 32px;
     margin-right: 10px;
     vertical-align: middle;
     flex-shrink: 0;
-}
-
-.wp-spid-cie-auth .cie-ico-btn {
-    height: 32px;
-    width: 32px;
-    margin-right: 8px;
 }
 
 .wp-spid-cie-auth .spid-button {
