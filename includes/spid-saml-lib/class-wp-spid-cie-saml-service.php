@@ -409,7 +409,9 @@ class WP_SPID_CIE_OIDC_Saml_Service {
             return false;
         }
 
-        return $this->validate_reference_digest($dom, $signatureNode);
+        $digestOk = $this->validate_reference_digest($dom, $signatureNode);
+        error_log('[SPID_DEBUG] verify_signature_strict: validate_reference_digest=' . ($digestOk ? 'OK' : 'FAIL'));
+        return $digestOk;
     }
 
     private function validate_reference_digest(DOMDocument $dom, DOMElement $signatureNode): bool {
@@ -447,6 +449,7 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         $digestAlgo = $this->resolve_digest_algo($digestMethodNode instanceof DOMElement ? (string) $digestMethodNode->getAttribute('Algorithm') : '');
         $computed = base64_encode(hash($digestAlgo, $canon, true));
         $expected = trim((string) $digestNode->textContent);
+        error_log('[SPID_DEBUG] validate_reference_digest: uri=' . $uri . ' algo=' . $digestAlgo . ' computed=' . substr($computed, 0, 20) . ' expected=' . substr($expected, 0, 20));
         return hash_equals($expected, $computed);
     }
 
