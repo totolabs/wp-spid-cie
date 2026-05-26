@@ -213,7 +213,9 @@ class WP_SPID_CIE_OIDC_Saml_Service {
 
         libxml_use_internal_errors(true);
         $dom = new DOMDocument();
-        $ok = $dom->loadXML($xmlRaw, LIBXML_NONET | LIBXML_NOBLANKS | LIBXML_NOCDATA);
+        // LIBXML_NOBLANKS strips whitespace-only text nodes, which corrupts the C14N digest
+        // when the IdP signed a pretty-printed response (e.g. Poste Italiane).
+        $ok = $dom->loadXML($xmlRaw, LIBXML_NONET | LIBXML_NOCDATA);
         if (!$ok) {
             return new WP_Error('saml_invalid_xml', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
@@ -423,6 +425,15 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         if (!$refNode instanceof DOMElement || !$digestNode instanceof DOMElement) {
             return false;
         }
+
+        $transformNodes = $xp->query('ds:SignedInfo/ds:Reference/ds:Transforms/ds:Transform', $signatureNode);
+        $transforms = [];
+        if ($transformNodes) {
+            foreach ($transformNodes as $t) {
+                $transforms[] = ($t instanceof DOMElement) ? $t->getAttribute('Algorithm') : '';
+            }
+        }
+        error_log('[SPID_DEBUG] validate_reference_digest: transforms=[' . implode(',', $transforms) . ']');
 
         $uri = ltrim((string) $refNode->getAttribute('URI'), '#');
         if ($uri === '') {
