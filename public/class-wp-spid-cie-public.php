@@ -1008,6 +1008,25 @@ private function extract_jwt_payload($jwt) {
         exit;
     }
 
+    private function get_spid_error_message(string $code): string {
+        // Mappa test AgID: 104→19, 105→20, 106→21, 107→22, 108→23, 111→25
+        $messages = [
+            'spid_error_19'                => 'Autenticazione fallita per ripetuta sottomissione di credenziali errate.',
+            'spid_error_20'                => 'Utente privo di credenziali compatibili con il livello richiesto dal fornitore del servizio.',
+            'spid_error_21'                => 'Timeout durante l\'autenticazione utente.',
+            'spid_error_22'                => 'Utente nega il consenso all\'invio di dati al SP in caso di sessione vigente.',
+            'spid_error_23'                => 'Utente con identità sospesa/revocata o con credenziali bloccate.',
+            'spid_error_25'                => 'Processo di autenticazione annullato dall\'utente.',
+            'saml_status_not_success'      => 'Autenticazione non completata.',
+            'saml_config_incomplete'       => 'Configurazione SPID incompleta. Contattare il gestore del servizio.',
+            'saml_missing_response'        => 'Risposta SPID non ricevuta. Riprovare.',
+            'saml_replay_detected'         => 'Richiesta già elaborata. Riprovare.',
+            'saml_missing_required_claims' => 'Dati utente incompleti nella risposta SPID.',
+            'saml_invalid_email'           => 'Indirizzo email non valido nella risposta SPID.',
+            'oidc_start_failed'            => 'Impossibile avviare l\'autenticazione. Riprovare.',
+        ];
+        return $messages[$code] ?? 'Autenticazione non completata. Riprovare o contattare il gestore del servizio.';
+    }
 
     private function resolve_login_entry_url(): string {
         if (function_exists('wp_login_url') && did_action('login_init')) {
@@ -1037,8 +1056,8 @@ private function extract_jwt_payload($jwt) {
         if (is_string($arg) && !empty($arg)) echo $arg;
 
         if (!empty($_GET['spid_cie_error'])) {
-            $code = sanitize_key(wp_unslash($_GET['spid_cie_error']));
-            echo '<p class="message" style="border-left-color:#d63638;">' . esc_html__('Autenticazione SPID/CIE non completata. Riprova.', 'wp-spid-cie') . ' (' . esc_html($code) . ')</p>';
+            $error_code = sanitize_key(wp_unslash($_GET['spid_cie_error']));
+            echo '<p class="message" style="border-left-color:#d63638;">' . esc_html($this->get_spid_error_message($error_code)) . '</p>';
         }
 
         echo $this->render_login_buttons();
@@ -1101,7 +1120,8 @@ private function extract_jwt_payload($jwt) {
         ob_start();
         ?>
         <?php if (!empty($_GET['spid_cie_error'])): ?>
-        <p class="message" style="border-left-color:#d63638;"><?php echo esc_html__('Autenticazione SPID/CIE non completata. Riprova.', 'wp-spid-cie'); ?> (<?php echo esc_html(sanitize_key(wp_unslash($_GET['spid_cie_error']))); ?>)</p>
+        <?php $error_code = sanitize_key(wp_unslash($_GET['spid_cie_error'])); ?>
+        <p class="message" style="border-left-color:#d63638;"><?php echo esc_html($this->get_spid_error_message($error_code)); ?></p>
         <?php endif; ?>
         <div class="wp-spid-cie-auth">
         <div class="spid-cie-container">
