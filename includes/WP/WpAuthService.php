@@ -65,6 +65,19 @@ class WP_SPID_CIE_OIDC_WpAuthService {
 
         $user = $userFromSub ?: $userFromFiscal;
 
+        if (!$user && !empty($identity['email'])) {
+            $userFromEmail = get_user_by('email', $identity['email']);
+            if ($userFromEmail instanceof WP_User) {
+                $this->logger->info('OIDC user linked by email', [
+                    'correlation_id' => $correlationId,
+                    'provider'       => $provider,
+                    'user_id'        => $userFromEmail->ID,
+                ]);
+                $this->updateIdentityMeta($userFromEmail->ID, $identity, $providerConfig);
+                return $userFromEmail;
+            }
+        }
+
         if (!$user) {
             $autoProvision = !empty($options['auto_provisioning']) && $options['auto_provisioning'] === '1';
             if (!$autoProvision) {
