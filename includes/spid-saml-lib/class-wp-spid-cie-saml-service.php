@@ -453,23 +453,34 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         error_log('[SPID_DEBUG] validate_reference_digest: target_tag=' . $target->tagName . ' target_ID=' . $target->getAttribute('ID'));
 
         // C14N must run on the live document node to preserve ancestor namespace declarations.
-        // Temporarily remove all descendant <ds:Signature> elements (enveloped-signature transform),
-        // compute C14N on the original in-document element, then restore them.
-        $sigsToRestore = [];
-        $sigInside = $target->getElementsByTagNameNS('http://www.w3.org/2000/09/xmldsig#', 'Signature');
-        while ($sigInside->length > 0) {
-            $sig = $sigInside->item(0);
-            $sigsToRestore[] = ['node' => $sig, 'parent' => $sig->parentNode, 'next' => $sig->nextSibling];
-            $sig->parentNode->removeChild($sig);
+        // Enveloped-signature transform: remove only THIS signature node (not all signatures inside
+        // target). Other signatures (e.g. Assertion-level) must remain because they were present
+        // when the IdP computed the digest.
+        $sigParent = $signatureNode->parentNode;
+        $sigNext   = $signatureNode->nextSibling;
+        $sigIsInsideTarget = false;
+
+        // Walk up from signatureNode to check it's inside $target
+        $node = $sigParent;
+        while ($node !== null) {
+            if ($node->isSameNode($target)) {
+                $sigIsInsideTarget = true;
+                break;
+            }
+            $node = $node->parentNode;
+        }
+
+        if ($sigIsInsideTarget && $sigParent !== null) {
+            $sigParent->removeChild($signatureNode);
         }
 
         $canon = $target->C14N(true, false);
 
-        foreach ($sigsToRestore as $info) {
-            if ($info['next']) {
-                $info['parent']->insertBefore($info['node'], $info['next']);
+        if ($sigIsInsideTarget && $sigParent !== null) {
+            if ($sigNext) {
+                $sigParent->insertBefore($signatureNode, $sigNext);
             } else {
-                $info['parent']->appendChild($info['node']);
+                $sigParent->appendChild($signatureNode);
             }
         }
 
