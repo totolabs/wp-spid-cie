@@ -100,8 +100,11 @@ class WP_SPID_CIE_OIDC_WpAuthService {
 
     private function provisionUser(array $identity, array $options, string $correlationId) {
         $provider = sanitize_key((string) $identity['provider']);
-        $hash = substr(hash('sha256', $identity['sub']), 0, 12);
-        $usernameBase = sanitize_user($provider . '_' . $hash, true);
+        $usernameBase = sanitize_user(strtoupper((string) $identity['fiscal_code']), true);
+        if ($usernameBase === '') {
+            $hash = substr(hash('sha256', $identity['sub']), 0, 12);
+            $usernameBase = sanitize_user($provider . '_' . $hash, true);
+        }
         $username = $usernameBase;
         $i = 1;
         while (username_exists($username)) {
