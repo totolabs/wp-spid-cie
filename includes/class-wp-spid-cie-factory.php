@@ -285,6 +285,8 @@ class WP_SPID_CIE_OIDC_Wrapper {
             "subject_type" => "pairwise",
             "id_token_signed_response_alg" => "RS256",
             "userinfo_signed_response_alg" => "RS256",
+            "userinfo_encrypted_response_alg" => "RSA-OAEP",
+            "userinfo_encrypted_response_enc" => "A256CBC-HS512",
             "token_endpoint_auth_method" => "private_key_jwt",
             "token_endpoint_auth_signing_alg" => "RS256"
         ];
@@ -371,6 +373,8 @@ class WP_SPID_CIE_OIDC_Wrapper {
                     'subject_type' => 'pairwise',
                     'id_token_signed_response_alg' => 'RS256',
                     'userinfo_signed_response_alg' => 'RS256',
+                    'userinfo_encrypted_response_alg' => 'RSA-OAEP',
+                    'userinfo_encrypted_response_enc' => 'A256CBC-HS512',
                     'token_endpoint_auth_method' => 'private_key_jwt',
                     'token_endpoint_auth_signing_alg' => 'RS256'
                 ],
