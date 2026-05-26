@@ -50,10 +50,10 @@ class WP_SPID_CIE_OIDC_CieProviderProfile implements WP_SPID_CIE_OIDC_ProviderPr
 
         if ($mode === 'auto') {
             $resolved = $discoveryResolver->resolveFromIssuer((string) $base['issuer'], 'cie-' . bin2hex(random_bytes(4)));
-            if (is_wp_error($resolved)) {
-                return $resolved;
+            if (!is_wp_error($resolved)) {
+                $base = array_merge($base, $resolved);
             }
-            $base = array_merge($base, $resolved);
+            // If discovery fails, fall back to static endpoints already set in buildBaseConfig.
         }
 
         $base['scope'] = $this->buildScope($options['cie_scope'] ?? 'openid profile email');
