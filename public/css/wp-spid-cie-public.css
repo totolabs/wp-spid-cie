@@ -179,6 +179,14 @@
     text-decoration: underline;
 }
 
+.wp-spid-cie-auth .spid-cie-intro-text {
+    font-size: 13px;
+    color: #444;
+    line-height: 1.5;
+    margin-bottom: 12px;
+    text-align: left;
+}
+
 .wp-spid-cie-auth .spid-info-links {
     font-size: 13px;
     text-align: center;
