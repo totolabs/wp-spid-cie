@@ -149,7 +149,11 @@ function wp_spid_cie_activate() {
         update_option($option_name, $options);
     }
 
-    wp_spid_cie_sync_w3tc_exclusion();
+    // Sync W3TC exclusion list at most once per day to avoid a DB query on every page load.
+    if ( ! get_transient( 'wp_spid_cie_w3tc_synced' ) ) {
+        wp_spid_cie_sync_w3tc_exclusion();
+        set_transient( 'wp_spid_cie_w3tc_synced', 1, DAY_IN_SECONDS );
+    }
 }
 
 /**
@@ -220,7 +224,9 @@ function wp_spid_cie_on_page_save( int $post_id ): void {
     }
     $post = get_post( $post_id );
     if ( $post instanceof WP_Post && has_shortcode( $post->post_content, 'spid_cie_login' ) ) {
+        delete_transient( 'wp_spid_cie_w3tc_synced' );
         wp_spid_cie_sync_w3tc_exclusion();
+        set_transient( 'wp_spid_cie_w3tc_synced', 1, DAY_IN_SECONDS );
     }
 }
 
@@ -249,7 +255,11 @@ add_action('plugins_loaded', function () {
 });
 
 add_action( 'save_post_page', 'wp_spid_cie_on_page_save' );
-add_action( 'update_option_wp-spid-cie_options', 'wp_spid_cie_sync_w3tc_exclusion' );
+add_action( 'update_option_wp-spid-cie_options', function () {
+    delete_transient( 'wp_spid_cie_w3tc_synced' );
+    wp_spid_cie_sync_w3tc_exclusion();
+    set_transient( 'wp_spid_cie_w3tc_synced', 1, DAY_IN_SECONDS );
+} );
 
 // Bootstrap everything
 run_wp_spid_cie();
