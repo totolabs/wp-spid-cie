@@ -41,7 +41,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
      * @param  string $correlationId  Unique request identifier for logging.
      * @return string|WP_Error Authorization URL, or error.
      */
-    public function buildAuthorizationUrl(array $providerConfig, string $targetUrl, string $correlationId) {
+    public function buildAuthorizationUrl(array $providerConfig, string $targetUrl, string $correlationId, ?callable $requestObjectSigner = null) {
         $state = bin2hex(random_bytes(16));
         $nonce = bin2hex(random_bytes(16));
         $verifier = $this->pkce->generateVerifier();
@@ -79,6 +79,25 @@ class WP_SPID_CIE_OIDC_OidcClient {
         $authorizationEndpoint = $providerConfig['authorization_endpoint'] ?? '';
         if (!$authorizationEndpoint) {
             return new WP_Error('oidc_no_auth_endpoint', __('Endpoint di autorizzazione non configurato.', 'wp-spid-cie'));
+        }
+
+        if ($requestObjectSigner !== null) {
+            $ro_payload = array_merge($params, [
+                'iss'    => $providerConfig['client_id'],
+                'sub'    => $providerConfig['client_id'],
+                'aud'    => [$providerConfig['issuer'] ?? $authorizationEndpoint],
+                'iat'    => time(),
+                'exp'    => time() + 300,
+                'prompt' => 'login',
+            ]);
+            $request_jwt = $requestObjectSigner($ro_payload);
+            $outer = [
+                'client_id'     => $providerConfig['client_id'],
+                'response_type' => 'code',
+                'scope'         => $providerConfig['scope'] ?? 'openid',
+                'request'       => $request_jwt,
+            ];
+            return $authorizationEndpoint . '?' . http_build_query($outer);
         }
 
         return $authorizationEndpoint . '?' . http_build_query($params);
