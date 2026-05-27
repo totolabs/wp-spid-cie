@@ -94,6 +94,7 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/CieProviderProfil
 require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/ProviderRegistry.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/WP/WpUserMapper.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/WP/WpAuthService.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/Integrations/GayadeedBridge.php';
 
 // 3. Load Admin and Public classes
 require_once plugin_dir_path( __FILE__ ) . 'admin/class-wp-spid-cie-admin.php';
