@@ -1163,7 +1163,11 @@ private function extract_jwt_payload($jwt) {
             <?php endif; ?>
 
             <span class="spid-cie-title">Accedi con Identità Digitale</span>
-            
+
+            <?php if ($show_spid_oidc || $show_spid_saml): ?>
+                <p class="spid-cie-intro-text">SPID, il <strong>Sistema Pubblico di Identità Digitale</strong>, è il sistema di accesso che consente di utilizzare, con un'identità digitale unica, i servizi online della Pubblica Amministrazione e dei privati accreditati. Se sei già in possesso di un'identità digitale, accedi con le credenziali del tuo gestore. Se non hai ancora un'identità digitale, richiedila ad uno dei gestori.</p>
+            <?php endif; ?>
+
             <?php if ($show_spid_oidc): ?>
                 <div class="spid-button-wrapper">
                     <?php echo $this->render_primary_auth_button('spid', 'Entra con SPID', [
@@ -1267,6 +1271,7 @@ private function extract_jwt_payload($jwt) {
             </div>
 
             <?php if ($cie_enabled): ?>
+                <p class="spid-cie-intro-text">La <strong>Carta di Identità Elettronica (CIE)</strong> è il documento personale che attesta l'identità del cittadino.<br>Dotata di microprocessore, oltre a comprovare l'identità personale, permette l'accesso ai servizi digitali della Pubblica Amministrazione.</p>
                 <?php echo $this->render_primary_auth_button('cie', 'Entra con CIE', [
                     'href' => $login_url_cie,
                 ]); ?>
