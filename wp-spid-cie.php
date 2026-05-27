@@ -149,6 +149,13 @@ function wp_spid_cie_activate() {
         update_option($option_name, $options);
     }
 
+    // Reset sync transient on version change so flush runs again after each plugin update.
+    $synced_ver = get_option( 'wp_spid_cie_w3tc_sync_ver', '' );
+    if ( $synced_ver !== WP_SPID_CIE_OIDC_VERSION ) {
+        update_option( 'wp_spid_cie_w3tc_sync_ver', WP_SPID_CIE_OIDC_VERSION );
+        delete_transient( 'wp_spid_cie_w3tc_synced' );
+    }
+
     // Sync W3TC exclusion list at most once per day to avoid a DB query on every page load.
     if ( ! get_transient( 'wp_spid_cie_w3tc_synced' ) ) {
         wp_spid_cie_sync_w3tc_exclusion();
@@ -216,10 +223,23 @@ function wp_spid_cie_sync_w3tc_exclusion(): void {
 
     // Delete existing cached files for the login page(s) so the next GET
     // request is handled by PHP (where DONOTCACHEPAGE prevents re-caching).
-    if ( function_exists( 'w3tc_pgcache_flush_url' ) ) {
-        foreach ( $paths as $p ) {
-            w3tc_pgcache_flush_url( home_url( $p ) );
-            w3tc_pgcache_flush_url( home_url( $p . '/' ) );
+    // Use wp_loaded to ensure W3TC is fully initialized; call directly if already past that hook.
+    if ( defined( 'W3TC' ) ) {
+        $flush_paths = $paths;
+        $do_flush    = static function () use ( $flush_paths ): void {
+            if ( ! function_exists( 'w3tc_pgcache_flush_url' ) ) {
+                return;
+            }
+            foreach ( $flush_paths as $p ) {
+                w3tc_pgcache_flush_url( home_url( $p ) );
+                w3tc_pgcache_flush_url( home_url( $p . '/' ) );
+            }
+        };
+
+        if ( did_action( 'wp_loaded' ) ) {
+            $do_flush();
+        } else {
+            add_action( 'wp_loaded', $do_flush, 20 );
         }
     }
 }
