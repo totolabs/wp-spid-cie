@@ -47,7 +47,7 @@ class WP_SPID_CIE_OIDC_Factory {
             'organization_name' => $options['organization_name'] ?? get_bloginfo('name'),
             'ipa_code'          => $options['ipa_code'] ?? '',
             'fiscal_number'     => $options['fiscal_number'] ?? '',
-            'contacts_email'    => $options['contacts_email'] ?? get_option('admin_email'),
+            'contacts_email'    => $options['contacts_email'] ?: get_option('admin_email'),
             'logo_uri'          => isset($options['logo_uri']) ? esc_url_raw((string) $options['logo_uri']) : '',
             'spid_saml_locality_name' => $options['spid_saml_locality_name'] ?? '',
             'base_url'          => $base_url,
