@@ -62,3 +62,20 @@ copilot-instructions.md
 private.key
 public.crt
 csr.pem
+portal-cert.pem
+portal-pubkey.pem
+jwt-x5c.pem
+
+# JWT debug artifacts
+*.jwt
+*.payload.json
+jwt-*.bin
+jwt-*.txt
+
+# Local debug scripts
+check_metadata.py
+check_registry.py
+decode_jwt.py
+
+# Claude Code AI assistant directory
+.claude/
