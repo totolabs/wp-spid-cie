@@ -31,6 +31,31 @@ class WP_SPID_CIE_OIDC_Public {
         // template_redirect plugins (e.g. custom login-page redirectors) that strip query params.
         add_action( 'init', array( $this, 'handle_login_flow' ), 20 );
 		add_filter('redirect_canonical', array($this, 'disable_canonical_for_federation'), 10, 2);
+        add_action('wp', array($this, 'maybe_disable_page_cache'));
+    }
+
+    /**
+     * Disables page cache for pages containing the [spid_cie_login] shortcode.
+     * Supports W3 Total Cache, WP Super Cache, WP Rocket, and compatible plugins.
+     *
+     * @since  1.3.2
+     * @return void
+     */
+    public function maybe_disable_page_cache(): void {
+        global $post;
+        if (!$post instanceof WP_Post) {
+            return;
+        }
+        if (!has_shortcode($post->post_content, 'spid_cie_login')) {
+            return;
+        }
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
+        if (!defined('DONOTCACHEDB')) {
+            define('DONOTCACHEDB', true);
+        }
+        add_filter('do_rocket_no_cache_page', '__return_true');
     }
 
     /**
