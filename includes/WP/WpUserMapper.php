@@ -26,7 +26,7 @@ class WP_SPID_CIE_OIDC_WpUserMapper {
         $givenName = $this->pickFirst($claims, ['given_name', 'name']);
         $familyName = $this->pickFirst($claims, ['family_name', 'familyName', 'surname']);
         $fiscalCode = $this->pickFirst($claims, ['fiscal_code', 'fiscalCode', 'fiscalNumber', 'fiscal_number', 'cf', 'tax_id']);
-        $mobile = $this->pickFirst($claims, ['mobile', 'mobile_phone', 'phone_number', 'phoneNumber', 'cellulare']);
+        $mobile = $this->pickFirst($claims, ['mobilePhone', 'mobile', 'mobile_phone', 'phone_number', 'phoneNumber', 'cellulare']);
 
         return [
             'provider' => $provider,

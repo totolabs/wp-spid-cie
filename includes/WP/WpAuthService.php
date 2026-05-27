@@ -164,6 +164,15 @@ class WP_SPID_CIE_OIDC_WpAuthService {
 
         $acr = isset($providerConfig['last_id_token_acr']) ? (string) $providerConfig['last_id_token_acr'] : '';
         update_user_meta($userId, '_spidcie_last_acr', sanitize_text_field($acr));
+
+        if (defined('GAYADEED_PLUGIN_VERSION')) {
+            $fiscalCode = strtoupper($identity['fiscal_code']);
+            $mobile     = (string) $identity['mobile'];
+            $prefix     = (strncmp($mobile, '+39', 3) === 0) ? '+39' : '';
+            update_user_meta($userId, 'gayadeed_fiscal_code',   $fiscalCode);
+            update_user_meta($userId, 'gayadeed_mobile_phone',  $mobile);
+            update_user_meta($userId, 'gayadeed_phone_prefix',  $prefix);
+        }
     }
 
     private function getProviderSubMetaKey(string $provider): string {
