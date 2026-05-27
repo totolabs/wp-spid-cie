@@ -148,115 +148,6 @@ function wp_spid_cie_activate() {
     if ($updated) {
         update_option($option_name, $options);
     }
-
-    // Reset sync transient on version change so flush runs again after each plugin update.
-    $synced_ver = get_option( 'wp_spid_cie_w3tc_sync_ver', '' );
-    if ( $synced_ver !== WP_SPID_CIE_OIDC_VERSION ) {
-        update_option( 'wp_spid_cie_w3tc_sync_ver', WP_SPID_CIE_OIDC_VERSION );
-        delete_transient( 'wp_spid_cie_w3tc_synced' );
-    }
-
-    // Sync W3TC exclusion list at most once per day to avoid a DB query on every page load.
-    if ( ! get_transient( 'wp_spid_cie_w3tc_synced' ) ) {
-        wp_spid_cie_sync_w3tc_exclusion();
-        set_transient( 'wp_spid_cie_w3tc_synced', 1, DAY_IN_SECONDS );
-    }
-}
-
-/**
- * Adds paths of pages containing [spid_cie_login] to W3 Total Cache's
- * pgcache.reject.uri list, so they are excluded before advanced-cache.php
- * even decides to serve a cached copy.
- */
-function wp_spid_cie_sync_w3tc_exclusion(): void {
-    if ( ! defined( 'W3TC' ) || ! class_exists( 'W3TC\\Config' ) ) {
-        return;
-    }
-
-    global $wpdb;
-    $ids = $wpdb->get_col(
-        $wpdb->prepare(
-            "SELECT ID FROM {$wpdb->posts}
-             WHERE post_status = 'publish'
-               AND post_type   = 'page'
-               AND post_content LIKE %s",
-            '%[spid_cie_login%'
-        )
-    );
-
-    if ( empty( $ids ) ) {
-        return;
-    }
-
-    $paths = [];
-    foreach ( $ids as $id ) {
-        $link = get_permalink( (int) $id );
-        if ( $link ) {
-            $path = rtrim( (string) parse_url( $link, PHP_URL_PATH ), '/' );
-            if ( $path !== '' ) {
-                $paths[] = $path;
-            }
-        }
-    }
-
-    if ( empty( $paths ) ) {
-        return;
-    }
-
-    try {
-        $cfg   = new W3TC\Config();
-        $uris  = (array) $cfg->get_array( 'pgcache.reject.uri' );
-        $dirty = false;
-        foreach ( $paths as $p ) {
-            if ( ! in_array( $p, $uris, true ) ) {
-                $uris[] = $p;
-                $dirty  = true;
-            }
-        }
-        if ( $dirty ) {
-            $cfg->set( 'pgcache.reject.uri', array_values( $uris ) );
-            $cfg->save();
-        }
-    } catch ( \Throwable $e ) {
-        // W3TC not configured or unavailable — skip silently.
-    }
-
-    // Delete existing cached files for the login page(s) so the next GET
-    // request is handled by PHP (where DONOTCACHEPAGE prevents re-caching).
-    // Use wp_loaded to ensure W3TC is fully initialized; call directly if already past that hook.
-    if ( defined( 'W3TC' ) ) {
-        $flush_paths = $paths;
-        $do_flush    = static function () use ( $flush_paths ): void {
-            if ( ! function_exists( 'w3tc_pgcache_flush_url' ) ) {
-                return;
-            }
-            foreach ( $flush_paths as $p ) {
-                w3tc_pgcache_flush_url( home_url( $p ) );
-                w3tc_pgcache_flush_url( home_url( $p . '/' ) );
-            }
-        };
-
-        if ( did_action( 'wp_loaded' ) ) {
-            $do_flush();
-        } else {
-            add_action( 'wp_loaded', $do_flush, 20 );
-        }
-    }
-}
-
-/**
- * Re-syncs W3TC exclusion when a page containing the login shortcode is saved.
- */
-function wp_spid_cie_on_page_save( int $post_id ): void {
-    if ( wp_is_post_revision( $post_id ) || wp_is_post_autosave( $post_id ) ) {
-        return;
-    }
-    $post = get_post( $post_id );
-    if ( $post instanceof WP_Post && has_shortcode( $post->post_content, 'spid_cie_login' ) ) {
-        delete_transient( 'wp_spid_cie_w3tc_synced' );
-        wp_spid_cie_sync_w3tc_exclusion();
-        set_transient( 'wp_spid_cie_w3tc_synced', 1, DAY_IN_SECONDS );
-    }
 }
 
 register_activation_hook(__FILE__, 'wp_spid_cie_activate');
@@ -282,13 +173,6 @@ add_action('plugins_loaded', function () {
     // Set defaults also on already-active installs (upgrade-safe)
     wp_spid_cie_activate();
 });
-
-add_action( 'save_post_page', 'wp_spid_cie_on_page_save' );
-add_action( 'update_option_wp-spid-cie_options', function () {
-    delete_transient( 'wp_spid_cie_w3tc_synced' );
-    wp_spid_cie_sync_w3tc_exclusion();
-    set_transient( 'wp_spid_cie_w3tc_synced', 1, DAY_IN_SECONDS );
-} );
 
 // Bootstrap everything
 run_wp_spid_cie();
