@@ -897,7 +897,9 @@ private function extract_jwt_payload($jwt) {
         }
         if ($action === 'login') {
             $target_url = $this->resolve_redirect_target();
-            $auth_url = $oidc->buildAuthorizationUrl($provider_config, $target_url, $correlation_id);
+            $wrapper    = WP_SPID_CIE_OIDC_Factory::get_client();
+            $signer     = fn(array $payload) => $wrapper->signRequestObject($payload);
+            $auth_url   = $oidc->buildAuthorizationUrl($provider_config, $target_url, $correlation_id, $signer);
             if (is_wp_error($auth_url)) {
                 $logger->error('OIDC start login failed', [
                     'correlation_id' => $correlation_id,

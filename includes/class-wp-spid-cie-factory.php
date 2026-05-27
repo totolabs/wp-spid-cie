@@ -416,86 +416,6 @@ class WP_SPID_CIE_OIDC_Wrapper {
     }
 
     /**
-     * Builds the OIDC authorization URL with a signed Request Object.
-     *
-     * @since  1.0.0
-     * @param  string      $trust_anchor Trust anchor URL used to select provider type (SPID/CIE).
-     * @param  string|null $idp_id       Optional SPID IdP key to pre-select.
-     * @return string Authorization endpoint URL with query parameters.
-     */
-    public function getAuthorizationUrl($trust_anchor, $idp_id = null) {
-        
-        $code_verifier = $this->generateCodeVerifier();
-        $code_challenge = $this->generateCodeChallenge($code_verifier);
-        $state = bin2hex(random_bytes(16));
-        $nonce = bin2hex(random_bytes(16));
-
-        if (!session_id()) { session_start(); }
-        $_SESSION['oidc_verifier'] = $code_verifier;
-        $_SESSION['oidc_state'] = $state;
-        $_SESSION['oidc_nonce'] = $nonce;
-
-        $auth_endpoint = '';
-        $issuer = ''; // For the 'aud' field in the Request Object
-        $scope = 'openid profile email';
-        $provider_param = isset($_GET['provider']) ? $_GET['provider'] : '';
-        $acr_values = 'https://www.spid.gov.it/SpidL2';
-
-        // Endpoint selection
-        if (strpos($trust_anchor, 'cie') !== false || $provider_param === 'cie') {
-             // CIE
-             $auth_endpoint = 'https://id.cie.gov.it/oidc/authorization';
-             $issuer = 'https://id.cie.gov.it/oidc/op/'; // CIE standard issuer
-             $scope = 'openid profile email';
-             $provider_param = 'cie';
-             $acr_values = 'https://www.spid.gov.it/SpidL2'; 
-        } else {
-             // SPID
-             $provider_param = 'spid';
-             $scope = 'openid profile'; 
-             
-             $selected_idp = 'validator'; // Default
-             if ($idp_id && isset($this->spid_providers[$idp_id])) {
-                 $selected_idp = $idp_id;
-             }
-             
-             $auth_endpoint = $this->spid_providers[$selected_idp]['auth_endpoint'];
-             $issuer = $this->spid_providers[$selected_idp]['issuer'];
-        }
-
-        // Build Request Object (JWT)
-        $ro_payload = [
-            'iss' => $this->config['base_url'],
-            'sub' => $this->config['base_url'],
-            'aud' => [$issuer], // Mandatory audience
-            'iat' => time(),
-            'exp' => time() + 300,
-            'client_id' => $this->config['base_url'],
-            'response_type' => 'code',
-            'scope' => $scope,
-            'redirect_uri' => add_query_arg(['oidc_action' => 'callback', 'provider' => $provider_param], trailingslashit($this->config['base_url'])),
-            'state' => $state,
-            'nonce' => $nonce,
-            'code_challenge' => $code_challenge,
-            'code_challenge_method' => 'S256',
-            'acr_values' => $acr_values,
-            'prompt' => 'login'
-        ];
-
-        // Sign with header 'typ' => 'oauth-authz-req+jwt'
-        $request_token = $this->signRequestObject($ro_payload);
-
-        $params = [
-            'client_id' => $this->config['base_url'],
-            'response_type' => 'code',
-            'scope' => $scope,
-            'request' => $request_token // Required parameter
-        ];
-
-        return $auth_endpoint . '?' . http_build_query($params);
-    }
-
-    /**
      * Stub for UserInfo endpoint support (not currently used).
      *
      * @since  1.0.0
@@ -537,7 +457,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
     }
 
     // Sign Request Object (oauth-authz-req+jwt)
-    private function signRequestObject($payload) {
+    public function signRequestObject(array $payload): string {
         return $this->signGenericJwt($payload, 'oauth-authz-req+jwt');
     }
 
