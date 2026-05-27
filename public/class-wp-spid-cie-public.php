@@ -1260,6 +1260,16 @@ private function extract_jwt_payload($jwt) {
                 </div>
             <?php endif; ?>
 
+            <?php if ($show_spid_oidc || $show_spid_saml): ?>
+                <p class="spid-info-links">
+                    <a href="https://www.spid.gov.it/cos-e-spid/come-attivare-spid/" target="_blank" rel="noopener noreferrer">Non hai SPID?</a>
+                    &nbsp;|&nbsp;
+                    <a href="https://www.spid.gov.it/" target="_blank" rel="noopener noreferrer">Maggiori informazioni su SPID</a>
+                    &nbsp;|&nbsp;
+                    <a href="https://helpdesk.spid.gov.it/" target="_blank" rel="noopener noreferrer">Serve aiuto?</a>
+                </p>
+            <?php endif; ?>
+
             <?php if ($cie_enabled): ?>
                 <?php echo $this->render_primary_auth_button('cie', 'Entra con CIE', [
                     'href' => $login_url_cie,
