@@ -132,9 +132,9 @@ function wp_spid_cie_activate() {
 
     // Set each default only if the field is empty or missing
     $defaults = [
-        'cie_trust_anchor_preprod' => 'https://registry.interno.gov.it/',
-        'cie_trust_anchor_prod'    => 'https://registry.interno.gov.it/',
-        'spid_trust_anchor'        => 'https://registry.agid.gov.it/',
+        'cie_trust_anchor_preprod' => '',
+        'cie_trust_anchor_prod'    => 'https://oidc.registry.servizicie.interno.gov.it',
+        'spid_trust_anchor'        => '',
     ];
 
     $updated = false;
