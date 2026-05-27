@@ -57,3 +57,8 @@ CLAUDE.md
 .aider*
 copilot-instructions.md
 /docs/STATO_PROGETTO.md
+
+# SPID/CIE key material — never commit private keys or certificates
+private.key
+public.crt
+csr.pem
