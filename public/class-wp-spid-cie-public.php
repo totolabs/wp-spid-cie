@@ -1189,13 +1189,6 @@ private function extract_jwt_payload($jwt) {
 
                             </li>
                         <?php endforeach; ?>
-                        <li class="spid-dropdown-footer">
-                            <a href="https://www.spid.gov.it/cos-e-spid/come-attivare-spid/" target="_blank" rel="noopener noreferrer">Non hai SPID?</a>
-                            &nbsp;|&nbsp;
-                            <a href="https://www.spid.gov.it/" target="_blank" rel="noopener noreferrer">Maggiori informazioni</a>
-                            &nbsp;|&nbsp;
-                            <a href="https://helpdesk.spid.gov.it/" target="_blank" rel="noopener noreferrer">Serve aiuto?</a>
-                        </li>
                     </ul>
                 </div>
             <?php endif; ?>
@@ -1248,9 +1241,6 @@ private function extract_jwt_payload($jwt) {
                                     <?php endif; ?>
                                 <?php endforeach; ?>
                             <?php endif; ?>
-                            <li><a class="idp-button-idp-logo spid-idp-support-link" href="https://www.spid.gov.it/" target="_blank" rel="noopener noreferrer"><span class="spid-idp-label">Maggiori informazioni</span></a></li>
-                            <li><a class="idp-button-idp-logo spid-idp-support-link" href="https://www.spid.gov.it/cos-e-spid/come-attivare-spid/" target="_blank" rel="noopener noreferrer"><span class="spid-idp-label">Non hai SPID?</span></a></li>
-                            <li><a class="idp-button-idp-logo spid-idp-support-link" href="https://helpdesk.spid.gov.it/" target="_blank" rel="noopener noreferrer"><span class="spid-idp-label">Serve aiuto?</span></a></li>
                             <?php if (!empty($options['spid_saml_validator_enabled']) && $options['spid_saml_validator_enabled'] === '1'): ?>
                                 <?php $validator_url = add_query_arg(['idp' => 'https://validator.spid.gov.it'], $saml_login_url); ?>
                                 <li><a class="idp-button-idp-logo spid-idp-support-link spid-validator-link" href="<?php echo esc_url($validator_url); ?>"><span class="spid-idp-label">SPID Validator</span></a></li>
@@ -1270,17 +1260,17 @@ private function extract_jwt_payload($jwt) {
                 </p>
             <?php endif; ?>
 
-            <?php if ($cie_enabled): ?>
-                <?php echo $this->render_primary_auth_button('cie', 'Entra con CIE', [
-                    'href' => $login_url_cie,
-                ]); ?>
-            <?php endif; ?>
-
             <div class="spid-agid-footer">
                 <img src="<?php echo esc_url(plugin_dir_url(__FILE__) . 'vendor/spid-access-button/img/spid-agid-logo-lb.png'); ?>"
                      alt="SPID - AgID Agenzia per l'Italia Digitale"
                      class="spid-agid-logo">
             </div>
+
+            <?php if ($cie_enabled): ?>
+                <?php echo $this->render_primary_auth_button('cie', 'Entra con CIE', [
+                    'href' => $login_url_cie,
+                ]); ?>
+            <?php endif; ?>
         </div>
         </div>
         <?php
