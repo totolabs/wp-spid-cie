@@ -82,14 +82,27 @@ class WP_SPID_CIE_OIDC_OidcClient {
         }
 
         if ($requestObjectSigner !== null) {
+            $provider   = $providerConfig['provider'] ?? '';
             $ro_payload = array_merge($params, [
                 'iss'    => $providerConfig['client_id'],
                 'sub'    => $providerConfig['client_id'],
                 'aud'    => [$providerConfig['issuer'] ?? $authorizationEndpoint],
                 'iat'    => time(),
                 'exp'    => time() + 300,
-                'prompt' => 'login',
+                'prompt' => 'consent login',
             ]);
+
+            if ($provider === 'cie' || $provider === 'spid') {
+                $ro_payload['claims'] = [
+                    'userinfo' => [
+                        'given_name'                                   => ['essential' => true],
+                        'family_name'                                  => ['essential' => true],
+                        'email'                                        => ['essential' => true],
+                        'https://attributes.eid.gov.it/fiscal_number' => ['essential' => true],
+                    ],
+                ];
+            }
+
             $request_jwt = $requestObjectSigner($ro_payload);
             $outer = [
                 'client_id'     => $providerConfig['client_id'],
