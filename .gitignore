@@ -79,3 +79,6 @@ decode_jwt.py
 
 # Claude Code AI assistant directory
 .claude/
+
+# Documentation PDFs — local reference only
+docs/*.pdf
