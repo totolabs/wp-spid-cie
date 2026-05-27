@@ -179,6 +179,23 @@
     text-decoration: underline;
 }
 
+.wp-spid-cie-auth .spid-info-links {
+    font-size: 13px;
+    text-align: center;
+    margin: 8px 0 4px;
+    color: #555;
+}
+
+.wp-spid-cie-auth .spid-info-links a {
+    color: #0066cc;
+    text-decoration: none;
+    font-weight: 600;
+}
+
+.wp-spid-cie-auth .spid-info-links a:hover {
+    text-decoration: underline;
+}
+
 body.login .italia-it-button .italia-it-button-icon {
     display: none;
 }
