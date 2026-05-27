@@ -307,11 +307,9 @@ class WP_SPID_CIE_OIDC_Wrapper {
             ]
         ];
 
-        if (!$omit_initial_cie_claims) {
-            $authority_hints = $this->buildAuthorityHints();
-            if (!empty($authority_hints)) {
-                $payload['authority_hints'] = $authority_hints;
-            }
+        $authority_hints = $this->buildAuthorityHints();
+        if (!empty($authority_hints)) {
+            $payload['authority_hints'] = $authority_hints;
         }
 
         $trust_marks = $this->buildTrustMarks();
