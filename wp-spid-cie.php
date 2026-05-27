@@ -213,6 +213,15 @@ function wp_spid_cie_sync_w3tc_exclusion(): void {
     } catch ( \Throwable $e ) {
         // W3TC not configured or unavailable — skip silently.
     }
+
+    // Delete existing cached files for the login page(s) so the next GET
+    // request is handled by PHP (where DONOTCACHEPAGE prevents re-caching).
+    if ( function_exists( 'w3tc_pgcache_flush_url' ) ) {
+        foreach ( $paths as $p ) {
+            w3tc_pgcache_flush_url( home_url( $p ) );
+            w3tc_pgcache_flush_url( home_url( $p . '/' ) );
+        }
+    }
 }
 
 /**
