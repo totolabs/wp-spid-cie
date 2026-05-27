@@ -1085,11 +1085,6 @@ private function extract_jwt_payload($jwt) {
         if (self::$buttons_printed) return $arg;
         if (is_string($arg) && !empty($arg)) echo $arg;
 
-        if (!empty($_GET['spid_cie_error'])) {
-            $error_code = sanitize_key(wp_unslash($_GET['spid_cie_error']));
-            echo '<p class="message" style="border-left-color:#d63638;">' . esc_html($this->get_spid_error_message($error_code)) . '</p>';
-        }
-
         echo $this->render_login_buttons();
         self::$buttons_printed = true;
         return null;
