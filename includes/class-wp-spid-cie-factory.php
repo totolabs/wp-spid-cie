@@ -454,9 +454,9 @@ class WP_SPID_CIE_OIDC_Wrapper {
         return $this->signGenericJwt($payload, 'entity-statement+jwt');
     }
 
-    // Sign Request Object (oauth-authz-req+jwt)
+    // Sign Request Object (entity-statement+jwt per profilo CIE)
     public function signRequestObject(array $payload): string {
-        return $this->signGenericJwt($payload, 'oauth-authz-req+jwt');
+        return $this->signGenericJwt($payload, 'entity-statement+jwt');
     }
 
     private function signGenericJwt($payload, $typ) {
