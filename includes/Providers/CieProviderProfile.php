@@ -75,9 +75,9 @@ class WP_SPID_CIE_OIDC_CieProviderProfile implements WP_SPID_CIE_OIDC_ProviderPr
         }
 
         $map = [
-            'SpidL1' => 'https://www.cie.gov.it/IAL1',
-            'SpidL2' => 'https://www.cie.gov.it/IAL2',
-            'SpidL3' => 'https://www.cie.gov.it/IAL3',
+            'SpidL1' => 'https://www.spid.gov.it/SpidL1',
+            'SpidL2' => 'https://www.spid.gov.it/SpidL2',
+            'SpidL3' => 'https://www.spid.gov.it/SpidL3',
         ];
 
         $min = $options['min_loa'] ?? 'SpidL2';
