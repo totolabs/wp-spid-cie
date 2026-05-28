@@ -248,9 +248,8 @@ class WP_SPID_CIE_OIDC_Saml_Service {
 
         $statusCode = trim((string) $xp->evaluate('string(/samlp:Response/samlp:Status/samlp:StatusCode/@Value)'));
         if ($statusCode !== 'urn:oasis:names:tc:SAML:2.0:status:Success') {
-            // Estrai il SubStatusCode SPID (es. urn:oasis:names:tc:SAML:2.0:status:AuthnFailed)
             $subStatusCode = trim((string) $xp->evaluate('string(/samlp:Response/samlp:Status/samlp:StatusCode/samlp:StatusCode/@Value)'));
-            // Mappa test AgID: 104→error19, 105→error20, 106→error21, 107→error22, 108→error23, 111→error25
+            $statusMessage = trim((string) $xp->evaluate('string(/samlp:Response/samlp:Status/samlp:StatusMessage)'));
             $spid_error_map = [
                 'urn:oasis:names:tc:SAML:2.0:status:AuthnFailed'        => 'spid_error_19',
                 'urn:oasis:names:tc:SAML:2.0:status:NoAuthnContext'     => 'spid_error_20',
@@ -266,10 +265,14 @@ class WP_SPID_CIE_OIDC_Saml_Service {
                         break;
                     }
                 }
-                // Codici numerici SPID (es. ...statusCode19, ...statusCode20, ecc.)
                 if ($error_code === 'saml_status_not_success' && preg_match('/(\d{1,3})$/', $subStatusCode, $m)) {
                     $error_code = 'spid_error_' . $m[1];
                 }
+            }
+            // StatusMessage "ErrorCode nrXX" ha priorità: spid-sp-test usa AuthnFailed per tutti
+            // i test 104–111 e distingue il codice reale solo tramite StatusMessage
+            if (!empty($statusMessage) && preg_match('/ErrorCode\s+nr(\d{1,3})/i', $statusMessage, $m)) {
+                $error_code = 'spid_error_' . $m[1];
             }
             return new WP_Error($error_code, __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
