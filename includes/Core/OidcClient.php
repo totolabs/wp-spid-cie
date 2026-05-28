@@ -107,10 +107,12 @@ class WP_SPID_CIE_OIDC_OidcClient {
 
             $request_jwt = $requestObjectSigner($ro_payload);
             $outer = [
-                'client_id'     => $providerConfig['client_id'],
-                'response_type' => 'code',
-                'scope'         => $providerConfig['scope'] ?? 'openid',
-                'request'       => $request_jwt,
+                'client_id'             => $providerConfig['client_id'],
+                'response_type'         => 'code',
+                'scope'                 => $providerConfig['scope'] ?? 'openid',
+                'code_challenge'        => $params['code_challenge'],
+                'code_challenge_method' => $params['code_challenge_method'],
+                'request'               => $request_jwt,
             ];
             return $authorizationEndpoint . '?' . http_build_query($outer);
         }
