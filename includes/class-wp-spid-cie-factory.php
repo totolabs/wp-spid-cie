@@ -609,9 +609,64 @@ class WP_SPID_CIE_OIDC_Wrapper {
 
     private function buildTrustChain(): array {
         try {
-            return [$this->getEntityStatement()];
+            $self_es = $this->getEntityStatement();
         } catch (\Exception $e) {
             return [];
         }
+
+        $sub = $this->getEntityId();
+        $trust_anchor = untrailingslashit((string) ($this->config['cie_trust_anchor_prod'] ?? ''));
+
+        if ($sub === '' || $trust_anchor === '') {
+            return [$self_es];
+        }
+
+        // Per OpenID Federation 1.0 il trust_chain restituito da /resolve va dall'entity
+        // soggetto fino al trust anchor: [self entity config, subordinate ES, anchor entity config].
+        $subordinate = $this->fetchFederationJwt(
+            $trust_anchor . '/fetch?sub=' . rawurlencode($sub),
+            'wp_spid_cie_tc_sub_' . md5($trust_anchor . '|' . $sub)
+        );
+        $anchor_ec = $this->fetchFederationJwt(
+            $trust_anchor . '/.well-known/openid-federation',
+            'wp_spid_cie_tc_anchor_' . md5($trust_anchor)
+        );
+
+        if ($subordinate !== '' && $anchor_ec !== '') {
+            return [$self_es, $subordinate, $anchor_ec];
+        }
+
+        return [$self_es];
+    }
+
+    private function fetchFederationJwt(string $url, string $cache_key): string {
+        $cached = get_transient($cache_key);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+
+        $response = wp_remote_get($url, [
+            'timeout' => 10,
+            'redirection' => 3,
+            'headers' => ['Accept' => 'application/entity-statement+jwt'],
+        ]);
+
+        if (is_wp_error($response)) {
+            return '';
+        }
+
+        $code = (int) wp_remote_retrieve_response_code($response);
+        if ($code < 200 || $code >= 300) {
+            return '';
+        }
+
+        $body = trim((string) wp_remote_retrieve_body($response));
+        if ($body === '' || substr_count($body, '.') !== 2) {
+            return '';
+        }
+
+        // Le subordinate statement del registry CIE hanno exp ~6h; refresh ogni 4h evita scadenze.
+        set_transient($cache_key, $body, HOUR_IN_SECONDS * 4);
+        return $body;
     }
 }
