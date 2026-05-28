@@ -204,7 +204,7 @@ class WP_SPID_CIE_OIDC_Admin {
             ['id' => 'fiscal_number', 'desc' => 'Codice Fiscale numerico (es. 80012345678)', 'placeholder' => '01234567890']
         );
         add_settings_field('contacts_email', 'Email Contatto Tecnico', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
-            ['id' => 'contacts_email', 'type' => 'email', 'desc' => 'Email per comunicazioni tecniche.', 'placeholder' => 'ced@ente.it']
+            ['id' => 'contacts_email', 'type' => 'email', 'desc' => 'Indirizzo PEC dell\'ente come indicato su IPA. Utilizzato come contatto tecnico nella federazione CIE OIDC.', 'placeholder' => 'ced@ente.it']
         );
         add_settings_field('logo_uri', 'URL Logo Ente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
             ['id' => 'logo_uri', 'desc' => 'URL pubblico del logo dell\'ente in formato SVG (es. https://www.ente.it/logo.svg). Dimensioni consigliate: 200×200px. Obbligatorio per la federazione CIE OIDC.', 'placeholder' => 'https://www.ente.it/logo.svg']
