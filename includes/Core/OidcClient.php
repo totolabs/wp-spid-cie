@@ -96,10 +96,14 @@ class WP_SPID_CIE_OIDC_OidcClient {
                 $userinfoClaims = [
                     'given_name'                                   => ['essential' => true],
                     'family_name'                                  => ['essential' => true],
-                    'email'                                        => ['essential' => true],
                     'https://attributes.eid.gov.it/fiscal_number' => ['essential' => true],
                 ];
+                if ($provider === 'spid') {
+                    // SPID garantisce sempre l'email (obbligatoria alla registrazione)
+                    $userinfoClaims['email'] = ['essential' => true];
+                }
                 if ($provider === 'cie') {
+                    // CIE: email opzionale (non memorizzata sulla carta), phone_number best-effort
                     $userinfoClaims['phone_number'] = ['essential' => false];
                 }
                 $ro_payload['claims'] = ['userinfo' => $userinfoClaims];
