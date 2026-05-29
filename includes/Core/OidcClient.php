@@ -329,6 +329,30 @@ class WP_SPID_CIE_OIDC_OidcClient {
             ];
             $body['client_assertion_type'] = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
             $body['client_assertion']      = $clientAssertionSigner($ca_payload);
+
+            // TEMP DEBUG: ispeziona header+payload del client_assertion JWT inviato.
+            // Da rimuovere a chiusura collaudo.
+            $ca_parts = explode('.', $body['client_assertion']);
+            if (count($ca_parts) === 3) {
+                $hdr_json = base64_decode(strtr($ca_parts[0], '-_', '+/'), true);
+                @error_log(sprintf(
+                    '[wp-spid-cie] [%s] client_assertion header=%s payload=iss=%s sub=%s aud=%s iat=%d exp=%d jti=%s',
+                    $correlationId,
+                    (string) $hdr_json,
+                    $ca_payload['iss'],
+                    $ca_payload['sub'],
+                    $ca_payload['aud'],
+                    $ca_payload['iat'],
+                    $ca_payload['exp'],
+                    $ca_payload['jti']
+                ));
+            }
+            @error_log(sprintf(
+                '[wp-spid-cie] [%s] token request body keys=%s redirect_uri=%s',
+                $correlationId,
+                implode(',', array_keys($body)),
+                (string) $body['redirect_uri']
+            ));
         }
 
         $response = wp_remote_post($tokenEndpoint, [
