@@ -298,13 +298,20 @@ class WP_SPID_CIE_OIDC_Saml_Service {
             return new WP_Error('saml_invalid_audience', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
+        // SubjectConfirmationData e i suoi attributi @Recipient, @InResponseTo, @NotOnOrAfter
+        // sono obbligatori per SPID (test 56-65 spid-sp-test).
+        $scdNodes = $xp->query('//saml:SubjectConfirmationData');
+        if (!$scdNodes || $scdNodes->length === 0) {
+            return new WP_Error('saml_missing_subject_confirmation_data', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
+        }
+
         $recipient = trim((string) $xp->evaluate('string(//saml:SubjectConfirmationData/@Recipient)'));
-        if ($recipient !== '' && untrailingslashit($recipient) !== untrailingslashit($sp['acs_url'])) {
+        if ($recipient === '' || untrailingslashit($recipient) !== untrailingslashit($sp['acs_url'])) {
             return new WP_Error('saml_invalid_recipient', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $subjectInResponseTo = trim((string) $xp->evaluate('string(//saml:SubjectConfirmationData/@InResponseTo)'));
-        if ($subjectInResponseTo !== '' && !hash_equals($inResponseTo, $subjectInResponseTo)) {
+        if ($subjectInResponseTo === '' || !hash_equals($inResponseTo, $subjectInResponseTo)) {
             return new WP_Error('saml_invalid_subject_inresponseto', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
@@ -541,9 +548,13 @@ class WP_SPID_CIE_OIDC_Saml_Service {
 
     private function validate_not_on_or_after(string $value, int $skew): void {
         if ($value === '') {
-            return;
+            throw new RuntimeException('saml_subject_invalid_not_on_or_after');
         }
-        if (strtotime($value) <= (time() - $skew)) {
+        $ts = strtotime($value);
+        if ($ts === false) {
+            throw new RuntimeException('saml_subject_invalid_not_on_or_after');
+        }
+        if ($ts <= (time() - $skew)) {
             throw new RuntimeException('saml_subject_expired');
         }
     }
