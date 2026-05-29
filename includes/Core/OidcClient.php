@@ -83,9 +83,12 @@ class WP_SPID_CIE_OIDC_OidcClient {
 
         if ($requestObjectSigner !== null) {
             $provider   = $providerConfig['provider'] ?? '';
+            // Per spec SPID/CIE OIDC (Authorization Endpoint, tabella claim del request object)
+            // il payload non prevede il claim "sub". Includendolo, e per di piu' con valore
+            // uguale a client_id, il CIE OP rifiuta la richiesta. Riferimento:
+            // https://docs.italia.it/italia/spid/spid-cie-oidc-docs/it/versione-corrente/authorization_endpoint.html
             $ro_payload = array_merge($params, [
                 'iss'    => $providerConfig['client_id'],
-                'sub'    => $providerConfig['client_id'],
                 'aud'    => [$providerConfig['issuer'] ?? $authorizationEndpoint],
                 'iat'    => time(),
                 'exp'    => time() + 300,
