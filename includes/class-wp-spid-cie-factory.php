@@ -464,6 +464,49 @@ class WP_SPID_CIE_OIDC_Wrapper {
         return $this->signGenericJwt($payload, 'JWT');
     }
 
+    /**
+     * Decifra una userinfo JWE inviata dal CIE OP usando la chiave privata RSA del SP.
+     * CIE pubblica entity config con userinfo_encrypted_response_alg=RSA-OAEP e
+     * userinfo_encrypted_response_enc=A256CBC-HS512 (policy registry consente anche
+     * RSA-OAEP-256 / A128CBC-HS256). Ritorna il payload del JWS interno (compact form).
+     *
+     * @throws \Exception su errore di caricamento chiave o decryption fallita.
+     */
+    public function decryptUserInfoJwe(string $jwe): string {
+        $privateKeyPath = $this->config['key_dir'] . '/private.key';
+        $privateKeyPem  = @file_get_contents($privateKeyPath);
+        if ($privateKeyPem === false) {
+            throw new \Exception('Private key not found at ' . $privateKeyPath);
+        }
+
+        $jwk = \Jose\Component\KeyManagement\JWKFactory::createFromKey($privateKeyPem);
+
+        $keyEncAlgorithms = new \Jose\Component\Core\AlgorithmManager([
+            new \Jose\Component\Encryption\Algorithm\KeyEncryption\RSAOAEP(),
+            new \Jose\Component\Encryption\Algorithm\KeyEncryption\RSAOAEP256(),
+        ]);
+        $contentEncAlgorithms = new \Jose\Component\Core\AlgorithmManager([
+            new \Jose\Component\Encryption\Algorithm\ContentEncryption\A256CBCHS512(),
+            new \Jose\Component\Encryption\Algorithm\ContentEncryption\A128CBCHS256(),
+        ]);
+        $compressionManager = new \Jose\Component\Encryption\Compression\CompressionMethodManager([]);
+
+        $jweDecrypter = new \Jose\Component\Encryption\JWEDecrypter(
+            $keyEncAlgorithms,
+            $contentEncAlgorithms,
+            $compressionManager
+        );
+
+        $serializer = new \Jose\Component\Encryption\Serializer\CompactSerializer();
+        $jweObject  = $serializer->unserialize($jwe);
+
+        if (!$jweDecrypter->decryptUsingKey($jweObject, $jwk, 0)) {
+            throw new \Exception('JWE decryption failed');
+        }
+
+        return (string) $jweObject->getPayload();
+    }
+
     private function signGenericJwt($payload, $typ) {
         $privateKeyContent = file_get_contents($this->config['key_dir'] . '/private.key');
         $rsa = \phpseclib3\Crypt\RSA::load($privateKeyContent);

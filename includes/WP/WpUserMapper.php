@@ -25,8 +25,16 @@ class WP_SPID_CIE_OIDC_WpUserMapper {
         $email = $this->pickFirst($claims, ['email', 'mail']);
         $givenName = $this->pickFirst($claims, ['given_name', 'name']);
         $familyName = $this->pickFirst($claims, ['family_name', 'familyName', 'surname']);
-        $fiscalCode = $this->pickFirst($claims, ['fiscal_code', 'fiscalCode', 'fiscalNumber', 'fiscal_number', 'cf', 'tax_id']);
-        $mobile = $this->pickFirst($claims, ['mobilePhone', 'mobile', 'mobile_phone', 'phone_number', 'phoneNumber', 'cellulare']);
+        // CIE userinfo restituisce il codice fiscale con la chiave URI piena.
+        $fiscalCode = $this->pickFirst($claims, [
+            'fiscal_code', 'fiscalCode', 'fiscalNumber', 'fiscal_number', 'cf', 'tax_id',
+            'https://attributes.eid.gov.it/fiscal_number',
+        ]);
+        $mobile = $this->pickFirst($claims, [
+            'phone_number', 'phoneNumber',
+            'mobilePhone', 'mobile', 'mobile_phone', 'cellulare',
+            'https://attributes.eid.gov.it/phone_number',
+        ]);
 
         return [
             'provider' => $provider,
@@ -44,12 +52,10 @@ class WP_SPID_CIE_OIDC_WpUserMapper {
      */
     public function validateMandatoryClaims(array $normalized, string $correlationId) {
         $missing = [];
+        $provider = (string) ($normalized['provider'] ?? '');
 
         if (empty($normalized['sub'])) {
             $missing[] = 'sub';
-        }
-        if (empty($normalized['email']) || !is_email($normalized['email'])) {
-            $missing[] = 'email';
         }
         if (empty($normalized['given_name'])) {
             $missing[] = 'given_name';
@@ -60,9 +66,13 @@ class WP_SPID_CIE_OIDC_WpUserMapper {
         if (empty($normalized['fiscal_code'])) {
             $missing[] = 'fiscal_code';
         }
-        if (empty($normalized['mobile'])) {
-            $missing[] = 'mobile';
+        // Email obbligatoria per SPID (sempre garantita), opzionale per CIE (non sempre
+        // memorizzata sulla carta). Per CIE manca -> WpAuthService genera email sintetica.
+        if ($provider === 'spid' && (empty($normalized['email']) || !is_email($normalized['email']))) {
+            $missing[] = 'email';
         }
+        // Mobile non piu' obbligatoria: phone_number per CIE e' best-effort,
+        // mobilePhone per SPID dipende dal profilo del provider.
 
         if (!empty($missing)) {
             $this->logger->error('OIDC mandatory claims missing', [

@@ -107,6 +107,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
                 }
                 if ($provider === 'cie') {
                     // CIE: email opzionale (non memorizzata sulla carta), phone_number best-effort
+                    $userinfoClaims['email']        = ['essential' => false];
                     $userinfoClaims['phone_number'] = ['essential' => false];
                 }
                 $ro_payload['claims'] = ['userinfo' => $userinfoClaims];
@@ -135,7 +136,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
      * @param  array $providerConfig Resolved provider configuration.
      * @return array|WP_Error Validated claims and state context, or error.
      */
-    public function handleCallback(array $request, array $providerConfig, ?callable $clientAssertionSigner = null) {
+    public function handleCallback(array $request, array $providerConfig, ?callable $clientAssertionSigner = null, ?callable $userInfoJweDecrypter = null) {
         $correlationId = $request['correlation_id'] ?? $this->logger->generateCorrelationId();
 
         if (!empty($request['error'])) {
@@ -176,11 +177,127 @@ class WP_SPID_CIE_OIDC_OidcClient {
             return $payload;
         }
 
+        // L'id_token CIE contiene solo sub + claim JWT standard. Gli attributi utente
+        // (given_name, family_name, fiscal_number, email, phone_number) sono nella
+        // userinfo, che CIE restituisce come JWE cifrato con la chiave pubblica del SP.
+        $accessToken    = (string) ($tokenResponse['access_token'] ?? '');
+        $userInfoClaims = $this->fetchUserInfo($accessToken, $providerConfig, $correlationId, $userInfoJweDecrypter);
+
+        $claims = array_merge($payload, $userInfoClaims);
+        if (!empty($payload['sub'])) {
+            // sub autoritativo dall'id_token, non sovrascrivibile dalla userinfo
+            $claims['sub'] = $payload['sub'];
+        }
+
         return [
-            'claims' => $payload,
+            'claims' => $claims,
             'state_context' => $stateCtx,
             'correlation_id' => $correlationId,
         ];
+    }
+
+    /**
+     * Recupera i claim utente dal /userinfo endpoint. Gestisce JSON, JWS e JWE.
+     * Per JWE invoca il decrypter del SP (RSA-OAEP + A256CBC-HS512), poi estrae
+     * il payload del JWS interno. Firma JWS non verificata (TLS + Bearer + JWE
+     * gia' garantiscono autenticita'; verifica con jwks CIE OP da aggiungere come
+     * defense in depth in futuro).
+     */
+    private function fetchUserInfo(string $accessToken, array $providerConfig, string $correlationId, ?callable $userInfoJweDecrypter): array {
+        if ($accessToken === '') {
+            return [];
+        }
+        $endpoint = (string) ($providerConfig['userinfo_endpoint'] ?? '');
+        if ($endpoint === '') {
+            return [];
+        }
+
+        $response = wp_remote_get($endpoint, [
+            'timeout'     => 15,
+            'redirection' => 2,
+            'headers'     => [
+                'Authorization' => 'Bearer ' . $accessToken,
+                'Accept'        => 'application/jwt, application/json',
+            ],
+        ]);
+
+        if (is_wp_error($response)) {
+            $this->logger->error('OIDC userinfo http error', [
+                'correlation_id' => $correlationId,
+                'error'          => $response->get_error_message(),
+            ]);
+            return [];
+        }
+
+        $status = (int) wp_remote_retrieve_response_code($response);
+        $body   = trim((string) wp_remote_retrieve_body($response));
+
+        if ($status < 200 || $status >= 300 || $body === '') {
+            // TEMP DEBUG: log raw response del rifiuto, da rimuovere a chiusura collaudo
+            @error_log(sprintf(
+                '[wp-spid-cie] [%s] userinfo REJECT http_status=%d body=%s',
+                $correlationId, $status, substr($body, 0, 1000)
+            ));
+            return [];
+        }
+
+        $payloadJson = '';
+
+        if ($body !== '' && $body[0] === '{') {
+            $payloadJson = $body;
+        } else {
+            $parts = explode('.', $body);
+            if (count($parts) === 5) {
+                if ($userInfoJweDecrypter === null) {
+                    $this->logger->error('OIDC userinfo received JWE but no decrypter configured', [
+                        'correlation_id' => $correlationId,
+                    ]);
+                    return [];
+                }
+                try {
+                    $inner = (string) $userInfoJweDecrypter($body);
+                } catch (\Throwable $e) {
+                    $this->logger->error('OIDC userinfo JWE decrypt failed', [
+                        'correlation_id' => $correlationId,
+                        'error'          => $e->getMessage(),
+                    ]);
+                    return [];
+                }
+                $innerParts = explode('.', trim($inner));
+                if (count($innerParts) === 3) {
+                    $payloadJson = (string) $this->base64urlDecode($innerParts[1]);
+                } else {
+                    $payloadJson = $inner;
+                }
+            } elseif (count($parts) === 3) {
+                $payloadJson = (string) $this->base64urlDecode($parts[1]);
+            }
+        }
+
+        if ($payloadJson === '') {
+            return [];
+        }
+        $json = json_decode($payloadJson, true);
+        if (!is_array($json)) {
+            return [];
+        }
+
+        // TEMP DEBUG: chiavi dei claim userinfo, da rimuovere a chiusura collaudo
+        @error_log(sprintf(
+            '[wp-spid-cie] [%s] userinfo OK keys=%s',
+            $correlationId, implode(',', array_keys($json))
+        ));
+
+        return $json;
+    }
+
+    private function base64urlDecode(string $data) {
+        $data = strtr($data, '-_', '+/');
+        $padding = strlen($data) % 4;
+        if ($padding > 0) {
+            $data .= str_repeat('=', 4 - $padding);
+        }
+        return base64_decode($data, true);
     }
 
     private function exchangeCodeForTokens(string $code, string $codeVerifier, array $providerConfig, string $correlationId, ?callable $clientAssertionSigner = null) {

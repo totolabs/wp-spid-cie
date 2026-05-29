@@ -954,7 +954,8 @@ private function extract_jwt_payload($jwt) {
 
         $wrapper          = WP_SPID_CIE_OIDC_Factory::get_client();
         $assertionSigner  = fn(array $payload) => $wrapper->signClientAssertion($payload);
-        $result           = $oidc->handleCallback($request, $provider_config, $assertionSigner);
+        $jweDecrypter     = fn(string $jwe) => $wrapper->decryptUserInfoJwe($jwe);
+        $result           = $oidc->handleCallback($request, $provider_config, $assertionSigner, $jweDecrypter);
         if (is_wp_error($result)) {
             $logger->error('OIDC callback failed', [
                 'correlation_id' => $correlation_id,
