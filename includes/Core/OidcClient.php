@@ -234,9 +234,23 @@ class WP_SPID_CIE_OIDC_OidcClient {
         $json = json_decode($rawBody, true);
 
         if ($status < 200 || $status >= 300 || !is_array($json)) {
+            // TEMP DEBUG: cattura raw body + content-type del rifiuto del CIE OP al code exchange.
+            // Da rimuovere dopo diagnosi. Usa error_log diretto per bypassare il truncate del Logger.
+            $ct = '';
+            if (is_array($response) && isset($response['headers']) && method_exists($response['headers'], 'offsetGet')) {
+                $ct = (string) $response['headers']['content-type'];
+            }
+            @error_log(sprintf(
+                '[wp-spid-cie] [%s] CIE token endpoint REJECT http_status=%d content_type=%s has_assertion=%s raw_body=%s',
+                $correlationId,
+                $status,
+                $ct,
+                isset($body['client_assertion']) ? 'yes' : 'no',
+                substr((string) $rawBody, 0, 2000)
+            ));
             $this->logger->error('OIDC token endpoint invalid response', [
                 'correlation_id' => $correlationId,
-                'http_status' => $status,
+                'http_status'    => $status,
             ]);
             return new WP_Error('oidc_token_bad_response', __('Risposta non valida dal servizio di autenticazione.', 'wp-spid-cie'));
         }
