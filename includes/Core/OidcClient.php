@@ -135,7 +135,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
      * @param  array $providerConfig Resolved provider configuration.
      * @return array|WP_Error Validated claims and state context, or error.
      */
-    public function handleCallback(array $request, array $providerConfig) {
+    public function handleCallback(array $request, array $providerConfig, ?callable $clientAssertionSigner = null) {
         $correlationId = $request['correlation_id'] ?? $this->logger->generateCorrelationId();
 
         if (!empty($request['error'])) {
@@ -157,7 +157,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
             return new WP_Error('oidc_state_mismatch', __('Sessione di autenticazione non valida o scaduta.', 'wp-spid-cie'));
         }
 
-        $tokenResponse = $this->exchangeCodeForTokens($code, $stateCtx['code_verifier'], $providerConfig, $correlationId);
+        $tokenResponse = $this->exchangeCodeForTokens($code, $stateCtx['code_verifier'], $providerConfig, $correlationId, $clientAssertionSigner);
         if (is_wp_error($tokenResponse)) {
             return $tokenResponse;
         }
@@ -183,7 +183,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
         ];
     }
 
-    private function exchangeCodeForTokens(string $code, string $codeVerifier, array $providerConfig, string $correlationId) {
+    private function exchangeCodeForTokens(string $code, string $codeVerifier, array $providerConfig, string $correlationId, ?callable $clientAssertionSigner = null) {
         $tokenEndpoint = $providerConfig['token_endpoint'] ?? '';
         if (empty($tokenEndpoint)) {
             return new WP_Error('oidc_no_token_endpoint', __('Endpoint token non configurato.', 'wp-spid-cie'));
@@ -197,8 +197,21 @@ class WP_SPID_CIE_OIDC_OidcClient {
             'code_verifier' => $codeVerifier,
         ];
 
-        if (!empty($providerConfig['client_secret'])) {
-            $body['client_secret'] = $providerConfig['client_secret'];
+        // CIE/SPID OIDC: token endpoint auth method = private_key_jwt (spec token_endpoint).
+        // client_assertion JWT con sub == iss == client_id (qui obbligatorio,
+        // a differenza del request object dell'authorization request).
+        if ($clientAssertionSigner !== null) {
+            $now = time();
+            $ca_payload = [
+                'iss' => $providerConfig['client_id'],
+                'sub' => $providerConfig['client_id'],
+                'aud' => $tokenEndpoint,
+                'iat' => $now,
+                'exp' => $now + 300,
+                'jti' => wp_generate_uuid4(),
+            ];
+            $body['client_assertion_type'] = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+            $body['client_assertion']      = $clientAssertionSigner($ca_payload);
         }
 
         $response = wp_remote_post($tokenEndpoint, [

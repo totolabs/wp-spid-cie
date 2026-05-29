@@ -459,6 +459,11 @@ class WP_SPID_CIE_OIDC_Wrapper {
         return $this->signGenericJwt($payload, 'entity-statement+jwt');
     }
 
+    // Sign client_assertion (private_key_jwt) per token endpoint CIE/SPID OIDC
+    public function signClientAssertion(array $payload): string {
+        return $this->signGenericJwt($payload, 'JWT');
+    }
+
     private function signGenericJwt($payload, $typ) {
         $privateKeyContent = file_get_contents($this->config['key_dir'] . '/private.key');
         $rsa = \phpseclib3\Crypt\RSA::load($privateKeyContent);
