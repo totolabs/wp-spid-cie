@@ -308,10 +308,14 @@ class WP_SPID_CIE_OIDC_OidcClient {
             return new WP_Error('oidc_no_token_endpoint', __('Endpoint token non configurato.', 'wp-spid-cie'));
         }
 
+        // Spec AgID SPID/CIE OIDC (token_endpoint.html) NON elenca redirect_uri fra i
+        // parametri del POST al token endpoint, anche se RFC 6749 §4.1.3 lo prescrive.
+        // Al test del 2026-05-29 13:48 il code exchange era passato con redirect_uri
+        // presente; dalle 14:06 il CIE OP risponde "unauthorized_client". Provo a
+        // riallinearmi strettamente alla tabella della spec rimuovendolo.
         $body = [
             'grant_type' => 'authorization_code',
             'code' => $code,
-            'redirect_uri' => $providerConfig['redirect_uri'],
             'client_id' => $providerConfig['client_id'],
             'code_verifier' => $codeVerifier,
         ];
