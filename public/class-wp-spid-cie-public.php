@@ -1051,6 +1051,7 @@ private function extract_jwt_payload($jwt) {
             'spid_error_23'                => 'Utente con identità sospesa/revocata o con credenziali bloccate.',
             'spid_error_25'                => 'Processo di autenticazione annullato dall\'utente.',
             'saml_status_not_success'      => 'Autenticazione non completata.',
+            'saml_authncontext_mismatch'   => 'Autenticazione non completata.',
             'saml_config_incomplete'       => 'Configurazione SPID incompleta. Contattare il gestore del servizio.',
             'saml_missing_response'        => 'Risposta SPID non ricevuta. Riprovare.',
             'saml_replay_detected'         => 'Richiesta già elaborata. Riprovare.',
