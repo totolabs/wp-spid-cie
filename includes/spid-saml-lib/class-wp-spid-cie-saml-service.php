@@ -344,6 +344,28 @@ class WP_SPID_CIE_OIDC_Saml_Service {
             return new WP_Error('saml_signature_invalid', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
+        // Test AgID 94/96: validazione del livello SPID dichiarato nella Response.
+        // La AuthnRequest viene SEMPRE inviata con Comparison="exact" (vedi
+        // build_authn_request_redirect), quindi la Response deve dichiarare ESATTAMENTE
+        // il livello richiesto: un AuthnContextClassRef assente, vuoto, duplicato, di livello
+        // inferiore (SpidL1) o superiore (SpidL3) rispetto al richiesto va rifiutato. Senza
+        // questo controllo il SP autenticava l'utente a un livello difforme da quello richiesto.
+        //
+        // Il livello atteso usa $sp['loa'], la STESSA fonte (option spid_saml_level) con cui e'
+        // costruita la Request: Request e Response leggono la medesima option, quindi i due
+        // valori coincidono per costruzione. Edge case non coperto e accettato consapevolmente
+        // (non e' un bug): se un amministratore cambia spid_saml_level tra l'avvio del login e
+        // il callback ACS, il confronto userebbe il livello nuovo invece di quello inviato.
+        $expectedAcr = 'https://www.spid.gov.it/' . (string) $sp['loa'];
+        $acrNodes = $xp->query('//saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthnContextClassRef');
+        if (!$acrNodes || $acrNodes->length !== 1) {
+            return new WP_Error('saml_authncontext_mismatch', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
+        }
+        $responseAcr = trim((string) $acrNodes->item(0)->textContent);
+        if ($responseAcr === '' || !hash_equals($expectedAcr, $responseAcr)) {
+            return new WP_Error('saml_authncontext_mismatch', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
+        }
+
         set_transient('spid_saml_resp_' . md5($responseId), 1, self::RESP_TTL);
 
         $attrs = [];
