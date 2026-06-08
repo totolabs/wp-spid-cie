@@ -7,11 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## v1.3.2 — 2026-06-08
 
-### Fix SAML
-- fix(spid-saml): validazione del livello di autenticazione nella Response — con RequestedAuthnContext `Comparison="exact"` la Response viene rifiutata se l'`AuthnContextClassRef` non corrisponde esattamente al livello richiesto (test AgID 94/96)
+Release di manutenzione: riallinea il ramo `main` allo stato stabile di `develop`. Il
+precedente rilascio v1.3.1 era stato propagato su `main` tramite squash-merge, che non
+aveva incluso tutti i fix gia' presenti su `develop`; questa versione li consolida.
 
-### Sicurezza / Pulizia
-- chore(cie-federation): rimossi log diagnostici temporanei dal client OIDC che potevano registrare dati sensibili (header/payload del client_assertion JWT, body di token e userinfo) nel log di WordPress
+### Novita' di questa versione
+- **SPID SAML**: validazione del livello di autenticazione nella Response — con
+  RequestedAuthnContext `Comparison="exact"` la Response viene rifiutata se
+  l'`AuthnContextClassRef` non corrisponde esattamente al livello richiesto (test AgID 94/96).
+- **Sicurezza / Pulizia**: rimossi i log diagnostici temporanei dal client OIDC che potevano
+  registrare dati sensibili (header/payload del `client_assertion` JWT, body di token e
+  userinfo) nel log di WordPress.
+
+### Consolidati su main (gia' introdotti in v1.3.0/v1.3.1, propagati ora)
+- CIE OIDC federation: entity configuration, private_key_jwt, trust chain, JWE/userinfo,
+  gestione claim e configurazione CIE.
+- Hardening per la distribuzione WordPress.org: guardie `ABSPATH`, `uninstall.php`,
+  README/CONTRIBUTING, pulizie di packaging.
+- UI/integrazioni: adeguamenti frontend, pulsante SPID, bridge integrazione.
 
 ## v1.3.1 — 2026-05-26
 

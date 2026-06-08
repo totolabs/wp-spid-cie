@@ -41,8 +41,10 @@ Sviluppato pensando alle esigenze delle Pubbliche Amministrazioni italiane (Comu
 == Changelog ==
 
 = 1.3.2 =
-* Validazione del livello di autenticazione nella Response SAML: con richiesta a confronto esatto, la Response viene rifiutata se il livello SPID non corrisponde a quello richiesto (test AgID 94/96)
-* Rimossi log diagnostici temporanei dal client OIDC che potevano registrare dati sensibili nel log di WordPress
+* Release di manutenzione: riallinea main allo stato stabile di sviluppo.
+* SPID SAML: validazione livello AuthnContext nella Response (test AgID 94/96).
+* Sicurezza: rimossi log diagnostici temporanei dal client OIDC.
+* Consolidati su main i fix CIE OIDC federation e l'hardening WordPress.org gia' introdotti nelle versioni precedenti.
 
 = 1.3.1 =
 * Fix compatibilità IdP dual-signature (Poste Italiane e altri)
