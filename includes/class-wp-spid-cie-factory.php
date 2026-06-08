@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Factory for creating and configuring the OIDC client instance.
@@ -275,15 +276,17 @@ class WP_SPID_CIE_OIDC_Wrapper {
             "jwks" => $jwks_structure,
             "client_name" => $this->config['organization_name'],
             "contacts" => [$this->config['contacts_email']],
-            "grant_types" => ["authorization_code"],
+            "grant_types" => ["authorization_code", "refresh_token"],
             "redirect_uris" => [
-                add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], $endpoint_base),
-                add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], $endpoint_base)
+                add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], trailingslashit($endpoint_base)),
+                add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], trailingslashit($endpoint_base))
             ],
             "response_types" => ["code"],
             "subject_type" => "pairwise",
             "id_token_signed_response_alg" => "RS256",
             "userinfo_signed_response_alg" => "RS256",
+            "userinfo_encrypted_response_alg" => "RSA-OAEP",
+            "userinfo_encrypted_response_enc" => "A256CBC-HS512",
             "token_endpoint_auth_method" => "private_key_jwt",
             "token_endpoint_auth_signing_alg" => "RS256"
         ];
@@ -304,11 +307,9 @@ class WP_SPID_CIE_OIDC_Wrapper {
             ]
         ];
 
-        if (!$omit_initial_cie_claims) {
-            $authority_hints = $this->buildAuthorityHints();
-            if (!empty($authority_hints)) {
-                $payload['authority_hints'] = $authority_hints;
-            }
+        $authority_hints = $this->buildAuthorityHints();
+        if (!empty($authority_hints)) {
+            $payload['authority_hints'] = $authority_hints;
         }
 
         $trust_marks = $this->buildTrustMarks();
@@ -361,15 +362,17 @@ class WP_SPID_CIE_OIDC_Wrapper {
                     'jwks' => $jwks_structure,
                     'client_name' => $this->config['organization_name'],
                     'contacts' => [$this->config['contacts_email']],
-                    'grant_types' => ['authorization_code'],
+                    'grant_types' => ['authorization_code', 'refresh_token'],
                     'redirect_uris' => [
-                        add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], $endpoint_base),
-                        add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], $endpoint_base)
+                        add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], trailingslashit($endpoint_base)),
+                        add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], trailingslashit($endpoint_base))
                     ],
                     'response_types' => ['code'],
                     'subject_type' => 'pairwise',
                     'id_token_signed_response_alg' => 'RS256',
                     'userinfo_signed_response_alg' => 'RS256',
+                    'userinfo_encrypted_response_alg' => 'RSA-OAEP',
+                    'userinfo_encrypted_response_enc' => 'A256CBC-HS512',
                     'token_endpoint_auth_method' => 'private_key_jwt',
                     'token_endpoint_auth_signing_alg' => 'RS256'
                 ],
@@ -408,86 +411,6 @@ class WP_SPID_CIE_OIDC_Wrapper {
             return $entity_id;
         }
         return $this->normalizeEntityIdentifier((string) ($this->config['base_url'] ?? ''));
-    }
-
-    /**
-     * Builds the OIDC authorization URL with a signed Request Object.
-     *
-     * @since  1.0.0
-     * @param  string      $trust_anchor Trust anchor URL used to select provider type (SPID/CIE).
-     * @param  string|null $idp_id       Optional SPID IdP key to pre-select.
-     * @return string Authorization endpoint URL with query parameters.
-     */
-    public function getAuthorizationUrl($trust_anchor, $idp_id = null) {
-        
-        $code_verifier = $this->generateCodeVerifier();
-        $code_challenge = $this->generateCodeChallenge($code_verifier);
-        $state = bin2hex(random_bytes(16));
-        $nonce = bin2hex(random_bytes(16));
-
-        if (!session_id()) { session_start(); }
-        $_SESSION['oidc_verifier'] = $code_verifier;
-        $_SESSION['oidc_state'] = $state;
-        $_SESSION['oidc_nonce'] = $nonce;
-
-        $auth_endpoint = '';
-        $issuer = ''; // For the 'aud' field in the Request Object
-        $scope = 'openid profile email';
-        $provider_param = isset($_GET['provider']) ? $_GET['provider'] : '';
-        $acr_values = 'https://www.spid.gov.it/SpidL2';
-
-        // Endpoint selection
-        if (strpos($trust_anchor, 'cie') !== false || $provider_param === 'cie') {
-             // CIE
-             $auth_endpoint = 'https://id.cie.gov.it/oidc/authorization';
-             $issuer = 'https://id.cie.gov.it/oidc/op/'; // CIE standard issuer
-             $scope = 'openid profile email';
-             $provider_param = 'cie';
-             $acr_values = 'https://www.spid.gov.it/SpidL2'; 
-        } else {
-             // SPID
-             $provider_param = 'spid';
-             $scope = 'openid profile'; 
-             
-             $selected_idp = 'validator'; // Default
-             if ($idp_id && isset($this->spid_providers[$idp_id])) {
-                 $selected_idp = $idp_id;
-             }
-             
-             $auth_endpoint = $this->spid_providers[$selected_idp]['auth_endpoint'];
-             $issuer = $this->spid_providers[$selected_idp]['issuer'];
-        }
-
-        // Build Request Object (JWT)
-        $ro_payload = [
-            'iss' => $this->config['base_url'],
-            'sub' => $this->config['base_url'],
-            'aud' => [$issuer], // Mandatory audience
-            'iat' => time(),
-            'exp' => time() + 300,
-            'client_id' => $this->config['base_url'],
-            'response_type' => 'code',
-            'scope' => $scope,
-            'redirect_uri' => add_query_arg(['oidc_action' => 'callback', 'provider' => $provider_param], $this->config['base_url']),
-            'state' => $state,
-            'nonce' => $nonce,
-            'code_challenge' => $code_challenge,
-            'code_challenge_method' => 'S256',
-            'acr_values' => $acr_values,
-            'prompt' => 'login'
-        ];
-
-        // Sign with header 'typ' => 'oauth-authz-req+jwt'
-        $request_token = $this->signRequestObject($ro_payload);
-
-        $params = [
-            'client_id' => $this->config['base_url'],
-            'response_type' => 'code',
-            'scope' => $scope,
-            'request' => $request_token // Required parameter
-        ];
-
-        return $auth_endpoint . '?' . http_build_query($params);
     }
 
     /**
@@ -531,9 +454,62 @@ class WP_SPID_CIE_OIDC_Wrapper {
         return $this->signGenericJwt($payload, 'entity-statement+jwt');
     }
 
-    // Sign Request Object (oauth-authz-req+jwt)
-    private function signRequestObject($payload) {
+    // Sign Request Object — typ "oauth-authz-req+jwt" per RFC 9101 (JAR).
+    // Il precedente cambio a "entity-statement+jwt" (commit 833a8ad) era basato su
+    // un'interpretazione errata: la causa di "La sessione non e' piu' valida" del
+    // CIE OP era il claim "sub" nel payload (rimosso in 4141bb1), non il typ. Lasciare
+    // entity-statement+jwt qui causa unauthorized_client al code exchange (riprodotto
+    // su tsrmpstrpsalerno.it 2026-05-29 con correlation_id e40e529b6778c1bc).
+    public function signRequestObject(array $payload): string {
         return $this->signGenericJwt($payload, 'oauth-authz-req+jwt');
+    }
+
+    // Sign client_assertion (private_key_jwt) per token endpoint CIE/SPID OIDC
+    public function signClientAssertion(array $payload): string {
+        return $this->signGenericJwt($payload, 'JWT');
+    }
+
+    /**
+     * Decifra una userinfo JWE inviata dal CIE OP usando la chiave privata RSA del SP.
+     * CIE pubblica entity config con userinfo_encrypted_response_alg=RSA-OAEP e
+     * userinfo_encrypted_response_enc=A256CBC-HS512 (policy registry consente anche
+     * RSA-OAEP-256 / A128CBC-HS256). Ritorna il payload del JWS interno (compact form).
+     *
+     * @throws \Exception su errore di caricamento chiave o decryption fallita.
+     */
+    public function decryptUserInfoJwe(string $jwe): string {
+        $privateKeyPath = $this->config['key_dir'] . '/private.key';
+        $privateKeyPem  = @file_get_contents($privateKeyPath);
+        if ($privateKeyPem === false) {
+            throw new \Exception('Private key not found at ' . $privateKeyPath);
+        }
+
+        $jwk = \Jose\Component\KeyManagement\JWKFactory::createFromKey($privateKeyPem);
+
+        $keyEncAlgorithms = new \Jose\Component\Core\AlgorithmManager([
+            new \Jose\Component\Encryption\Algorithm\KeyEncryption\RSAOAEP(),
+            new \Jose\Component\Encryption\Algorithm\KeyEncryption\RSAOAEP256(),
+        ]);
+        $contentEncAlgorithms = new \Jose\Component\Core\AlgorithmManager([
+            new \Jose\Component\Encryption\Algorithm\ContentEncryption\A256CBCHS512(),
+            new \Jose\Component\Encryption\Algorithm\ContentEncryption\A128CBCHS256(),
+        ]);
+        $compressionManager = new \Jose\Component\Encryption\Compression\CompressionMethodManager([]);
+
+        $jweDecrypter = new \Jose\Component\Encryption\JWEDecrypter(
+            $keyEncAlgorithms,
+            $contentEncAlgorithms,
+            $compressionManager
+        );
+
+        $serializer = new \Jose\Component\Encryption\Serializer\CompactSerializer();
+        $jweObject  = $serializer->unserialize($jwe);
+
+        if (!$jweDecrypter->decryptUsingKey($jweObject, $jwk, 0)) {
+            throw new \Exception('JWE decryption failed');
+        }
+
+        return (string) $jweObject->getPayload();
     }
 
     private function signGenericJwt($payload, $typ) {
@@ -686,9 +662,64 @@ class WP_SPID_CIE_OIDC_Wrapper {
 
     private function buildTrustChain(): array {
         try {
-            return [$this->getEntityStatement()];
+            $self_es = $this->getEntityStatement();
         } catch (\Exception $e) {
             return [];
         }
+
+        $sub = $this->getEntityId();
+        $trust_anchor = untrailingslashit((string) ($this->config['cie_trust_anchor_prod'] ?? ''));
+
+        if ($sub === '' || $trust_anchor === '') {
+            return [$self_es];
+        }
+
+        // Per OpenID Federation 1.0 il trust_chain restituito da /resolve va dall'entity
+        // soggetto fino al trust anchor: [self entity config, subordinate ES, anchor entity config].
+        $subordinate = $this->fetchFederationJwt(
+            $trust_anchor . '/fetch?sub=' . rawurlencode($sub),
+            'wp_spid_cie_tc_sub_' . md5($trust_anchor . '|' . $sub)
+        );
+        $anchor_ec = $this->fetchFederationJwt(
+            $trust_anchor . '/.well-known/openid-federation',
+            'wp_spid_cie_tc_anchor_' . md5($trust_anchor)
+        );
+
+        if ($subordinate !== '' && $anchor_ec !== '') {
+            return [$self_es, $subordinate, $anchor_ec];
+        }
+
+        return [$self_es];
+    }
+
+    private function fetchFederationJwt(string $url, string $cache_key): string {
+        $cached = get_transient($cache_key);
+        if (is_string($cached) && $cached !== '') {
+            return $cached;
+        }
+
+        $response = wp_remote_get($url, [
+            'timeout' => 10,
+            'redirection' => 3,
+            'headers' => ['Accept' => 'application/entity-statement+jwt'],
+        ]);
+
+        if (is_wp_error($response)) {
+            return '';
+        }
+
+        $code = (int) wp_remote_retrieve_response_code($response);
+        if ($code < 200 || $code >= 300) {
+            return '';
+        }
+
+        $body = trim((string) wp_remote_retrieve_body($response));
+        if ($body === '' || substr_count($body, '.') !== 2) {
+            return '';
+        }
+
+        // Le subordinate statement del registry CIE hanno exp ~6h; refresh ogni 4h evita scadenze.
+        set_transient($cache_key, $body, HOUR_IN_SECONDS * 4);
+        return $body;
     }
 }

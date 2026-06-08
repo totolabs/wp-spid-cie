@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Fetches and validates the OpenID Connect provider discovery document.

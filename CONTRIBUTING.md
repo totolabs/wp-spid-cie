@@ -1,39 +1,86 @@
 # Contributing
 
-Questo repository adotta un flusso Git standard Totolabs.
+Guida per contribuire al plugin **SPID & CIE Login per WordPress**.
 
-## Branch strategy
+## Workflow branch
 
-- `main`: solo codice rilasciato/stabile.
-- `develop`: branch di integrazione per sviluppo continuo.
-- `feature/*`: nuove funzionalità, **sempre create da `develop`**.
-- `fix/*`: bugfix, **sempre creati da `develop`**.
+Il repository usa un flusso basato su `develop` come branch di integrazione.
 
-Esempi naming:
+```
+main      ← solo release stabili (merge da develop con tag)
+develop   ← branch di integrazione continua
+fix/*     ← bugfix, sempre creati da develop
+feat/*    ← nuove funzionalità, sempre create da develop
+```
 
-- `feature/login-spid-ui`
-- `fix/session-timeout`
+**Regole:**
+- Non fare push diretto su `main` o `develop`.
+- Ogni `fix/*` o `feat/*` viene mergiato su `develop` via Pull Request.
+- `develop` → `main` solo per release stabili, con squash merge e tag.
 
-## Regole operative
+## Flusso di lavoro
 
-- ❌ Non fare push diretto su `main`.
-- ✅ Apri Pull Request verso `develop` per ogni `feature/*` o `fix/*`.
-- ✅ Usa **Squash and merge** per mantenere una history pulita.
-- ✅ Prima di aprire la PR, allinea il branch con `develop` e verifica i check CI.
+```bash
+# 1. Partire sempre da develop aggiornato
+git checkout develop
+git pull origin develop
 
-## Flusso consigliato
+# 2. Creare il branch di lavoro
+git checkout -b fix/nome-bug
+# oppure
+git checkout -b feat/nome-funzionalita
 
-1. Aggiorna `develop` locale:
-   ```bash
-   git checkout develop
-   git pull origin develop
-   ```
-2. Crea il branch di lavoro:
-   ```bash
-   git checkout -b feature/nome-attivita
-   # oppure
-   git checkout -b fix/nome-bug
-   ```
-3. Commit atomici e descrittivi.
-4. Push del branch e apertura PR verso `develop`.
-5. Merge via **Squash and merge**.
+# 3. Lavorare e committare
+git add <files>
+git commit -m "fix(scope): descrizione breve"
+
+# 4. Push e PR verso develop
+git push origin fix/nome-bug
+```
+
+## Convenzioni commit
+
+```
+tipo(scope): descrizione breve in italiano o inglese
+```
+
+**Tipi:** `fix`, `feat`, `chore`, `refactor`, `docs`
+
+**Scope validi:** `spid-saml`, `cie-federation`, `spid-registry`, `admin`, `public`
+
+**Esempi:**
+```
+fix(spid-saml): correggi parsing certificati multipli nel registry
+feat(admin): aggiungi tab configurazione CIE
+chore(release): bump version to 1.3.1
+```
+
+**Regole:**
+- Non aggiungere righe `Co-authored-by` nei commit message.
+- Il git user del repository è configurato a livello di repo — non modificarlo.
+
+## Pull Request verso develop
+
+1. Aprire la PR da `fix/*` o `feat/*` verso `develop`.
+2. Descrivere cosa cambia e perché.
+3. Attendere la revisione prima del merge.
+4. Usare **merge commit** (no squash sui branch fix/feat → develop, per mantenere la storia).
+
+## Release process (develop → main)
+
+1. Aggiornare `readme.txt` (`Stable tag`) e `wp-spid-cie.php` (numero versione).
+2. Aggiornare `CHANGELOG.md` con la sezione della nuova versione.
+3. Aggiornare la sezione `== Changelog ==` in `readme.txt`.
+4. Merge `develop` → `main` con `--no-ff`.
+5. Creare il tag: `git tag vX.Y.Z && git push origin vX.Y.Z`.
+
+## Internazionalizzazione
+
+- Tutto il testo visibile all'utente deve usare `__()`, `_e()`, `esc_html__()` o equivalenti con textdomain `wp-spid-cie`.
+- Non usare stringhe hardcoded in HTML output.
+
+## Compatibilità WordPress.org
+
+- Ogni file PHP deve avere `defined( 'ABSPATH' ) || exit;` come seconda riga.
+- Nessuna funzione globale senza prefisso `wp_spid_cie_` fuori dalle classi.
+- Testare con PHP 7.4 (versione minima dichiarata) prima di ogni release.

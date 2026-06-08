@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Fetches and caches the SPID IdP list and details from the AgID registry.
@@ -27,6 +28,7 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
         if (!$force) {
             $cached = get_transient(self::LIST_TRANSIENT);
             if (is_array($cached) && !empty($cached)) {
+                usort($cached, fn($a, $b) => strcasecmp($a['name'] ?? '', $b['name'] ?? ''));
                 return $cached;
             }
         }

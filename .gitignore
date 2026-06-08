@@ -57,3 +57,30 @@ CLAUDE.md
 .aider*
 copilot-instructions.md
 /docs/STATO_PROGETTO.md
+
+# SPID/CIE key material — never commit private keys or certificates
+private.key
+public.crt
+csr.pem
+portal-cert.pem
+portal-pubkey.pem
+jwt-x5c.pem
+
+# JWT debug artifacts
+*.jwt
+*.payload.json
+jwt-*.bin
+jwt-*.txt
+
+# Local debug scripts
+check_*.py
+decode_*.py
+
+# Local sandbox tests (not part of the official test suite)
+tests/test_spid_error_mapping.php
+
+# Claude Code AI assistant directory
+.claude/
+
+# Documentation PDFs — local reference only
+docs/*.pdf

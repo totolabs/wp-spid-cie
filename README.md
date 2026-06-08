@@ -1,41 +1,64 @@
-# wp-spid-cie
-Plugin WordPress per l'autenticazione tramite SPID e CIE con protocollo OpenID Connect, dedicato alle Pubbliche Amministrazioni italiane.
+# SPID & CIE Login per WordPress
 
-## Collaudo SPID SAML Step 2
+![PHP](https://img.shields.io/badge/PHP-7.4%2B-blue) ![WordPress](https://img.shields.io/badge/WordPress-6.0%2B-21759b) ![License](https://img.shields.io/badge/License-GPL--2.0--or--later-green)
 
-Checklist operativa GO/NO-GO disponibile in `docs/spid-saml-step2-go-no-go-checklist.md`.
+Plugin WordPress per l'autenticazione tramite **SPID** e **CIE** nelle Pubbliche Amministrazioni italiane, conforme alla misura PNRR 1.4.4 e alle linee guida AgID.
 
+## Funzionalità
 
-## SPID SAML Step 2b
+- **SPID SAML2** — Autenticazione tramite il Sistema Pubblico di Identità Digitale con protocollo SAML 2.0. Supporto a tutti gli Identity Provider del registro AgID (inclusi IdP con firme dual-signature).
+- **CIE OIDC Federation** — Autenticazione tramite Carta d'Identità Elettronica con OpenID Connect Federation 1.0.
+- **SPID OIDC** — Supporto OpenID Connect Federation per SPID (in sviluppo).
+- **Smart Button** — Pulsante SPID conforme alle linee guida UX AgID con selezione IdP tramite menu a tendina.
+- **Generazione certificati** — Generazione one-click di chiavi RSA e certificato X.509 self-signed conformi al profilo SP pubblico SPID.
+- **Auto-provisioning utenti** — Creazione automatica dell'utente WordPress al primo accesso con username dal codice fiscale SPID/CIE.
+- **Registry IdP** — Cache locale del registry AgID con aggiornamento manuale dall'area admin.
 
-- Runbook rapido: `docs/spid-saml-step2b-runbook-15min.md`
-- Checklist GO/NO-GO estesa: `docs/spid-saml-step2-go-no-go-checklist.md`
+## Requisiti
 
-- Admin SPID SAML: configura solo dati SP/metadata; la scelta IdP avviene lato frontend utente da Registry SPID (cache locale).
+- WordPress 6.0 o superiore
+- PHP 7.4 o superiore
+- Estensioni PHP: `openssl`, `gmp`, `mbstring`, `curl`, `json`
+- Server HTTPS con certificato valido
+- Accesso SFTP/FTP per il deploy iniziale
 
-## Note aggiornamento configurazione (admin)
+## Installazione
 
-- Nuova organizzazione backend in 5 tab principali: **Ente**, **Impostazioni**, **SPID OIDC**, **SPID SAML**, **CIE**.
-- In **Impostazioni** è disponibile la selezione mutuamente esclusiva del metodo SPID (`SAML`/`OIDC`).
-- Endpoint metadata SPID SAML ufficiale e stabile: `https://<dominio>/sp-metadata.xml` (alias compatibile anche su `/spid/saml/metadata`).
-- Protezione metadata con token disponibile come opzione amministrativa: quando attiva, richiede `?spid_metadata_token=...` sull'endpoint legacy ma non cambia l'URL ufficiale pubblicabile.
-- URL Aggregator pubblicabile: `https://<dominio>/sp-metadata.xml?aggregator=1`; gli URL legacy `/spid/saml/metadata` (anche con `aggregator=1`) possono richiedere token quando la protezione è attiva.
-- Stato attivo SPID SAML: fonte di verità `effective_saml = (spid_enabled === '1') && (spid_auth_method === 'saml')`; la flag legacy `spid_saml_enabled` è mantenuta solo per compatibilità.
+1. Caricare la cartella del plugin in `/wp-content/plugins/`.
+2. Attivare il plugin dal menu **Plugin** in WordPress.
+3. Andare su **Impostazioni > SPID & CIE Login**.
+4. Compilare i dati dell'Ente nel tab **Ente** (denominazione, IPA, codice fiscale).
+5. Generare i certificati SPID nel tab **SPID SAML** con il bottone dedicato.
+6. Configurare gli endpoint IdP nel tab **SPID SAML** o abilitare il registry AgID.
+7. Configurare CIE nel tab **CIE** con trust anchor e chiavi JWKS.
+8. Inserire lo shortcode `[spid_cie_login]` nella pagina di login.
 
-## Certificati SPID SAML one-click (SP pubblico)
+## Siti in produzione
 
-- Il plugin genera automaticamente `private.key` + `public.crt` self-signed in `wp-content/uploads/wp-spid-cie-keys/` (più `csr.pem` opzionale) usando solo estensione OpenSSL PHP.
-- Requisiti minimi implementati: RSA 2048 (default), digest SHA-256, Subject con `C=IT`, `L`, `O`, `CN`, OID `2.5.4.83` (URI=EntityID, presente nel SubjectDN come attributo custom) e OID `2.5.4.97` (`PA:IT-<codice IPA>`).
-- Estensioni certificate SPID: `keyUsage` critical (`digitalSignature`, `nonRepudiation/contentCommitment`), `basicConstraints=CA:FALSE`, `certificatePolicies` con OID richiesti dal profilo SP pubblico.
-- In area admin è disponibile il bottone **“Genera/Rigenera certificati SPID”** con warning: la rigenerazione cambia fingerprint e richiede aggiornamento metadata su AgID/CIE.
-- Stato mostrato in UI: presenza certificato, scadenza, subject e verifica modulus match chiave/certificato.
-- Al primo salvataggio configurazione (tab Ente/SPID SAML/Impostazioni), se i certificati mancano, il plugin prova a generarli automaticamente e mostra eventuali errori chiari.
+Il plugin è utilizzato da Pubbliche Amministrazioni italiane (Ordini Professionali, Enti Locali) in ambiente di produzione con SPID SAML e CIE OIDC Federation attivi.
 
+## Sviluppo
 
+```
+main      ← release stabili con tag vX.Y.Z
+develop   ← branch di integrazione
+fix/*     ← bugfix creati da develop
+feat/*    ← nuove funzionalità create da develop
+```
 
-## Changelog 1.2.1
+Per contribuire: aprire una Pull Request verso `develop`. Vedere [CONTRIBUTING.md](CONTRIBUTING.md) per il workflow completo.
 
-- Allineamento UI/UX dei pulsanti primari “Entra con SPID” e “Entra con CIE” con struttura HTML/CSS condivisa.
-- Dropdown SPID OIDC aggiornato con testo “Maggiori informazioni” e link esterni hardenizzati (`rel="noopener noreferrer"`).
-- Rimozione asset/riferimenti legacy di “IntesaID”.
-- Mapping logo SAML confermato per `https://idp.intesigroup.com` con `spid-idp-intesigroupspid.svg` e fallback al logo remoto del Registry.
+Per testare i metadata SPID SAML:
+
+```bash
+docker run --rm python:3.11-slim bash -c \
+  "apt-get update -qq && apt-get install -y -qq xmlsec1 libxmlsec1-openssl && \
+   pip install -q spid-sp-test && \
+   spid_sp_test --metadata-url https://DOMINIO/sp-metadata.xml"
+```
+
+## Licenza
+
+GPL-2.0-or-later — vedere [LICENSE](https://www.gnu.org/licenses/gpl-2.0.html).
+
+Sviluppato da [Totolabs Srl](https://totolabs.it).

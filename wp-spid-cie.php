@@ -16,7 +16,7 @@
  * Plugin Name:       SPID & CIE Login per WordPress
  * Plugin URI:        https://github.com/totolabs/wp-spid-cie
  * Description:       Abilita l'autenticazione tramite SPID e CIE con protocollo OpenID Connect per le Pubbliche Amministrazioni italiane. Conforme PNRR 1.4.4. Sviluppato da Totolabs Srl.
- * Version:           1.3.1
+ * Version:           1.3.2
  * Author:            Totolabs Srl
  * Author URI:        https://totolabs.it
  * License:           GPL-2.0-or-later
@@ -33,7 +33,7 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 if ( ! defined( 'WP_SPID_CIE_OIDC_VERSION' ) ) {
-	define( 'WP_SPID_CIE_OIDC_VERSION', '1.3.1' );
+	define( 'WP_SPID_CIE_OIDC_VERSION', '1.3.2' );
 }
 
 // 1. Load Composer autoloader (external libraries)
@@ -94,6 +94,7 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/CieProviderProfil
 require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/ProviderRegistry.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/WP/WpUserMapper.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/WP/WpAuthService.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/Integrations/GayadeedBridge.php';
 
 // 3. Load Admin and Public classes
 require_once plugin_dir_path( __FILE__ ) . 'admin/class-wp-spid-cie-admin.php';
@@ -132,9 +133,9 @@ function wp_spid_cie_activate() {
 
     // Set each default only if the field is empty or missing
     $defaults = [
-        'cie_trust_anchor_preprod' => 'https://registry.interno.gov.it/',
-        'cie_trust_anchor_prod'    => 'https://registry.interno.gov.it/',
-        'spid_trust_anchor'        => 'https://registry.agid.gov.it/',
+        'cie_trust_anchor_preprod' => '',
+        'cie_trust_anchor_prod'    => 'https://oidc.registry.servizicie.interno.gov.it',
+        'spid_trust_anchor'        => '',
     ];
 
     $updated = false;

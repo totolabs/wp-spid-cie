@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Manages token-based protection for the SPID SAML SP metadata endpoint.

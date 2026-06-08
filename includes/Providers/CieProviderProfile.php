@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * CIE OIDC provider profile.
@@ -26,11 +27,11 @@ class WP_SPID_CIE_OIDC_CieProviderProfile implements WP_SPID_CIE_OIDC_ProviderPr
         return [
             'provider' => 'cie',
             'provider_id' => 'cie',
-            'issuer' => untrailingslashit((string) ($options['cie_issuer'] ?? 'https://id.cie.gov.it/oidc/op')),
-            'authorization_endpoint' => (string) ($options['cie_authorization_endpoint'] ?? 'https://id.cie.gov.it/oidc/authorization'),
-            'token_endpoint' => (string) ($options['cie_token_endpoint'] ?? 'https://id.cie.gov.it/oidc/token'),
-            'jwks_uri' => (string) ($options['cie_jwks_uri'] ?? 'https://id.cie.gov.it/oidc/jwks'),
-            'userinfo_endpoint' => (string) ($options['cie_userinfo_endpoint'] ?? ''),
+            'issuer' => untrailingslashit(!empty($options['cie_issuer']) ? (string) $options['cie_issuer'] : 'https://oidc.idserver.servizicie.interno.gov.it'),
+            'authorization_endpoint' => !empty($options['cie_authorization_endpoint']) ? (string) $options['cie_authorization_endpoint'] : 'https://oidc.idserver.servizicie.interno.gov.it/idp/profile/oidc/authorize',
+            'token_endpoint' => !empty($options['cie_token_endpoint']) ? (string) $options['cie_token_endpoint'] : 'https://oidc.idserver.servizicie.interno.gov.it/idp/profile/oidc/token',
+            'jwks_uri' => !empty($options['cie_jwks_uri']) ? (string) $options['cie_jwks_uri'] : 'https://oidc.idserver.servizicie.interno.gov.it/idp/profile/oidc/keyset',
+            'userinfo_endpoint' => !empty($options['cie_userinfo_endpoint']) ? (string) $options['cie_userinfo_endpoint'] : 'https://oidc.idserver.servizicie.interno.gov.it/idp/profile/oidc/userinfo',
             'end_session_endpoint' => (string) ($options['cie_end_session_endpoint'] ?? ''),
         ];
     }
@@ -49,10 +50,10 @@ class WP_SPID_CIE_OIDC_CieProviderProfile implements WP_SPID_CIE_OIDC_ProviderPr
 
         if ($mode === 'auto') {
             $resolved = $discoveryResolver->resolveFromIssuer((string) $base['issuer'], 'cie-' . bin2hex(random_bytes(4)));
-            if (is_wp_error($resolved)) {
-                return $resolved;
+            if (!is_wp_error($resolved)) {
+                $base = array_merge($base, $resolved);
             }
-            $base = array_merge($base, $resolved);
+            // If discovery fails, fall back to static endpoints already set in buildBaseConfig.
         }
 
         $base['scope'] = $this->buildScope($options['cie_scope'] ?? 'openid profile email');
