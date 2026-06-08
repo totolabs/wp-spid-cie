@@ -73,9 +73,11 @@ jwt-*.bin
 jwt-*.txt
 
 # Local debug scripts
-check_metadata.py
-check_registry.py
-decode_jwt.py
+check_*.py
+decode_*.py
+
+# Local sandbox tests (not part of the official test suite)
+tests/test_spid_error_mapping.php
 
 # Claude Code AI assistant directory
 .claude/

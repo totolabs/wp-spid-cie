@@ -235,11 +235,6 @@ class WP_SPID_CIE_OIDC_OidcClient {
         $body   = trim((string) wp_remote_retrieve_body($response));
 
         if ($status < 200 || $status >= 300 || $body === '') {
-            // TEMP DEBUG: log raw response del rifiuto, da rimuovere a chiusura collaudo
-            @error_log(sprintf(
-                '[wp-spid-cie] [%s] userinfo REJECT http_status=%d body=%s',
-                $correlationId, $status, substr($body, 0, 1000)
-            ));
             return [];
         }
 
@@ -283,12 +278,6 @@ class WP_SPID_CIE_OIDC_OidcClient {
         if (!is_array($json)) {
             return [];
         }
-
-        // TEMP DEBUG: chiavi dei claim userinfo, da rimuovere a chiusura collaudo
-        @error_log(sprintf(
-            '[wp-spid-cie] [%s] userinfo OK keys=%s',
-            $correlationId, implode(',', array_keys($json))
-        ));
 
         return $json;
     }
@@ -336,30 +325,6 @@ class WP_SPID_CIE_OIDC_OidcClient {
             ];
             $body['client_assertion_type'] = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
             $body['client_assertion']      = $clientAssertionSigner($ca_payload);
-
-            // TEMP DEBUG: ispeziona header+payload del client_assertion JWT inviato.
-            // Da rimuovere a chiusura collaudo.
-            $ca_parts = explode('.', $body['client_assertion']);
-            if (count($ca_parts) === 3) {
-                $hdr_json = base64_decode(strtr($ca_parts[0], '-_', '+/'), true);
-                @error_log(sprintf(
-                    '[wp-spid-cie] [%s] client_assertion header=%s payload=iss=%s sub=%s aud=%s iat=%d exp=%d jti=%s',
-                    $correlationId,
-                    (string) $hdr_json,
-                    $ca_payload['iss'],
-                    $ca_payload['sub'],
-                    $ca_payload['aud'],
-                    $ca_payload['iat'],
-                    $ca_payload['exp'],
-                    $ca_payload['jti']
-                ));
-            }
-            @error_log(sprintf(
-                '[wp-spid-cie] [%s] token request body keys=%s redirect_uri=%s',
-                $correlationId,
-                implode(',', array_keys($body)),
-                (string) $body['redirect_uri']
-            ));
         }
 
         $response = wp_remote_post($tokenEndpoint, [
@@ -382,20 +347,6 @@ class WP_SPID_CIE_OIDC_OidcClient {
         $json = json_decode($rawBody, true);
 
         if ($status < 200 || $status >= 300 || !is_array($json)) {
-            // TEMP DEBUG: cattura raw body + content-type del rifiuto del CIE OP al code exchange.
-            // Da rimuovere dopo diagnosi. Usa error_log diretto per bypassare il truncate del Logger.
-            $ct = '';
-            if (is_array($response) && isset($response['headers']) && method_exists($response['headers'], 'offsetGet')) {
-                $ct = (string) $response['headers']['content-type'];
-            }
-            @error_log(sprintf(
-                '[wp-spid-cie] [%s] CIE token endpoint REJECT http_status=%d content_type=%s has_assertion=%s raw_body=%s',
-                $correlationId,
-                $status,
-                $ct,
-                isset($body['client_assertion']) ? 'yes' : 'no',
-                substr((string) $rawBody, 0, 2000)
-            ));
             $this->logger->error('OIDC token endpoint invalid response', [
                 'correlation_id' => $correlationId,
                 'http_status'    => $status,
