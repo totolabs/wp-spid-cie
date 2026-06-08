@@ -3,7 +3,7 @@ Contributors: totolabs
 Tags: spid, cie, oidc, login, pnrr, pa, openid connect, italia
 Requires at least: 6.0
 Tested up to: 6.7
-Stable tag: 1.3.1
+Stable tag: 1.3.2
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -39,6 +39,10 @@ Sviluppato pensando alle esigenze delle Pubbliche Amministrazioni italiane (Comu
 7. Una volta attivati i servizi sui portali istituzionali, abilita i pulsanti di login nelle impostazioni del plugin.
 
 == Changelog ==
+
+= 1.3.2 =
+* Validazione del livello di autenticazione nella Response SAML: con richiesta a confronto esatto, la Response viene rifiutata se il livello SPID non corrisponde a quello richiesto (test AgID 94/96)
+* Rimossi log diagnostici temporanei dal client OIDC che potevano registrare dati sensibili nel log di WordPress
 
 = 1.3.1 =
 * Fix compatibilità IdP dual-signature (Poste Italiane e altri)

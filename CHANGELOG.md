@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.3.2 — 2026-06-08
+
+### Fix SAML
+- fix(spid-saml): validazione del livello di autenticazione nella Response — con RequestedAuthnContext `Comparison="exact"` la Response viene rifiutata se l'`AuthnContextClassRef` non corrisponde esattamente al livello richiesto (test AgID 94/96)
+
+### Sicurezza / Pulizia
+- chore(cie-federation): rimossi log diagnostici temporanei dal client OIDC che potevano registrare dati sensibili (header/payload del client_assertion JWT, body di token e userinfo) nel log di WordPress
+
 ## v1.3.1 — 2026-05-26
 
 ### Fix SAML — compatibilità IdP dual-signature
