@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Handles SPID SAML2 SP operations: config, AuthnRequest, ACS response parsing.
@@ -247,9 +248,8 @@ class WP_SPID_CIE_OIDC_Saml_Service {
 
         $statusCode = trim((string) $xp->evaluate('string(/samlp:Response/samlp:Status/samlp:StatusCode/@Value)'));
         if ($statusCode !== 'urn:oasis:names:tc:SAML:2.0:status:Success') {
-            // Estrai il SubStatusCode SPID (es. urn:oasis:names:tc:SAML:2.0:status:AuthnFailed)
             $subStatusCode = trim((string) $xp->evaluate('string(/samlp:Response/samlp:Status/samlp:StatusCode/samlp:StatusCode/@Value)'));
-            // Mappa test AgID: 104→error19, 105→error20, 106→error21, 107→error22, 108→error23, 111→error25
+            $statusMessage = trim((string) $xp->evaluate('string(/samlp:Response/samlp:Status/samlp:StatusMessage)'));
             $spid_error_map = [
                 'urn:oasis:names:tc:SAML:2.0:status:AuthnFailed'        => 'spid_error_19',
                 'urn:oasis:names:tc:SAML:2.0:status:NoAuthnContext'     => 'spid_error_20',
@@ -265,10 +265,14 @@ class WP_SPID_CIE_OIDC_Saml_Service {
                         break;
                     }
                 }
-                // Codici numerici SPID (es. ...statusCode19, ...statusCode20, ecc.)
                 if ($error_code === 'saml_status_not_success' && preg_match('/(\d{1,3})$/', $subStatusCode, $m)) {
                     $error_code = 'spid_error_' . $m[1];
                 }
+            }
+            // StatusMessage "ErrorCode nrXX" ha priorità: spid-sp-test usa AuthnFailed per tutti
+            // i test 104–111 e distingue il codice reale solo tramite StatusMessage
+            if (!empty($statusMessage) && preg_match('/ErrorCode\s+nr(\d{1,3})/i', $statusMessage, $m)) {
+                $error_code = 'spid_error_' . $m[1];
             }
             return new WP_Error($error_code, __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
@@ -294,13 +298,20 @@ class WP_SPID_CIE_OIDC_Saml_Service {
             return new WP_Error('saml_invalid_audience', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
+        // SubjectConfirmationData e i suoi attributi @Recipient, @InResponseTo, @NotOnOrAfter
+        // sono obbligatori per SPID (test 56-65 spid-sp-test).
+        $scdNodes = $xp->query('//saml:SubjectConfirmationData');
+        if (!$scdNodes || $scdNodes->length === 0) {
+            return new WP_Error('saml_missing_subject_confirmation_data', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
+        }
+
         $recipient = trim((string) $xp->evaluate('string(//saml:SubjectConfirmationData/@Recipient)'));
-        if ($recipient !== '' && untrailingslashit($recipient) !== untrailingslashit($sp['acs_url'])) {
+        if ($recipient === '' || untrailingslashit($recipient) !== untrailingslashit($sp['acs_url'])) {
             return new WP_Error('saml_invalid_recipient', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         $subjectInResponseTo = trim((string) $xp->evaluate('string(//saml:SubjectConfirmationData/@InResponseTo)'));
-        if ($subjectInResponseTo !== '' && !hash_equals($inResponseTo, $subjectInResponseTo)) {
+        if ($subjectInResponseTo === '' || !hash_equals($inResponseTo, $subjectInResponseTo)) {
             return new WP_Error('saml_invalid_subject_inresponseto', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
@@ -331,6 +342,28 @@ class WP_SPID_CIE_OIDC_Saml_Service {
         $sigValid = $this->verify_signature_strict($dom, $sigNode, $certForValidation);
         if (!$sigValid) {
             return new WP_Error('saml_signature_invalid', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
+        }
+
+        // Test AgID 94/96: validazione del livello SPID dichiarato nella Response.
+        // La AuthnRequest viene SEMPRE inviata con Comparison="exact" (vedi
+        // build_authn_request_redirect), quindi la Response deve dichiarare ESATTAMENTE
+        // il livello richiesto: un AuthnContextClassRef assente, vuoto, duplicato, di livello
+        // inferiore (SpidL1) o superiore (SpidL3) rispetto al richiesto va rifiutato. Senza
+        // questo controllo il SP autenticava l'utente a un livello difforme da quello richiesto.
+        //
+        // Il livello atteso usa $sp['loa'], la STESSA fonte (option spid_saml_level) con cui e'
+        // costruita la Request: Request e Response leggono la medesima option, quindi i due
+        // valori coincidono per costruzione. Edge case non coperto e accettato consapevolmente
+        // (non e' un bug): se un amministratore cambia spid_saml_level tra l'avvio del login e
+        // il callback ACS, il confronto userebbe il livello nuovo invece di quello inviato.
+        $expectedAcr = 'https://www.spid.gov.it/' . (string) $sp['loa'];
+        $acrNodes = $xp->query('//saml:Assertion/saml:AuthnStatement/saml:AuthnContext/saml:AuthnContextClassRef');
+        if (!$acrNodes || $acrNodes->length !== 1) {
+            return new WP_Error('saml_authncontext_mismatch', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
+        }
+        $responseAcr = trim((string) $acrNodes->item(0)->textContent);
+        if ($responseAcr === '' || !hash_equals($expectedAcr, $responseAcr)) {
+            return new WP_Error('saml_authncontext_mismatch', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
         }
 
         set_transient('spid_saml_resp_' . md5($responseId), 1, self::RESP_TTL);
@@ -537,9 +570,13 @@ class WP_SPID_CIE_OIDC_Saml_Service {
 
     private function validate_not_on_or_after(string $value, int $skew): void {
         if ($value === '') {
-            return;
+            throw new RuntimeException('saml_subject_invalid_not_on_or_after');
         }
-        if (strtotime($value) <= (time() - $skew)) {
+        $ts = strtotime($value);
+        if ($ts === false) {
+            throw new RuntimeException('saml_subject_invalid_not_on_or_after');
+        }
+        if ($ts <= (time() - $skew)) {
             throw new RuntimeException('saml_subject_expired');
         }
     }

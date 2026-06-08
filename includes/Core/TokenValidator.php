@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Validates OIDC id_tokens received from SPID and CIE providers.
@@ -144,7 +145,7 @@ class WP_SPID_CIE_OIDC_TokenValidator {
 
     private function verifySignature(string $signedData, string $signature, array $jwk, string $alg): bool {
         try {
-            $key = \phpseclib3\Crypt\PublicKeyLoader::loadFormat('JWK', wp_json_encode($jwk));
+            $key = \phpseclib3\Crypt\PublicKeyLoader::load(wp_json_encode($jwk));
             $rsa = $key->withHash('sha256');
 
             if ($alg === 'PS256') {

@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Resolves or auto-provisions a WordPress user from a verified OIDC identity.
@@ -114,7 +115,14 @@ class WP_SPID_CIE_OIDC_WpAuthService {
 
         $email = $identity['email'];
         if (!is_email($email)) {
-            return new WP_Error('oidc_invalid_email', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
+            if (($identity['provider'] ?? '') === 'cie') {
+                // CIE non garantisce l'email (non e' memorizzata sulla carta). WordPress
+                // pero' richiede user_email univoco: generiamo un placeholder casuale
+                // sotto un TLD non delegato. L'utente potra' aggiornarlo dal profilo WP.
+                $email = bin2hex(random_bytes(4)) . '@cambia.mail';
+            } else {
+                return new WP_Error('oidc_invalid_email', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
+            }
         }
 
         $displayName = trim($identity['given_name'] . ' ' . $identity['family_name']);
@@ -163,6 +171,8 @@ class WP_SPID_CIE_OIDC_WpAuthService {
 
         $acr = isset($providerConfig['last_id_token_acr']) ? (string) $providerConfig['last_id_token_acr'] : '';
         update_user_meta($userId, '_spidcie_last_acr', sanitize_text_field($acr));
+
+        do_action('wp_spid_cie_user_identity_updated', $userId, $identity, $provider);
     }
 
     private function getProviderSubMetaKey(string $provider): string {

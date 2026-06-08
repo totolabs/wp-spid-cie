@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Handles the OIDC authorization code flow with PKCE.
@@ -40,7 +41,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
      * @param  string $correlationId  Unique request identifier for logging.
      * @return string|WP_Error Authorization URL, or error.
      */
-    public function buildAuthorizationUrl(array $providerConfig, string $targetUrl, string $correlationId) {
+    public function buildAuthorizationUrl(array $providerConfig, string $targetUrl, string $correlationId, ?callable $requestObjectSigner = null) {
         $state = bin2hex(random_bytes(16));
         $nonce = bin2hex(random_bytes(16));
         $verifier = $this->pkce->generateVerifier();
@@ -80,6 +81,52 @@ class WP_SPID_CIE_OIDC_OidcClient {
             return new WP_Error('oidc_no_auth_endpoint', __('Endpoint di autorizzazione non configurato.', 'wp-spid-cie'));
         }
 
+        if ($requestObjectSigner !== null) {
+            $provider   = $providerConfig['provider'] ?? '';
+            // Per spec SPID/CIE OIDC (Authorization Endpoint, tabella claim del request object)
+            // il payload non prevede il claim "sub". Includendolo, e per di piu' con valore
+            // uguale a client_id, il CIE OP rifiuta la richiesta. Riferimento:
+            // https://docs.italia.it/italia/spid/spid-cie-oidc-docs/it/versione-corrente/authorization_endpoint.html
+            $ro_payload = array_merge($params, [
+                'iss'    => $providerConfig['client_id'],
+                'aud'    => [$providerConfig['issuer'] ?? $authorizationEndpoint],
+                'iat'    => time(),
+                'exp'    => time() + 300,
+                'prompt' => 'consent login',
+            ]);
+
+            if ($provider === 'cie' || $provider === 'spid') {
+                $userinfoClaims = [
+                    'given_name'                                   => ['essential' => true],
+                    'family_name'                                  => ['essential' => true],
+                    'https://attributes.eid.gov.it/fiscal_number' => ['essential' => true],
+                ];
+                if ($provider === 'spid') {
+                    // SPID garantisce sempre l'email (obbligatoria alla registrazione)
+                    $userinfoClaims['email'] = ['essential' => true];
+                }
+                if ($provider === 'cie') {
+                    // CIE: phone_number best-effort. email NON richiesta nemmeno come
+                    // non-essential perche' la sua presenza nel set di claim della authz
+                    // request fa rispondere al CIE OP "unauthorized_client" al code
+                    // exchange (riprodotto su tsrmpstrpsalerno.it 2026-05-29).
+                    $userinfoClaims['phone_number'] = ['essential' => false];
+                }
+                $ro_payload['claims'] = ['userinfo' => $userinfoClaims];
+            }
+
+            $request_jwt = $requestObjectSigner($ro_payload);
+            $outer = [
+                'client_id'             => $providerConfig['client_id'],
+                'response_type'         => 'code',
+                'scope'                 => $providerConfig['scope'] ?? 'openid',
+                'code_challenge'        => $params['code_challenge'],
+                'code_challenge_method' => $params['code_challenge_method'],
+                'request'               => $request_jwt,
+            ];
+            return $authorizationEndpoint . '?' . http_build_query($outer);
+        }
+
         return $authorizationEndpoint . '?' . http_build_query($params);
     }
 
@@ -91,7 +138,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
      * @param  array $providerConfig Resolved provider configuration.
      * @return array|WP_Error Validated claims and state context, or error.
      */
-    public function handleCallback(array $request, array $providerConfig) {
+    public function handleCallback(array $request, array $providerConfig, ?callable $clientAssertionSigner = null, ?callable $userInfoJweDecrypter = null) {
         $correlationId = $request['correlation_id'] ?? $this->logger->generateCorrelationId();
 
         if (!empty($request['error'])) {
@@ -113,7 +160,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
             return new WP_Error('oidc_state_mismatch', __('Sessione di autenticazione non valida o scaduta.', 'wp-spid-cie'));
         }
 
-        $tokenResponse = $this->exchangeCodeForTokens($code, $stateCtx['code_verifier'], $providerConfig, $correlationId);
+        $tokenResponse = $this->exchangeCodeForTokens($code, $stateCtx['code_verifier'], $providerConfig, $correlationId, $clientAssertionSigner);
         if (is_wp_error($tokenResponse)) {
             return $tokenResponse;
         }
@@ -132,19 +179,129 @@ class WP_SPID_CIE_OIDC_OidcClient {
             return $payload;
         }
 
+        // L'id_token CIE contiene solo sub + claim JWT standard. Gli attributi utente
+        // (given_name, family_name, fiscal_number, email, phone_number) sono nella
+        // userinfo, che CIE restituisce come JWE cifrato con la chiave pubblica del SP.
+        $accessToken    = (string) ($tokenResponse['access_token'] ?? '');
+        $userInfoClaims = $this->fetchUserInfo($accessToken, $providerConfig, $correlationId, $userInfoJweDecrypter);
+
+        $claims = array_merge($payload, $userInfoClaims);
+        if (!empty($payload['sub'])) {
+            // sub autoritativo dall'id_token, non sovrascrivibile dalla userinfo
+            $claims['sub'] = $payload['sub'];
+        }
+
         return [
-            'claims' => $payload,
+            'claims' => $claims,
             'state_context' => $stateCtx,
             'correlation_id' => $correlationId,
         ];
     }
 
-    private function exchangeCodeForTokens(string $code, string $codeVerifier, array $providerConfig, string $correlationId) {
+    /**
+     * Recupera i claim utente dal /userinfo endpoint. Gestisce JSON, JWS e JWE.
+     * Per JWE invoca il decrypter del SP (RSA-OAEP + A256CBC-HS512), poi estrae
+     * il payload del JWS interno. Firma JWS non verificata (TLS + Bearer + JWE
+     * gia' garantiscono autenticita'; verifica con jwks CIE OP da aggiungere come
+     * defense in depth in futuro).
+     */
+    private function fetchUserInfo(string $accessToken, array $providerConfig, string $correlationId, ?callable $userInfoJweDecrypter): array {
+        if ($accessToken === '') {
+            return [];
+        }
+        $endpoint = (string) ($providerConfig['userinfo_endpoint'] ?? '');
+        if ($endpoint === '') {
+            return [];
+        }
+
+        $response = wp_remote_get($endpoint, [
+            'timeout'     => 15,
+            'redirection' => 2,
+            'headers'     => [
+                'Authorization' => 'Bearer ' . $accessToken,
+                'Accept'        => 'application/jwt, application/json',
+            ],
+        ]);
+
+        if (is_wp_error($response)) {
+            $this->logger->error('OIDC userinfo http error', [
+                'correlation_id' => $correlationId,
+                'error'          => $response->get_error_message(),
+            ]);
+            return [];
+        }
+
+        $status = (int) wp_remote_retrieve_response_code($response);
+        $body   = trim((string) wp_remote_retrieve_body($response));
+
+        if ($status < 200 || $status >= 300 || $body === '') {
+            return [];
+        }
+
+        $payloadJson = '';
+
+        if ($body !== '' && $body[0] === '{') {
+            $payloadJson = $body;
+        } else {
+            $parts = explode('.', $body);
+            if (count($parts) === 5) {
+                if ($userInfoJweDecrypter === null) {
+                    $this->logger->error('OIDC userinfo received JWE but no decrypter configured', [
+                        'correlation_id' => $correlationId,
+                    ]);
+                    return [];
+                }
+                try {
+                    $inner = (string) $userInfoJweDecrypter($body);
+                } catch (\Throwable $e) {
+                    $this->logger->error('OIDC userinfo JWE decrypt failed', [
+                        'correlation_id' => $correlationId,
+                        'error'          => $e->getMessage(),
+                    ]);
+                    return [];
+                }
+                $innerParts = explode('.', trim($inner));
+                if (count($innerParts) === 3) {
+                    $payloadJson = (string) $this->base64urlDecode($innerParts[1]);
+                } else {
+                    $payloadJson = $inner;
+                }
+            } elseif (count($parts) === 3) {
+                $payloadJson = (string) $this->base64urlDecode($parts[1]);
+            }
+        }
+
+        if ($payloadJson === '') {
+            return [];
+        }
+        $json = json_decode($payloadJson, true);
+        if (!is_array($json)) {
+            return [];
+        }
+
+        return $json;
+    }
+
+    private function base64urlDecode(string $data) {
+        $data = strtr($data, '-_', '+/');
+        $padding = strlen($data) % 4;
+        if ($padding > 0) {
+            $data .= str_repeat('=', 4 - $padding);
+        }
+        return base64_decode($data, true);
+    }
+
+    private function exchangeCodeForTokens(string $code, string $codeVerifier, array $providerConfig, string $correlationId, ?callable $clientAssertionSigner = null) {
         $tokenEndpoint = $providerConfig['token_endpoint'] ?? '';
         if (empty($tokenEndpoint)) {
             return new WP_Error('oidc_no_token_endpoint', __('Endpoint token non configurato.', 'wp-spid-cie'));
         }
 
+        // redirect_uri ripristinato: e' prescritto da RFC 6749 §4.1.3 e non e' la
+        // causa di unauthorized_client (test del 2026-05-29 14:46 con body privo di
+        // redirect_uri ha riprodotto lo stesso errore). La tabella della spec AgID
+        // (token_endpoint.html) lo omette, ma e' un'omissione del documento: il
+        // redirect_uri al code exchange e' standard OAuth2 e va incluso.
         $body = [
             'grant_type' => 'authorization_code',
             'code' => $code,
@@ -153,8 +310,21 @@ class WP_SPID_CIE_OIDC_OidcClient {
             'code_verifier' => $codeVerifier,
         ];
 
-        if (!empty($providerConfig['client_secret'])) {
-            $body['client_secret'] = $providerConfig['client_secret'];
+        // CIE/SPID OIDC: token endpoint auth method = private_key_jwt (spec token_endpoint).
+        // client_assertion JWT con sub == iss == client_id (qui obbligatorio,
+        // a differenza del request object dell'authorization request).
+        if ($clientAssertionSigner !== null) {
+            $now = time();
+            $ca_payload = [
+                'iss' => $providerConfig['client_id'],
+                'sub' => $providerConfig['client_id'],
+                'aud' => $tokenEndpoint,
+                'iat' => $now,
+                'exp' => $now + 300,
+                'jti' => wp_generate_uuid4(),
+            ];
+            $body['client_assertion_type'] = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+            $body['client_assertion']      = $clientAssertionSigner($ca_payload);
         }
 
         $response = wp_remote_post($tokenEndpoint, [
@@ -179,7 +349,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
         if ($status < 200 || $status >= 300 || !is_array($json)) {
             $this->logger->error('OIDC token endpoint invalid response', [
                 'correlation_id' => $correlationId,
-                'http_status' => $status,
+                'http_status'    => $status,
             ]);
             return new WP_Error('oidc_token_bad_response', __('Risposta non valida dal servizio di autenticazione.', 'wp-spid-cie'));
         }

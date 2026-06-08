@@ -27,8 +27,35 @@ class WP_SPID_CIE_OIDC_Public {
         add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_styles' ) );
         add_action( 'init', array( $this, 'setup_federation_endpoints' ) );
         add_action( 'template_redirect', array( $this, 'serve_federation_endpoints' ) );
-        add_action( 'template_redirect', array( $this, 'handle_login_flow' ) );
+        // Priority 20: fires after setup_federation_endpoints (init/10) but before
+        // template_redirect plugins (e.g. custom login-page redirectors) that strip query params.
+        add_action( 'init', array( $this, 'handle_login_flow' ), 20 );
 		add_filter('redirect_canonical', array($this, 'disable_canonical_for_federation'), 10, 2);
+        add_action('wp', array($this, 'maybe_disable_page_cache'));
+    }
+
+    /**
+     * Disables page cache for pages containing the [spid_cie_login] shortcode.
+     * Supports W3 Total Cache, WP Super Cache, WP Rocket, and compatible plugins.
+     *
+     * @since  1.3.2
+     * @return void
+     */
+    public function maybe_disable_page_cache(): void {
+        global $post;
+        if (!$post instanceof WP_Post) {
+            return;
+        }
+        if (!has_shortcode($post->post_content, 'spid_cie_login')) {
+            return;
+        }
+        if (!defined('DONOTCACHEPAGE')) {
+            define('DONOTCACHEPAGE', true);
+        }
+        if (!defined('DONOTCACHEDB')) {
+            define('DONOTCACHEDB', true);
+        }
+        add_filter('do_rocket_no_cache_page', '__return_true');
     }
 
     /**
@@ -891,11 +918,13 @@ private function extract_jwt_payload($jwt) {
                 'error_code' => $provider_config->get_error_code(),
             ]);
             $this->redirect_to_login_error($provider_config->get_error_code());
+            return;
         }
-
         if ($action === 'login') {
             $target_url = $this->resolve_redirect_target();
-            $auth_url = $oidc->buildAuthorizationUrl($provider_config, $target_url, $correlation_id);
+            $wrapper    = WP_SPID_CIE_OIDC_Factory::get_client();
+            $signer     = fn(array $payload) => $wrapper->signRequestObject($payload);
+            $auth_url   = $oidc->buildAuthorizationUrl($provider_config, $target_url, $correlation_id, $signer);
             if (is_wp_error($auth_url)) {
                 $logger->error('OIDC start login failed', [
                     'correlation_id' => $correlation_id,
@@ -903,6 +932,7 @@ private function extract_jwt_payload($jwt) {
                     'error_code' => $auth_url->get_error_code(),
                 ]);
                 $this->redirect_to_login_error('oidc_start_failed');
+                return;
             }
 
             $logger->info('OIDC start login redirect', [
@@ -911,7 +941,7 @@ private function extract_jwt_payload($jwt) {
                 'idp' => $idp,
             ]);
 
-            wp_safe_redirect($auth_url);
+            wp_redirect($auth_url);
             exit;
         }
 
@@ -922,7 +952,10 @@ private function extract_jwt_payload($jwt) {
             'correlation_id' => $correlation_id,
         ];
 
-        $result = $oidc->handleCallback($request, $provider_config);
+        $wrapper          = WP_SPID_CIE_OIDC_Factory::get_client();
+        $assertionSigner  = fn(array $payload) => $wrapper->signClientAssertion($payload);
+        $jweDecrypter     = fn(string $jwe) => $wrapper->decryptUserInfoJwe($jwe);
+        $result           = $oidc->handleCallback($request, $provider_config, $assertionSigner, $jweDecrypter);
         if (is_wp_error($result)) {
             $logger->error('OIDC callback failed', [
                 'correlation_id' => $correlation_id,
@@ -1018,6 +1051,7 @@ private function extract_jwt_payload($jwt) {
             'spid_error_23'                => 'Utente con identità sospesa/revocata o con credenziali bloccate.',
             'spid_error_25'                => 'Processo di autenticazione annullato dall\'utente.',
             'saml_status_not_success'      => 'Autenticazione non completata.',
+            'saml_authncontext_mismatch'   => 'Autenticazione non completata.',
             'saml_config_incomplete'       => 'Configurazione SPID incompleta. Contattare il gestore del servizio.',
             'saml_missing_response'        => 'Risposta SPID non ricevuta. Riprovare.',
             'saml_replay_detected'         => 'Richiesta già elaborata. Riprovare.',
@@ -1054,11 +1088,6 @@ private function extract_jwt_payload($jwt) {
     public function print_login_buttons_on_login_page($arg = null) {
         if (self::$buttons_printed) return $arg;
         if (is_string($arg) && !empty($arg)) echo $arg;
-
-        if (!empty($_GET['spid_cie_error'])) {
-            $error_code = sanitize_key(wp_unslash($_GET['spid_cie_error']));
-            echo '<p class="message" style="border-left-color:#d63638;">' . esc_html($this->get_spid_error_message($error_code)) . '</p>';
-        }
 
         echo $this->render_login_buttons();
         self::$buttons_printed = true;
@@ -1133,7 +1162,11 @@ private function extract_jwt_payload($jwt) {
             <?php endif; ?>
 
             <span class="spid-cie-title">Accedi con Identità Digitale</span>
-            
+
+            <?php if ($show_spid_oidc || $show_spid_saml): ?>
+                <p class="spid-cie-intro-text">SPID, il <strong>Sistema Pubblico di Identità Digitale</strong>, è il sistema di accesso che consente di utilizzare, con un'identità digitale unica, i servizi online della Pubblica Amministrazione e dei privati accreditati. Se sei già in possesso di un'identità digitale, accedi con le credenziali del tuo gestore. Se non hai ancora un'identità digitale, richiedila ad uno dei gestori.</p>
+            <?php endif; ?>
+
             <?php if ($show_spid_oidc): ?>
                 <div class="spid-button-wrapper">
                     <?php echo $this->render_primary_auth_button('spid', 'Entra con SPID', [
@@ -1159,13 +1192,6 @@ private function extract_jwt_payload($jwt) {
 
                             </li>
                         <?php endforeach; ?>
-                        <li class="spid-dropdown-footer">
-                            <a href="https://www.spid.gov.it/cos-e-spid/come-attivare-spid/" target="_blank" rel="noopener noreferrer">Non hai SPID?</a>
-                            &nbsp;|&nbsp;
-                            <a href="https://www.spid.gov.it/" target="_blank" rel="noopener noreferrer">Maggiori informazioni</a>
-                            &nbsp;|&nbsp;
-                            <a href="https://helpdesk.spid.gov.it/" target="_blank" rel="noopener noreferrer">Serve aiuto?</a>
-                        </li>
                     </ul>
                 </div>
             <?php endif; ?>
@@ -1218,9 +1244,6 @@ private function extract_jwt_payload($jwt) {
                                     <?php endif; ?>
                                 <?php endforeach; ?>
                             <?php endif; ?>
-                            <li><a class="idp-button-idp-logo spid-idp-support-link" href="https://www.spid.gov.it/" target="_blank" rel="noopener noreferrer"><span class="spid-idp-label">Maggiori informazioni</span></a></li>
-                            <li><a class="idp-button-idp-logo spid-idp-support-link" href="https://www.spid.gov.it/cos-e-spid/come-attivare-spid/" target="_blank" rel="noopener noreferrer"><span class="spid-idp-label">Non hai SPID?</span></a></li>
-                            <li><a class="idp-button-idp-logo spid-idp-support-link" href="https://helpdesk.spid.gov.it/" target="_blank" rel="noopener noreferrer"><span class="spid-idp-label">Serve aiuto?</span></a></li>
                             <?php if (!empty($options['spid_saml_validator_enabled']) && $options['spid_saml_validator_enabled'] === '1'): ?>
                                 <?php $validator_url = add_query_arg(['idp' => 'https://validator.spid.gov.it'], $saml_login_url); ?>
                                 <li><a class="idp-button-idp-logo spid-idp-support-link spid-validator-link" href="<?php echo esc_url($validator_url); ?>"><span class="spid-idp-label">SPID Validator</span></a></li>
@@ -1230,10 +1253,14 @@ private function extract_jwt_payload($jwt) {
                 </div>
             <?php endif; ?>
 
-            <?php if ($cie_enabled): ?>
-                <?php echo $this->render_primary_auth_button('cie', 'Entra con CIE', [
-                    'href' => $login_url_cie,
-                ]); ?>
+            <?php if ($show_spid_oidc || $show_spid_saml): ?>
+                <p class="spid-info-links">
+                    <a href="https://www.spid.gov.it/" target="_blank" rel="noopener noreferrer">Maggiori informazioni su SPID</a>
+                    &nbsp;|&nbsp;
+                    <a href="https://www.spid.gov.it/cos-e-spid/come-attivare-spid/" target="_blank" rel="noopener noreferrer">Non hai SPID?</a>
+                    &nbsp;|&nbsp;
+                    <a href="https://helpdesk.spid.gov.it/" target="_blank" rel="noopener noreferrer">Serve aiuto?</a>
+                </p>
             <?php endif; ?>
 
             <div class="spid-agid-footer">
@@ -1241,6 +1268,13 @@ private function extract_jwt_payload($jwt) {
                      alt="SPID - AgID Agenzia per l'Italia Digitale"
                      class="spid-agid-logo">
             </div>
+
+            <?php if ($cie_enabled): ?>
+                <p class="spid-cie-intro-text">La <strong>Carta di Identità Elettronica (CIE)</strong> è il documento personale che attesta l'identità del cittadino.<br>Dotata di microprocessore, oltre a comprovare l'identità personale, permette l'accesso ai servizi digitali della Pubblica Amministrazione.</p>
+                <?php echo $this->render_primary_auth_button('cie', 'Entra con CIE', [
+                    'href' => $login_url_cie,
+                ]); ?>
+            <?php endif; ?>
         </div>
         </div>
         <?php
@@ -1453,7 +1487,9 @@ private function extract_jwt_payload($jwt) {
     }
 
     private function get_spid_saml_validator_cert(): string {
-        return trim((string) apply_filters('wp_spid_cie_validator_x509_cert', 'MIIEATCCAumgAwIBAgIUKnIX6ljIqVPkFQ8hJVj8KAYegBIwDQYJKoZIhvcNAQELBQAwgY8xCzAJBgNVBAYTAklUMQ0wCwYDVQQIDARSb21lMQ0wCwYDVQQHDARSb21lMQ0wCwYDVQQKDARBZ0lEMQ0wCwYDVQQLDARBZ0lEMR4wHAYDVQQDDBV2YWxpZGF0b3Iuc3BpZC5nb3YuaXQxJDAiBgkqhkiG9w0BCQEWFXNwaWQudGVjaEBhZ2lkLmdvdi5pdDAeFw0yMzEwMTgwNjI1MjVaFw0yNTEwMTcwNjI1MjVaMIGPMQswCQYDVQQGEwJJVDENMAsGA1UECAwEUm9tZTENMAsGA1UEBwwEUm9tZTENMAsGA1UECgwEQWdJRDENMAsGA1UECwwEQWdJRDEeMBwGA1UEAwwVdmFsaWRhdG9yLnNwaWQuZ292Lml0MSQwIgYJKoZIhvcNAQkBFhVzcGlkLnRlY2hAYWdpZC5nb3YuaXQwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDrvNDIgz4davA/fTJEc10f6yptnLojSspzXgP61EAg4REGmwfhbEP8+2v5pN4mVeCdL3saFUiFbn3LZRDbHAwKkoE6Uzi+mD7cPGqj10jtHU9i82C5cv2hta7VmPZkm0DFWFcayMiqfCqG8u19ntL/PX5bUa3mUcDQ6LNG+0qM9JTeHpB3UjP1Dh881i3zdqbi1mBWtJYPDkdHerZwem0+E8cdv01d3P9593Ui8zQ6jnT3eRDRVH+yquy9sxEUuds4fcF95kJhXK7YOdZQyU2+xg0bLO35XajvCSBGIqVsTBbTd5M154EU/+dfklL9AeXBwF9NoGpa2gc+CJCOfgqvAgMBAAGjUzBRMB0GA1UdDgQWBBTqP5J762zVXV2hiVxZBqw1UGdFKjAfBgNVHSMEGDAWgBTqP5J762zVXV2hiVxZBqw1UGdFKjAPBgNVHRMBAf8EBTADAQH/MA0GCSqGSIb3DQEBCwUAA4IBAQDRlOps/3rEXdEc2SAbFUjU6PmoD+ycpQvMvhn1fbrScLB4v4MnsaT5pCgLsxfglb+cDjgkRyEXhs1K6sTsJhTkJ9t9sYgwLVlxuqxKPPxOab0JUZ5/9UsxZ0eKnw0ZmW2VYFIZ6u3zm8RwWZXtpm97w0p43c31fQ0Dc0+KFTKjgQ5q7oG67fV1M0aQaC9wjnthtjCIkBXyK+T637INAoSN4SXIiaZR7OTSTKzJzSBfg+CHGvUTlYVZe9vUx+0filRd0NAv5eCdGPyVbLieCGxJgNnV970TE0olp2VOmAE6O6kvisIvf2Lf3kNtuDTcov+tnKsS3L1FanDUjjZnkTaO'));
+        // Cert pubblico di SpidValidator AgID rinnovato 2025-03-12 (scad. 2035-03-11).
+        // Recuperato da https://validator.spid.gov.it/metadata.xml — KeyDescriptor use="signing"
+        return trim((string) apply_filters('wp_spid_cie_validator_x509_cert', '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'));
     }
 
     private function saml_debug_url_host(string $url): string {

@@ -178,9 +178,9 @@ $wrapper = new WP_SPID_CIE_OIDC_Wrapper([
     'key_dir' => $keyDir,
     'cie_trust_mark_preprod' => $trustMark,
     'cie_trust_mark_prod' => '',
-    'cie_trust_anchor_preprod' => 'https://registry.interno.gov.it/',
-    'cie_trust_anchor_prod' => 'https://registry.interno.gov.it/',
-    'spid_trust_anchor' => 'https://registry.agid.gov.it/',
+    'cie_trust_anchor_preprod' => '',
+    'cie_trust_anchor_prod' => 'https://oidc.registry.servizicie.interno.gov.it',
+    'spid_trust_anchor' => '',
     'cie_enabled' => true,
     'spid_enabled' => true,
 ]);
@@ -192,7 +192,7 @@ $entityRpMetadata = (array) ($entityStatementPayload['metadata']['openid_relying
 $entityFederationMetadata = (array) ($entityStatementPayload['metadata']['federation_entity'] ?? []);
 
 assert_true(($entityStatementHeader['typ'] ?? '') === 'entity-statement+jwt', 'L\'entity configuration deve avere typ=entity-statement+jwt.');
-assert_true(!array_key_exists('authority_hints', $entityStatementPayload), 'L\'entity configuration iniziale non deve esporre authority_hints.');
+assert_true(in_array('https://oidc.registry.servizicie.interno.gov.it', $entityStatementPayload['authority_hints'] ?? [], true), 'L\'entity configuration deve esporre authority_hints con il trust anchor CIE corretto.');
 assert_true(isset($entityStatementPayload['jwks']['keys'][0]), 'L\'entity configuration iniziale deve includere jwks.');
 assert_true(isset($entityStatementPayload['iss']) && $entityStatementPayload['iss'] === 'https://example.gov.it', 'iss deve essere presente e normalizzato senza trailing slash.');
 assert_true(isset($entityStatementPayload['sub']) && $entityStatementPayload['sub'] === 'https://example.gov.it', 'sub deve essere presente e normalizzato senza trailing slash.');
@@ -228,7 +228,7 @@ assert_true(!array_key_exists('organization_identifier', $entityFederationMetada
 assert_true(($entityStatementPayload['trust_marks'][0]['id'] ?? '') === 'https://example.gov.it/trust-mark/test', 'I trust marks CIE validi devono restare presenti.');
 assert_true(($entityStatementPayload['trust_marks'][0]['trust_mark'] ?? '') === $trustMark, 'Il trust mark CIE non deve essere alterato.');
 
-$resolveJwt = $wrapper->getResolveResponse('', 'https://registry.interno.gov.it/');
+$resolveJwt = $wrapper->getResolveResponse('', 'https://oidc.registry.servizicie.interno.gov.it');
 $resolveHeader = decode_jwt_segment($resolveJwt, 0);
 $resolvePayload = decode_jwt_segment($resolveJwt, 1);
 $resolveRpMetadata = (array) ($resolvePayload['metadata']['openid_relying_party'] ?? []);
@@ -247,7 +247,7 @@ assert_true(($resolveFederationMetadata['federation_resolve_endpoint'] ?? '') ==
 assert_true(!array_key_exists('federation_fetch_endpoint', $resolveFederationMetadata), 'Resolve RP CIE non deve esporre federation_fetch_endpoint.');
 assert_true(!array_key_exists('federation_list_endpoint', $resolveFederationMetadata), 'Resolve RP CIE non deve esporre federation_list_endpoint.');
 assert_true(!array_key_exists('federation_trust_mark_status_endpoint', $resolveFederationMetadata), 'Resolve RP CIE non deve esporre federation_trust_mark_status_endpoint.');
-assert_true(($resolvePayload['trust_anchor'] ?? '') === 'https://registry.interno.gov.it', 'trust_anchor deve essere normalizzato senza trailing slash.');
+assert_true(($resolvePayload['trust_anchor'] ?? '') === 'https://oidc.registry.servizicie.interno.gov.it', 'trust_anchor deve essere normalizzato senza trailing slash.');
 
 $spidOnlyWrapper = new WP_SPID_CIE_OIDC_Wrapper([
     'organization_name' => 'Comune di Test',
@@ -259,9 +259,9 @@ $spidOnlyWrapper = new WP_SPID_CIE_OIDC_Wrapper([
     'key_dir' => $keyDir,
     'cie_trust_mark_preprod' => '',
     'cie_trust_mark_prod' => '',
-    'cie_trust_anchor_preprod' => 'https://registry.interno.gov.it/',
-    'cie_trust_anchor_prod' => 'https://registry.interno.gov.it/',
-    'spid_trust_anchor' => 'https://registry.agid.gov.it/',
+    'cie_trust_anchor_preprod' => '',
+    'cie_trust_anchor_prod' => '',
+    'spid_trust_anchor' => '',
     'cie_enabled' => false,
     'spid_enabled' => true,
 ]);
@@ -270,7 +270,7 @@ $spidOnlyEntityStatement = decode_jwt_segment($spidOnlyWrapper->getEntityStateme
 $spidOnlyRpMetadata = (array) ($spidOnlyEntityStatement['metadata']['openid_relying_party'] ?? []);
 
 assert_true(($spidOnlyRpMetadata['jwks_uri'] ?? '') === 'https://example.gov.it/jwks.json', 'La entity configuration senza CIE deve continuare a esporre jwks_uri.');
-assert_true(($spidOnlyEntityStatement['authority_hints'][0] ?? '') === 'https://registry.agid.gov.it', 'La entity configuration SPID-only deve continuare a esporre authority_hints.');
+assert_true(!array_key_exists('authority_hints', $spidOnlyEntityStatement), 'La entity configuration SPID-only senza trust anchor configurato non deve esporre authority_hints.');
 assert_true(isset($spidOnlyEntityStatement['metadata']['federation_entity']['federation_fetch_endpoint']), 'La compatibilita SPID-only deve mantenere federation_fetch_endpoint.');
 
 echo "entity configuration CIE initial claims: OK\n";

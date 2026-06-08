@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Contract for storing and consuming OIDC state/nonce pairs.

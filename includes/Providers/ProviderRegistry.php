@@ -1,4 +1,5 @@
 <?php
+defined( 'ABSPATH' ) || exit;
 
 /**
  * Resolves the full OIDC configuration for a given provider key.
@@ -52,7 +53,7 @@ class WP_SPID_CIE_OIDC_ProviderRegistry {
 
         $config['client_id'] = $baseUrl;
         $config['client_secret'] = '';
-        $config['redirect_uri'] = add_query_arg(['oidc_action' => 'callback', 'provider' => $provider], $baseUrl);
+        $config['redirect_uri'] = add_query_arg(['oidc_action' => 'callback', 'provider' => $provider], trailingslashit($baseUrl));
 
         return $config;
     }
