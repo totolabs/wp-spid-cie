@@ -147,6 +147,14 @@ class WP_SPID_CIE_OIDC_FiscalCodeMigration {
         $skipped = 0;
 
         foreach ($report['legacy_usernames'] as $entry) {
+            // Stesso criterio di normalize_all(): davanti a un conflitto non si tocca
+            // nulla. Rinominare qui lascerebbe un account con lo username gia' pulito e
+            // il codice fiscale ancora prefissato, uno stato ibrido che confonde e basta.
+            if (isset($report['conflicts'][$entry['proposed']])) {
+                $skipped++;
+                continue;
+            }
+
             $proposed = sanitize_user($entry['proposed'], true);
             if ($proposed === '' || username_exists($proposed)) {
                 $skipped++;
@@ -301,12 +309,31 @@ class WP_SPID_CIE_OIDC_FiscalCodeMigration {
         }
 
         if (!empty($report['legacy_usernames'])) {
+            $renameable = 0;
+            foreach ($report['legacy_usernames'] as $entry) {
+                if (!isset($report['conflicts'][$entry['proposed']])) {
+                    $renameable++;
+                }
+            }
+
             printf(
                 '<p style="margin-top:12px">%d username conservano il prefisso <code>TINIT-</code>. È solo estetica: '
                 . 'il collegamento fra le identità usa il codice fiscale, non lo username, e gli utenti accedono '
                 . 'via SPID/CIE senza digitarlo.</p>',
                 count($report['legacy_usernames'])
             );
+
+            if ($renameable === 0) {
+                echo '<p><em>Nessuna rinomina possibile: gli username interessati appartengono ad account '
+                    . 'in conflitto. Risolvere prima i conflitti qui sopra.</em></p>';
+                return;
+            }
+            if ($renameable < count($report['legacy_usernames'])) {
+                printf(
+                    '<p><em>Di questi, %d verranno rinominati: gli altri appartengono ad account in conflitto e vengono saltati.</em></p>',
+                    $renameable
+                );
+            }
             $url = wp_nonce_url(
                 add_query_arg(
                     array('page' => 'wp-spid-cie', 'tab' => 'stato', 'spidcie_fc_rename' => '1'),
@@ -317,7 +344,7 @@ class WP_SPID_CIE_OIDC_FiscalCodeMigration {
             printf(
                 '<p><a class="button button-secondary" onclick="return confirm(\'Rinominare gli username? Operazione non reversibile automaticamente.\');" href="%s">Rinomina %d username</a></p>',
                 esc_url($url),
-                count($report['legacy_usernames'])
+                $renameable
             );
         }
     }
