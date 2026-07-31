@@ -5,6 +5,36 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Non rilasciato
+
+### Corretto
+- **Codice fiscale: un unico punto di normalizzazione** (`WP_SPID_CIE_OIDC_FiscalCode`).
+  SPID SAML consegna il codice fiscale nudo, CIE OIDC lo consegna con prefisso `TINIT-`, e
+  i due flussi lo trattavano in modo diverso: la stessa persona otteneva **due account
+  WordPress distinti** a seconda del protocollo usato per accedere. Di conseguenza il
+  ricongiungimento per codice fiscale gia' presente in `WpAuthService` — che confronta il
+  valore in modo esatto — non agganciava mai nulla fra SPID e CIE. Ora entrambi i flussi
+  passano dallo stesso normalizzatore.
+
+### Aggiunto
+- **Codice fiscale nel profilo utente**: visibile a tutti, modificabile solo da chi ha
+  `edit_users`. Permette di collegare a mano un utente preesistente alla sua identita'
+  SPID/CIE. Un codice gia' assegnato a un altro account viene rifiutato, perche' due utenti
+  con lo stesso codice fiscale bloccherebbero il login di entrambi.
+- **Colonna e ricerca per codice fiscale** nella lista utenti di WordPress, con evidenza dei
+  valori non ancora normalizzati.
+- **Strumento di migrazione** nel tab "Stato": normalizza i codici fiscali salvati dalle
+  versioni precedenti, elenca i conflitti senza toccarli e, opzionalmente, rinomina gli
+  username che conservano il prefisso `TINIT-`.
+
+### Note per l'aggiornamento
+- Chi possiede **un solo account** si migra da solo al primo accesso: il `sub` del provider
+  continua ad agganciare l'utente, e il codice fiscale viene riscritto normalizzato.
+- Chi possiede **due account** (uno creato via SPID e uno via CIE) va riconciliato **prima**
+  con lo strumento di migrazione: in quel caso `sub` e codice fiscale puntano ad account
+  diversi e il login fallirebbe con `oidc_identity_conflict`. Lo strumento li elenca e li
+  salta invece di applicare la modifica.
+
 ## v1.3.2 — 2026-06-08
 
 Release di manutenzione: riallinea il ramo `main` allo stato stabile di `develop`. Il

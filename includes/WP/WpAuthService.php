@@ -165,7 +165,9 @@ class WP_SPID_CIE_OIDC_WpAuthService {
             update_user_meta($userId, '_spidcie_sub_cie', $identity['sub']);
         }
 
-        update_user_meta($userId, '_spidcie_fiscal_code', strtoupper($identity['fiscal_code']));
+        // normalize() e' idempotente: garantisce che il meta resti confrontabile fra
+        // protocolli anche se l'identita' arrivasse da un percorso non normalizzato.
+        update_user_meta($userId, '_spidcie_fiscal_code', WP_SPID_CIE_OIDC_FiscalCode::normalize($identity['fiscal_code']));
         update_user_meta($userId, '_spidcie_mobile', $identity['mobile']);
         update_user_meta($userId, '_spidcie_last_login_ts', time());
 
