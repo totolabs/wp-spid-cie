@@ -42,7 +42,9 @@ class WP_SPID_CIE_OIDC_WpUserMapper {
             'email' => sanitize_email((string) $email),
             'given_name' => $this->sanitizeText($givenName),
             'family_name' => $this->sanitizeText($familyName),
-            'fiscal_code' => strtoupper($this->sanitizeText($fiscalCode)),
+            // CIE consegna il codice fiscale con prefisso TINIT-, SPID SAML nudo: senza
+            // normalizzazione condivisa la stessa persona produce due account distinti.
+            'fiscal_code' => WP_SPID_CIE_OIDC_FiscalCode::normalize($this->sanitizeText($fiscalCode)),
             'mobile' => $this->normalizeMobile($mobile),
         ];
     }

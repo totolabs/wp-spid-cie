@@ -42,6 +42,8 @@ if ( file_exists( plugin_dir_path( __FILE__ ) . 'vendor/autoload.php' ) ) {
 }
 
 // 2. Load our Factory (configuration and key management)
+// FiscalCode first: both the SAML service and the OIDC mapper depend on it.
+require_once plugin_dir_path( __FILE__ ) . 'includes/Core/FiscalCode.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-wp-spid-cie-factory.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-wp-spid-cie-spid-certificates.php';
 
@@ -94,10 +96,12 @@ require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/CieProviderProfil
 require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/ProviderRegistry.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/WP/WpUserMapper.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/WP/WpAuthService.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/WP/FiscalCodeMigration.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Integrations/GayadeedBridge.php';
 
 // 3. Load Admin and Public classes
 require_once plugin_dir_path( __FILE__ ) . 'admin/class-wp-spid-cie-admin.php';
+require_once plugin_dir_path( __FILE__ ) . 'admin/class-wp-spid-cie-user-profile.php';
 require_once plugin_dir_path( __FILE__ ) . 'public/class-wp-spid-cie-public.php';
 
 
@@ -113,6 +117,8 @@ function run_wp_spid_cie() {
     // Start Admin side (only when loading /wp-admin/)
     if ( is_admin() ) {
         $plugin_admin = new WP_SPID_CIE_OIDC_Admin( $plugin_name, $version );
+        $plugin_user_profile = new WP_SPID_CIE_OIDC_User_Profile();
+        $plugin_fc_migration = new WP_SPID_CIE_OIDC_FiscalCodeMigration();
     }
 
     // Bootstrap runtime services once (OIDC client, mapper, auth, provider registry)
