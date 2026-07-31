@@ -195,7 +195,15 @@ class WP_SPID_CIE_OIDC_WpAuthService {
         ]);
 
         $results = $query->get_results();
-        return is_array($results) ? $results : [];
+        if (!is_array($results)) {
+            return [];
+        }
+
+        // Con 'fields' => 'all_with_meta' WP_User_Query indicizza i risultati per ID
+        // utente, non da zero: l'array e' [47 => WP_User], quindi count() vale 1 ma
+        // $results[0] e' null. I chiamanti leggono l'elemento 0 e senza array_values()
+        // scartano l'utente trovato, provisionandone un duplicato a ogni accesso.
+        return array_values($results);
     }
 
     private function resolveDefaultRole(array $options): string {
