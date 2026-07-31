@@ -8,6 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## Non rilasciato
 
 ### Corretto
+- **Account duplicati a ogni login (SPID e CIE)** — bug preesistente, non introdotto in
+  questa versione. `findByMetaValue()` restituiva i risultati di `WP_User_Query` senza
+  reindicizzarli: con `fields => all_with_meta` WordPress li indicizza per **ID utente**,
+  quindi `count()` valeva 1 ma `$results[0]` era `null`. Il codice non riconosceva l'utente
+  gia' registrato e ne creava uno nuovo a ogni accesso successivo al primo (`<username>_1`),
+  finche' dal terzo accesso il lookup ne trovava due e restituiva `oidc_identity_conflict`,
+  **bloccando il login**. Riguardava entrambi i protocolli, perche' condividono
+  `resolveOrProvisionUser`.
+  *Dopo l'aggiornamento*: verificare nel tab "Stato" la presenza di conflitti e riconciliare
+  gli account duplicati gia' creati.
 - **Codice fiscale: un unico punto di normalizzazione** (`WP_SPID_CIE_OIDC_FiscalCode`).
   SPID SAML consegna il codice fiscale nudo, CIE OIDC lo consegna con prefisso `TINIT-`, e
   i due flussi lo trattavano in modo diverso: la stessa persona otteneva **due account
