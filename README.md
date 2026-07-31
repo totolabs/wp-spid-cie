@@ -27,11 +27,27 @@ Plugin WordPress per l'autenticazione tramite **SPID** e **CIE** nelle Pubbliche
 1. Caricare la cartella del plugin in `/wp-content/plugins/`.
 2. Attivare il plugin dal menu **Plugin** in WordPress.
 3. Andare su **Impostazioni > SPID & CIE Login**.
-4. Compilare i dati dell'Ente nel tab **Ente** (denominazione, IPA, codice fiscale).
+4. Compilare i dati dell'Ente nel tab **Ente** (denominazione, IPA, codice fiscale, email).
 5. Generare i certificati SPID nel tab **SPID SAML** con il bottone dedicato.
 6. Configurare gli endpoint IdP nel tab **SPID SAML** o abilitare il registry AgID.
 7. Configurare CIE nel tab **CIE** con trust anchor e chiavi JWKS.
 8. Inserire lo shortcode `[spid_cie_login]` nella pagina di login.
+
+## Federazione CIE
+
+Il trust anchor CIE di produzione è `https://oidc.registry.servizicie.interno.gov.it`. Va compilato **solo** il campo "Trust Anchor CIE (Produzione)", lasciando vuoti "CIE pre-produzione" e "SPID": è l'unico valore che deve comparire in `authority_hints` nell'entity configuration.
+
+L'email del tab **Ente** deve coincidere con l'indirizzo registrato nei dettagli dell'ente sul portale CIE. Il portale incrocia i due valori quando si valida la componente tecnica e, se differiscono, restituisce `[metadata.federation_entity.contacts] Elemento non presente` — messaggio fuorviante, perché l'elemento è presente ma non corrisponde.
+
+Prima dell'approvazione della federazione, `trust_marks: null` e una trust chain a 1 solo elemento in `/resolve` sono lo stato atteso: il trust mark viene rilasciato dal portale **dopo** la federazione.
+
+Endpoint da verificare dopo ogni modifica alla configurazione CIE:
+
+```bash
+curl -sS -H "Accept: application/entity-statement+jwt" https://DOMINIO/.well-known/openid-federation
+curl -sS "https://DOMINIO/resolve?sub=https://DOMINIO&trust_anchor=https://oidc.registry.servizicie.interno.gov.it"
+curl -sS "https://oidc.registry.servizicie.interno.gov.it/fetch?sub=https://DOMINIO"
+```
 
 ## Siti in produzione
 
