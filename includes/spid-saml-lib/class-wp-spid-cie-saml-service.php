@@ -648,11 +648,9 @@ class WP_SPID_CIE_OIDC_Saml_Service {
      * @return string Normalized fiscal code.
      */
     public function normalize_fiscal_code(string $value): string {
-        $value = strtoupper(trim($value));
-        if (strpos($value, 'TINIT-') === 0) {
-            $value = substr($value, 6);
-        }
-        return preg_replace('/[^A-Z0-9]/', '', $value);
+        // Delega al punto unico di normalizzazione condiviso con il flusso OIDC:
+        // se i due divergono, la stessa persona ottiene due account WordPress.
+        return WP_SPID_CIE_OIDC_FiscalCode::normalize($value);
     }
 
     /**

@@ -3,7 +3,7 @@ Contributors: totolabs
 Tags: spid, cie, oidc, login, pnrr, pa, openid connect, italia
 Requires at least: 6.0
 Tested up to: 6.7
-Stable tag: 1.3.2
+Stable tag: 1.4.0
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -39,6 +39,13 @@ Sviluppato pensando alle esigenze delle Pubbliche Amministrazioni italiane (Comu
 7. Una volta attivati i servizi sui portali istituzionali, abilita i pulsanti di login nelle impostazioni del plugin.
 
 == Changelog ==
+
+= 1.4.0 =
+* Corretto: account WordPress duplicati a ogni accesso successivo al primo, su SPID e CIE. Dal terzo accesso il login veniva rifiutato. Aggiornamento consigliato a tutti.
+* Corretto: codice fiscale normalizzato allo stesso modo su SPID e CIE (niente piu' doppi account per la stessa persona).
+* Nuovo: codice fiscale nel profilo utente, modificabile dai soli amministratori.
+* Nuovo: colonna e ricerca per codice fiscale nella lista utenti.
+* Nuovo: strumento di migrazione nel tab "Stato" per normalizzare i codici fiscali esistenti e individuare gli account duplicati da riconciliare.
 
 = 1.3.2 =
 * Release di manutenzione: riallinea main allo stato stabile di sviluppo.
