@@ -565,6 +565,10 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '<h2>Diagnostica</h2>';
         $this->render_status_dashboard();
         $this->render_operational_help();
+        if (class_exists('WP_SPID_CIE_OIDC_FiscalCodeMigration')) {
+            echo '<hr>';
+            WP_SPID_CIE_OIDC_FiscalCodeMigration::render_panel();
+        }
         echo '<hr>';
         $this->render_spid_saml_home();
         echo '<hr>';

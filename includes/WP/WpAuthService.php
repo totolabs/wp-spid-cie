@@ -165,7 +165,9 @@ class WP_SPID_CIE_OIDC_WpAuthService {
             update_user_meta($userId, '_spidcie_sub_cie', $identity['sub']);
         }
 
-        update_user_meta($userId, '_spidcie_fiscal_code', strtoupper($identity['fiscal_code']));
+        // normalize() e' idempotente: garantisce che il meta resti confrontabile fra
+        // protocolli anche se l'identita' arrivasse da un percorso non normalizzato.
+        update_user_meta($userId, '_spidcie_fiscal_code', WP_SPID_CIE_OIDC_FiscalCode::normalize($identity['fiscal_code']));
         update_user_meta($userId, '_spidcie_mobile', $identity['mobile']);
         update_user_meta($userId, '_spidcie_last_login_ts', time());
 
@@ -193,7 +195,15 @@ class WP_SPID_CIE_OIDC_WpAuthService {
         ]);
 
         $results = $query->get_results();
-        return is_array($results) ? $results : [];
+        if (!is_array($results)) {
+            return [];
+        }
+
+        // Con 'fields' => 'all_with_meta' WP_User_Query indicizza i risultati per ID
+        // utente, non da zero: l'array e' [47 => WP_User], quindi count() vale 1 ma
+        // $results[0] e' null. I chiamanti leggono l'elemento 0 e senza array_values()
+        // scartano l'utente trovato, provisionandone un duplicato a ogni accesso.
+        return array_values($results);
     }
 
     private function resolveDefaultRole(array $options): string {
