@@ -1279,7 +1279,12 @@ class WP_SPID_CIE_OIDC_Admin {
         }
         echo '</fieldset>';
         $this->render_checkbox_field(['id' => 'spid_saml_debug', 'desc' => 'Debug header/log extra (solo WP_DEBUG)']);
-        $this->render_text_field(['id' => 'spid_saml_clock_skew','placeholder'=>'120']);
+        echo '<p><strong>Tolleranza orologio (secondi)</strong></p>';
+        $this->render_text_field([
+            'id' => 'spid_saml_clock_skew',
+            'placeholder' => '120',
+            'desc' => "Tolleranza (secondi) per lo sfasamento tra l'orologio del server e quello dell'IdP nella validazione temporale della Response. Vuoto = 120 (consigliato). Aumenta solo se il server ha un orologio non sincronizzato via NTP e vedi errori saml_not_yet_valid / saml_expired; meglio sincronizzare l'orologio (NTP) che alzare questo valore. Max 600.",
+        ]);
         $this->render_spid_saml_test_config();
     }
 
@@ -1804,8 +1809,13 @@ class WP_SPID_CIE_OIDC_Admin {
 
 
         if (in_array('spid_saml_clock_skew', $allowed, true)) {
-            $skew = isset($input['spid_saml_clock_skew']) ? (int) $input['spid_saml_clock_skew'] : 120;
-            $new_input['spid_saml_clock_skew'] = (string) max(0, min(600, $skew));
+            // Distingue "campo lasciato vuoto" da "zero digitato": (int) '' vale 0, quindi
+            // senza controllare la stringa grezza la tolleranza si azzera per distrazione e
+            // ogni Response SAML viene rifiutata con saml_not_yet_valid. Stesso trattamento
+            // per un valore non numerico, che non esprime una scelta consapevole.
+            $raw = isset($input['spid_saml_clock_skew']) ? trim((string) $input['spid_saml_clock_skew']) : '';
+            $skew = ($raw === '' || !is_numeric($raw)) ? 120 : max(0, min(600, (int) $raw));
+            $new_input['spid_saml_clock_skew'] = (string) $skew;
         }
 
 
