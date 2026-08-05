@@ -3,7 +3,7 @@ Contributors: totolabs
 Tags: spid, cie, oidc, login, pnrr, pa, openid connect, italia
 Requires at least: 6.0
 Tested up to: 6.7
-Stable tag: 1.4.0
+Stable tag: 1.4.1
 Requires PHP: 7.4
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -39,6 +39,12 @@ Sviluppato pensando alle esigenze delle Pubbliche Amministrazioni italiane (Comu
 7. Una volta attivati i servizi sui portali istituzionali, abilita i pulsanti di login nelle impostazioni del plugin.
 
 == Changelog ==
+
+= 1.4.1 =
+Release di interfaccia e prevenzione. Aggiornamento consigliato ma non urgente.
+* Corretto: la tolleranza orologio SPID SAML, se lasciata vuota, non si azzera piu' ma usa il default (120 secondi).
+* Modificato: pannello di configurazione rivisto — campi con tipo corretto (URL, e-mail, numero), etichette associate per l'accessibilita', testi piu' chiari nel tab CIE, tab senza numeri.
+* Modificato: interfaccia SPID OIDC (non ancora operativa lato AgID) nascosta dal pannello; option e codice restano, si riattiva quando il profilo sara' stabile.
 
 = 1.4.0 =
 * Corretto: account WordPress duplicati a ogni accesso successivo al primo, su SPID e CIE. Dal terzo accesso il login veniva rifiutato. Aggiornamento consigliato a tutti.
