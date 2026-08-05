@@ -529,7 +529,7 @@ class WP_SPID_CIE_OIDC_Admin {
             'Registry IdP' => $this->get_registry_service()->get_status()['count'] > 0,
             'SPID SAML enabled (effective)' => $spid_saml_effective_enabled,
         ];
-        echo '<h2>Dashboard stato</h2><ul class="spid-readonly-list">';
+        echo '<h3>Diagnostica generale</h3><ul class="spid-readonly-list">';
         foreach ($checks as $label => $ok) {
             echo '<li><strong>' . esc_html($label) . ':</strong> ' . ($ok ? '<span style="color:#0a7f37;">OK</span>' : '<span style="color:#b32d2e;">KO</span>') . '</li>';
         }
@@ -602,7 +602,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
 
     private function render_stato_tab(): void {
-        echo '<h2>Diagnostica</h2>';
+        echo '<h2>Stato</h2>';
         $this->render_status_dashboard();
         $this->render_operational_help();
         if (class_exists('WP_SPID_CIE_OIDC_FiscalCodeMigration')) {
@@ -639,7 +639,7 @@ class WP_SPID_CIE_OIDC_Admin {
         $shortcode = '[spid_cie_login]';
         $callback = add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], home_url('/'));
 
-        echo '<h2>Checklist rapida</h2>';
+        echo '<h3>Checklist rapida</h3>';
         echo '<ol>';
         echo '<li>Inserisci lo shortcode <code>' . esc_html($shortcode) . '</code> in una pagina pubblica.</li>';
         echo '<li>Configura callback OIDC con URL <code>' . esc_html($callback) . '</code>.</li>';
