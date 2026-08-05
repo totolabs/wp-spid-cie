@@ -38,6 +38,24 @@ Sviluppato pensando alle esigenze delle Pubbliche Amministrazioni italiane (Comu
 6. Copia l'**Entity Statement URI** generato e comunicalo ad AgID (Registry) e al Ministero dell'Interno (Federazione CIE) per l'onboarding tecnico.
 7. Una volta attivati i servizi sui portali istituzionali, abilita i pulsanti di login nelle impostazioni del plugin.
 
+== Frequently Asked Questions ==
+
+= Cosa succede ai miei dati se elimino il plugin? =
+
+Nulla: configurazione, cache del registry IdP e collegamenti fra utenti WordPress e identita' SPID/CIE restano nel database. Reinstallando il plugin ritrovi tutto com'era.
+
+Questo e' il comportamento predefinito, pensato per proteggere i siti gia' accreditati: una disinstallazione accidentale non deve costare la riconfigurazione e la ripresentazione dei metadata ad AgID.
+
+= Come faccio a rimuovere davvero tutti i dati? =
+
+Aggiungi questa costante nel file `wp-config.php`, prima della riga `/* That's all, stop editing! */`:
+
+`define( 'WP_SPID_CIE_DELETE_DATA_ON_UNINSTALL', true );`
+
+Con la costante attiva, eliminando il plugin dal menu Plugin di WordPress vengono cancellati: le impostazioni del plugin, i transient del registry IdP e i metadati SPID/CIE degli utenti (codice fiscale, identificativi del provider, ultimo accesso). Gli account WordPress **non** vengono eliminati.
+
+**Attenzione:** l'operazione e' irreversibile. Le chiavi crittografiche in `wp-content/uploads/wp-spid-cie-keys/` non vengono toccate, ma senza le impostazioni il plugin va riconfigurato da zero.
+
 == Changelog ==
 
 = 1.4.1 =

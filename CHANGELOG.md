@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Non rilasciato
+
+### Modificato
+- **La disinstallazione non cancella piu' i dati per impostazione predefinita.**
+  `uninstall.php` esce prima di qualsiasi operazione se la costante
+  `WP_SPID_CIE_DELETE_DATA_ON_UNINSTALL` non e' definita a `true` in `wp-config.php`
+  (stesso approccio di `WC_REMOVE_ALL_DATA` in WooCommerce). Il flag vive fuori dal
+  database, quindi non puo' essere perso insieme alle option che dovrebbe proteggere.
+  **Cambio di comportamento**: prima dell'aggiornamento la rimozione del plugin cancellava
+  option, transient e metadati utente senza conferma.
+
+### Corretto
+- **`uninstall.php` non cancella piu' option di altri plugin.** Le due query
+  `DELETE ... LIKE 'spid\_%'` e `LIKE 'cie\_%'` avevano intersezione vuota con i dati del
+  plugin — che registra una sola option, `wp-spid-cie_options`, mentre i transient del
+  registry stanno sotto `_transient_spid_saml_registry_%` — e colpivano quindi soltanto
+  option di terzi. Rilevante perche' il plugin dichiara la coesistenza con installazioni
+  SPID SAML preesistenti. Sostituite da un `delete_option()` esplicito.
+
 ## v1.4.1 — 2026-08-05
 
 ### Corretto
