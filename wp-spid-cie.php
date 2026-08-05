@@ -16,7 +16,7 @@
  * Plugin Name:       SPID & CIE Login per WordPress
  * Plugin URI:        https://github.com/totolabs/wp-spid-cie
  * Description:       Abilita l'autenticazione tramite SPID e CIE con protocollo OpenID Connect per le Pubbliche Amministrazioni italiane. Conforme PNRR 1.4.4. Sviluppato da Totolabs Srl.
- * Version:           1.4.0
+ * Version:           1.4.1
  * Author:            Totolabs Srl
  * Author URI:        https://totolabs.it
  * License:           GPL-2.0-or-later
@@ -33,7 +33,20 @@ if ( ! defined( 'WPINC' ) ) {
 }
 
 if ( ! defined( 'WP_SPID_CIE_OIDC_VERSION' ) ) {
-	define( 'WP_SPID_CIE_OIDC_VERSION', '1.4.0' );
+	define( 'WP_SPID_CIE_OIDC_VERSION', '1.4.1' );
+}
+
+/**
+ * Mostra l'interfaccia di configurazione SPID OIDC nel pannello.
+ *
+ * Il profilo SPID OIDC non e' ancora stabile lato AgID: i relativi campi restano
+ * nascosti per non offrire scelte non utilizzabili. Option e codice restano intatti,
+ * l'interfaccia riemerge alzando questa costante (anche da wp-config.php).
+ *
+ * @since 1.4.1
+ */
+if ( ! defined( 'WP_SPID_CIE_ENABLE_SPID_OIDC' ) ) {
+	define( 'WP_SPID_CIE_ENABLE_SPID_OIDC', false );
 }
 
 // 1. Load Composer autoloader (external libraries)

@@ -5,6 +5,25 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## v1.4.1 — 2026-08-05
+
+### Corretto
+- **clock_skew SPID SAML: campo vuoto usa il default invece di azzerare.** `(int) ''` valeva 0,
+  azzerando la tolleranza a ogni salvataggio con campo vuoto e provocando `saml_not_yet_valid` /
+  `saml_expired`. Ora `''` o valore non numerico ricade su 120.
+
+### Modificato
+- **UI SPID OIDC nascosta dietro flag** `WP_SPID_CIE_ENABLE_SPID_OIDC` (default false, override da
+  wp-config). Tab, selettore metodo, campo Trust Anchor SPID e preview non mostrati; option e codice
+  intatti. `min_loa` spostato nel tab CIE (governa min_acr anche per CIE).
+- **Omologazione UI pannello.** I renderer emettono `id` e rispettano il `type` (text|url|email|number);
+  `label_for` sui campi Settings API; gruppo radio metodo in `fieldset/legend`. Tab senza numeri.
+  Help CIE riscritti (JWKS = RSA non EC; il certificato X.509 non e' il valore da incollare nel portale).
+- **Logo Totolabs** ripristinato nel pannello (asset aggiunto).
+- Rinomine label e titoli sezione (tab Ente/CIE/Disclaimer).
+
+Nessuna rimozione di funzionalita' o codice in questa release.
+
 ## v1.4.0 — 2026-08-03
 
 ### Corretto
