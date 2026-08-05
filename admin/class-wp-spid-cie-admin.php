@@ -193,21 +193,21 @@ class WP_SPID_CIE_OIDC_Admin {
         );
 
         // --- 1. ENTITY DATA ---
-        add_settings_section('ente_section', '1. Dati Anagrafici Ente', null, $this->plugin_name . '_ente');
-        add_settings_field('organization_name', 'Denominazione Ente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section', 
+        add_settings_section('ente_section', 'Dati Anagrafici Ente', null, $this->plugin_name . '_ente');
+        add_settings_field('organization_name', 'Denominazione', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
             ['id' => 'organization_name', 'label_for' => 'organization_name', 'desc' => 'Denominazione ufficiale dell\'ente come registrata su IPA (max 64 caratteri). Se superiore ai 64 caratteri è necessario aggiornare la denominazione AOO su IPA prima di procedere.', 'placeholder' => 'Es. Comune di Roma']
         );
         add_settings_field('ipa_code', 'Codice IPA', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
             ['id' => 'ipa_code', 'label_for' => 'ipa_code', 'desc' => 'Codice univoco IPA (es. c_h501)', 'placeholder' => 'c_h501']
         );
         // fiscal_number resta 'text': il codice fiscale dell'ente non e' garantito numerico.
-        add_settings_field('fiscal_number', 'Codice Fiscale Ente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
+        add_settings_field('fiscal_number', 'Codice Fiscale', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
             ['id' => 'fiscal_number', 'label_for' => 'fiscal_number', 'desc' => 'Codice Fiscale numerico (es. 80012345678)', 'placeholder' => '01234567890']
         );
-        add_settings_field('contacts_email', 'Email Contatto Tecnico', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
-            ['id' => 'contacts_email', 'label_for' => 'contacts_email', 'type' => 'email', 'desc' => 'Indirizzo PEC dell\'ente come indicato su IPA. Utilizzato come contatto tecnico nella federazione CIE OIDC.', 'placeholder' => 'ced@ente.it']
+        add_settings_field('contacts_email', 'Indirizzo e-mail', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
+            ['id' => 'contacts_email', 'label_for' => 'contacts_email', 'type' => 'email', 'desc' => 'Utilizzato come e-mail nella pratica amministrativa federazione CIE', 'placeholder' => 'ced@ente.it']
         );
-        add_settings_field('logo_uri', 'URL Logo Ente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
+        add_settings_field('logo_uri', 'URL Logo', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
             ['id' => 'logo_uri', 'label_for' => 'logo_uri', 'type' => 'url', 'desc' => 'URL pubblico del logo dell\'ente in formato SVG (es. https://www.ente.it/logo.svg). Dimensioni consigliate: 200×200px. Obbligatorio per la federazione CIE OIDC.', 'placeholder' => 'https://www.ente.it/logo.svg']
         );
         add_settings_field('issuer_override', 'Issuer / Identificativo componente', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
@@ -218,7 +218,7 @@ class WP_SPID_CIE_OIDC_Admin {
         );
 
         // --- 2. CRYPTOGRAPHY ---
-        add_settings_section('keys_section', '2. Crittografia e Federazione', array($this, 'print_keys_section_info'), $this->plugin_name . '_keys');
+        add_settings_section('keys_section', 'Crittografia e Federazione CIE', array($this, 'print_keys_section_info'), $this->plugin_name . '_keys');
         add_settings_field('oidc_keys_manager', 'Stato Chiavi', array($this, 'render_keys_manager'), $this->plugin_name . '_keys', 'keys_section');
 		add_settings_field(
 		  'cie_trust_anchor_preprod',
@@ -345,7 +345,7 @@ class WP_SPID_CIE_OIDC_Admin {
         add_settings_field('cie_end_session_endpoint', 'CIE End Session endpoint', array($this, 'render_text_field'), $this->plugin_name . '_providers', 'providers_section', ['id' => 'cie_end_session_endpoint', 'placeholder' => 'https://...', 'desc' => 'Opzionale.']);
 
         // --- 4. NOTICES ---
-        add_settings_section('disclaimer_section', '4. Gestione Avvisi (Disclaimer)', null, $this->plugin_name . '_disclaimer');
+        add_settings_section('disclaimer_section', 'Gestione Avviso (Disclaimer)', null, $this->plugin_name . '_disclaimer');
         add_settings_field('disclaimer_enabled', 'Attiva Messaggio Avviso', array($this, 'render_checkbox_field'), $this->plugin_name . '_disclaimer', 'disclaimer_section', 
             ['id' => 'disclaimer_enabled', 'label_for' => 'disclaimer_enabled', 'desc' => 'Mostra un box di avviso sopra i pulsanti di login.']
         );
