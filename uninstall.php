@@ -1,14 +1,22 @@
 <?php
 defined( 'WP_UNINSTALL_PLUGIN' ) || exit;
 
+// Opt-in esplicito via costante in wp-config.php (pattern WooCommerce WC_REMOVE_ALL_DATA).
+// Senza la costante, o se falsa, NON si cancella nulla: default sicuro.
+if ( ! defined( 'WP_SPID_CIE_DELETE_DATA_ON_UNINSTALL' ) || ! WP_SPID_CIE_DELETE_DATA_ON_UNINSTALL ) {
+    return;
+}
+
 global $wpdb;
 
 // Remove plugin options
-$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'wp-spid-cie\_%'" );
-$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'spid\_%'" );
-$wpdb->query( "DELETE FROM {$wpdb->options} WHERE option_name LIKE 'cie\_%'" );
+delete_option( 'wp-spid-cie_options' );
 
-// Remove all registry transients (list, LKG, per-IdP detail)
+// Transient registry IdP: 4 nomi fissi
+// (idp_list_v3, idp_list_lkg_v3, status_v3, registry_list_v1 legacy)
+// e 3 famiglie dinamiche per-IdP
+// (idp_detail_v3_<md5>, idp_detail_lkg_v3_<md5>, registry_detail_<md5>).
+// Il LIKE '_transient_spid_saml_registry_%' li copre tutti.
 $wpdb->query(
     "DELETE FROM {$wpdb->options}
      WHERE option_name LIKE '_transient_spid\_saml\_registry\_%'
