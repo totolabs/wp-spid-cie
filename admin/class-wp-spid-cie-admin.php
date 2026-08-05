@@ -195,7 +195,7 @@ class WP_SPID_CIE_OIDC_Admin {
         // --- 1. ENTITY DATA ---
         add_settings_section('ente_section', 'Dati Anagrafici Ente', null, $this->plugin_name . '_ente');
         add_settings_field('organization_name', 'Denominazione', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
-            ['id' => 'organization_name', 'label_for' => 'organization_name', 'desc' => 'Denominazione ufficiale dell\'ente come registrata su IPA (max 64 caratteri). Se superiore ai 64 caratteri è necessario aggiornare la denominazione AOO su IPA prima di procedere.', 'placeholder' => 'Es. Comune di Roma']
+            ['id' => 'organization_name', 'label_for' => 'organization_name', 'maxlength' => 64, 'desc' => 'Denominazione ufficiale dell\'ente come registrata su IPA (max 64 caratteri). Se superiore ai 64 caratteri è necessario aggiornare la denominazione AOO su IPA prima di procedere.', 'placeholder' => 'Es. Comune di Roma']
         );
         add_settings_field('ipa_code', 'Codice IPA', array($this, 'render_text_field'), $this->plugin_name . '_ente', 'ente_section',
             ['id' => 'ipa_code', 'label_for' => 'ipa_code', 'desc' => 'Codice univoco IPA (es. c_h501)', 'placeholder' => 'c_h501']
@@ -1286,7 +1286,7 @@ class WP_SPID_CIE_OIDC_Admin {
             echo '<label style="display:block;margin-bottom:4px;"><input type="checkbox" name="' . esc_attr($this->plugin_name . '_options[spid_saml_requested_attributes][]') . '" value="' . esc_attr($attr_key) . '" ' . checked($is_checked, true, false) . ' /> ' . esc_html($attr_label) . '</label>';
         }
         echo '</fieldset>';
-        $this->render_checkbox_field(['id' => 'spid_saml_debug', 'desc' => 'Debug header/log extra (solo WP_DEBUG)']);
+        $this->render_checkbox_field(['id' => 'spid_saml_debug', 'desc' => 'Abilita diagnostica SPID SAML aggiuntiva: log di route/ACS/SLS, header metadata e file debug della firma. Alcuni header e log avanzati richiedono anche WP_DEBUG.']);
         echo '<p><label for="spid_saml_clock_skew"><strong>Tolleranza orologio (secondi)</strong></label></p>';
         $this->render_text_field([
             'id' => 'spid_saml_clock_skew',
@@ -1491,6 +1491,12 @@ class WP_SPID_CIE_OIDC_Admin {
                     $extra .= " $attr='" . esc_attr( (string) $args[$attr] ) . "'";
                 }
             }
+        }
+
+        // maxlength opzionale, valido per qualsiasi type: e' solo un vincolo client-side
+        // sull'input, non tocca il valore salvato ne' la sanitizzazione.
+        if ( isset( $args['maxlength'] ) ) {
+            $extra .= ' maxlength="' . absint( $args['maxlength'] ) . '"';
         }
 
         echo "<input type='" . esc_attr( $type ) . "' id='" . esc_attr( $id ) . "' name='{$this->plugin_name}_options[$id]' value='$val' class='regular-text' placeholder='$placeholder'$extra>";
