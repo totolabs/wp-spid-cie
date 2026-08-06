@@ -31,6 +31,7 @@ class WP_SPID_CIE_OIDC_Admin {
         add_action( 'admin_init', array( $this, 'handle_spid_saml_registry_refresh' ) );
         add_action( 'admin_init', array( $this, 'handle_spid_saml_metadata_actions' ) );
         add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_styles' ) );
+        add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
     }
 
     /**
@@ -51,6 +52,27 @@ class WP_SPID_CIE_OIDC_Admin {
             array(),
             $this->version,
             'all'
+        );
+    }
+
+    /**
+     * Enqueues JS assets for the administration panel.
+     *
+     * @since  1.4.2
+     * @param  string $hook Current admin page hook suffix.
+     * @return void
+     */
+    public function enqueue_admin_scripts($hook) {
+        if (strpos($hook, $this->plugin_name) === false) {
+            return;
+        }
+
+        wp_enqueue_script(
+            $this->plugin_name . '-admin',
+            plugin_dir_url( __FILE__ ) . 'js/wp-spid-cie-admin.js',
+            array(),
+            $this->version,
+            true
         );
     }
 
@@ -1376,6 +1398,18 @@ class WP_SPID_CIE_OIDC_Admin {
         $protected_sp_url = $token !== '' ? add_query_arg('spid_metadata_token', rawurlencode($token), home_url('/spid/saml/metadata')) : '';
         $protected_agg_url = $token !== '' ? add_query_arg('spid_metadata_token', rawurlencode($token), home_url('/spid/saml/metadata?aggregator=1')) : '';
 
+        // Varianti da mostrare a schermo: token mascherato. Gli URL interi qui sopra restano
+        // invariati e finiscono solo in data-copy-url, per il pulsante Copia.
+        // fail-closed: se il mascheramento non matcha, non esporre mai il token.
+        $encoded_token = rawurlencode($token);
+        $masked_token = $this->mask_metadata_token($token);
+        $sp_count = 0;
+        $agg_count = 0;
+        $display_sp_url = $protected_sp_url !== '' ? str_replace($encoded_token, $masked_token, $protected_sp_url, $sp_count) : '';
+        $display_agg_url = $protected_agg_url !== '' ? str_replace($encoded_token, $masked_token, $protected_agg_url, $agg_count) : '';
+        $display_sp_url = ($sp_count === 1) ? $display_sp_url : 'URL protetto disponibile tramite il pulsante Copia';
+        $display_agg_url = ($agg_count === 1) ? $display_agg_url : 'URL protetto disponibile tramite il pulsante Copia';
+
         echo '<hr><h3>Metadata SPID SAML</h3>';
         echo '<p><strong>URL metadata SP (ufficiale/stabile):</strong> <code>' . esc_html($official_sp_url) . '</code></p>';
         echo '<p><strong>URL metadata Aggregator (ufficiale/stabile):</strong> <code>' . esc_html($official_agg_url) . '</code></p>';
@@ -1386,8 +1420,12 @@ class WP_SPID_CIE_OIDC_Admin {
         echo '<p>Stato corrente: <strong>' . ($token_required ? 'ATTIVA' : 'DISATTIVA') . '</strong></p>';
         echo '<p class="description">Valori raw opzioni: <code>spid_saml_metadata_require_token=' . esc_html(isset($options['spid_saml_metadata_require_token']) ? (string) $options['spid_saml_metadata_require_token'] : '(unset)') . '</code>, <code>spid_saml_metadata_token=' . esc_html($this->mask_metadata_token($token)) . '</code></p>';
         if ($protected_sp_url !== '') {
-            echo '<p><strong>URL protetta SP (legacy):</strong> <code>' . esc_html($protected_sp_url) . '</code></p>';
-            echo '<p><strong>URL protetta Aggregator (legacy):</strong> <code>' . esc_html($protected_agg_url) . '</code></p>';
+            echo '<p><strong>URL protetta SP (legacy):</strong> <code>' . esc_html($display_sp_url) . '</code> '
+                . '<button type="button" class="button spid-copy-protected-url" data-copy-url="' . esc_attr($protected_sp_url) . '" aria-describedby="spid-copy-metadata-status">Copia</button></p>';
+            echo '<p><strong>URL protetta Aggregator (legacy):</strong> <code>' . esc_html($display_agg_url) . '</code> '
+                . '<button type="button" class="button spid-copy-protected-url" data-copy-url="' . esc_attr($protected_agg_url) . '" aria-describedby="spid-copy-metadata-status">Copia</button></p>';
+            echo '<p class="description">Gli URL sopra sono mascherati a schermo. Usa "Copia" per copiare l\'URL completo negli appunti.</p>';
+            echo '<p id="spid-copy-metadata-status" class="description" role="status" aria-live="polite"></p>';
         }
 
         $toggle = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'spid_saml','toggle_metadata_token'=>'1'], admin_url('admin.php')), 'spid_saml_toggle_metadata_token');
