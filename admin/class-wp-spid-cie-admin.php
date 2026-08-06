@@ -521,15 +521,28 @@ class WP_SPID_CIE_OIDC_Admin {
         $spid_enabled = !empty($options['spid_enabled']) && $options['spid_enabled'] === '1';
         $spid_saml_effective_enabled = $this->is_spid_saml_effective_enabled(is_array($options) ? $options : []);
 
+        $registry_status = $this->get_registry_service()->get_status();
+        $registry_count = (int) ($registry_status['count'] ?? 0);
+        $registry_source = (string) ($registry_status['source'] ?? 'n/a');
+        $registry_fetched_at = (int) ($registry_status['fetched_at'] ?? 0);
+
         $checks = [
             'Chiavi SP presenti' => $this->spid_saml_keys_exist(),
             'Metadata URL ufficiale stabile' => true,
-            'Registry IdP' => $this->get_registry_service()->get_status()['count'] > 0,
             'SPID SAML enabled (effective)' => $spid_saml_effective_enabled,
         ];
         echo '<h3>Diagnostica generale</h3><ul class="spid-readonly-list">';
         foreach ($checks as $label => $ok) {
             echo '<li><strong>' . esc_html($label) . ':</strong> ' . ($ok ? '<span style="color:#0a7f37;">OK</span>' : '<span style="color:#b32d2e;">KO</span>') . '</li>';
+        }
+        if ($registry_fetched_at > 0) {
+            echo '<li><strong>Registry IdP:</strong> ' . esc_html((string) $registry_count)
+                . ' IdP nell\'ultimo stato registrato — '
+                . esc_html(wp_date('d/m/Y H:i:s', $registry_fetched_at))
+                . ' — sorgente ' . esc_html(strtoupper($registry_source)) . '</li>';
+        } else {
+            echo '<li><strong>Registry IdP:</strong> stato non disponibile; apri il tab SPID SAML '
+                . 'per aggiornare il registry.</li>';
         }
         echo '</ul>';
     }
