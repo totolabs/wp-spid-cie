@@ -627,8 +627,6 @@ class WP_SPID_CIE_OIDC_Admin {
             echo '<hr>';
             WP_SPID_CIE_OIDC_FiscalCodeMigration::render_panel();
         }
-        echo '<hr>';
-        $this->render_spid_saml_metadata_subtab();
     }
 
     private function render_cie_tab(): void {
@@ -1044,7 +1042,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
         $page = isset($_GET['page']) ? sanitize_key((string) wp_unslash($_GET['page'])) : '';
         $tab = isset($_GET['tab']) ? sanitize_key((string) wp_unslash($_GET['tab'])) : '';
-        if ($page !== $this->plugin_name || $tab !== 'stato') {
+        if ($page !== $this->plugin_name || $tab !== 'spid_saml') {
             return;
         }
 
@@ -1117,7 +1115,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
             $redirect_args = [
                 'page' => $this->plugin_name,
-                'tab' => 'stato',
+                'tab' => 'spid_saml',
                 'metadata_token_notice' => $notice,
             ];
             if ($reason !== '') {
@@ -1156,7 +1154,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
             $redirect_args = [
                 'page' => $this->plugin_name,
-                'tab' => 'stato',
+                'tab' => 'spid_saml',
                 'metadata_token_notice' => $notice,
             ];
             if ($reason !== '') {
@@ -1260,6 +1258,7 @@ class WP_SPID_CIE_OIDC_Admin {
         $options = get_option($this->plugin_name . '_options', []);
         $d = $this->get_spid_saml_defaults($options);
         echo '<h2>Impostazioni SPID SAML</h2>';
+        $this->render_spid_saml_metadata_notices();
         echo '<p class="description">Se lasci vuoto, usiamo automaticamente i valori del tab 1. Ente.<br>I dati anagrafici (denominazione, IPA, codice fiscale, email) vengono letti dalla Tab 1 — non è necessario reinserirli qui.</p>';
 
         echo '<p><label for="spid_saml_country_name"><strong>Paese (countryName)</strong></label></p>';
@@ -1321,6 +1320,7 @@ class WP_SPID_CIE_OIDC_Admin {
         $this->render_spid_saml_test_config();
         $this->render_spid_saml_activation_diagnostics($options);
         $this->render_spid_saml_home();
+        $this->render_spid_saml_metadata_subtab();
     }
 
 
@@ -1335,12 +1335,7 @@ class WP_SPID_CIE_OIDC_Admin {
         return substr($token, 0, 6) . str_repeat('*', max(0, strlen($token) - 10)) . substr($token, -4);
     }
 
-    private function render_spid_saml_metadata_subtab(): void {
-        $options = get_option($this->plugin_name . '_options', []);
-        if (!is_array($options)) {
-            $options = [];
-        }
-
+    private function render_spid_saml_metadata_notices(): void {
         if (isset($_GET['metadata_token_notice'])) {
             $notice = sanitize_key((string) wp_unslash($_GET['metadata_token_notice']));
             $reason = isset($_GET['metadata_token_reason']) ? sanitize_key((string) wp_unslash($_GET['metadata_token_reason'])) : '';
@@ -1366,6 +1361,13 @@ class WP_SPID_CIE_OIDC_Admin {
                 echo '<div class="notice notice-warning inline"><p>Helper mancante: stai usando fallback; reinstallare plugin completo.</p><p><strong>Reason:</strong> <code>missing_helper</code></p></div>';
             }
         }
+    }
+
+    private function render_spid_saml_metadata_subtab(): void {
+        $options = get_option($this->plugin_name . '_options', []);
+        if (!is_array($options)) {
+            $options = [];
+        }
 
         $token = isset($options['spid_saml_metadata_token']) ? (string) $options['spid_saml_metadata_token'] : '';
         $token_required = (string) ($options['spid_saml_metadata_require_token'] ?? '0') === '1';
@@ -1374,13 +1376,13 @@ class WP_SPID_CIE_OIDC_Admin {
         $protected_sp_url = $token !== '' ? add_query_arg('spid_metadata_token', rawurlencode($token), home_url('/spid/saml/metadata')) : '';
         $protected_agg_url = $token !== '' ? add_query_arg('spid_metadata_token', rawurlencode($token), home_url('/spid/saml/metadata?aggregator=1')) : '';
 
-        echo '<h2>Metadata SPID SAML</h2>';
+        echo '<hr><h3>Metadata SPID SAML</h3>';
         echo '<p><strong>URL metadata SP (ufficiale/stabile):</strong> <code>' . esc_html($official_sp_url) . '</code></p>';
         echo '<p><strong>URL metadata Aggregator (ufficiale/stabile):</strong> <code>' . esc_html($official_agg_url) . '</code></p>';
         echo '<p class="description">Gli endpoint ufficiali /sp-metadata.xml e /sp-metadata.xml?aggregator=1 sono sempre pubblici/publishable.</p>';
         echo '<p class="description">Gli URL legacy /spid/saml/metadata (anche con aggregator=1) possono richiedere token quando la protezione è attiva.</p>';
 
-        echo '<h3>Protezione opzionale con token</h3>';
+        echo '<h4>Protezione opzionale con token</h4>';
         echo '<p>Stato corrente: <strong>' . ($token_required ? 'ATTIVA' : 'DISATTIVA') . '</strong></p>';
         echo '<p class="description">Valori raw opzioni: <code>spid_saml_metadata_require_token=' . esc_html(isset($options['spid_saml_metadata_require_token']) ? (string) $options['spid_saml_metadata_require_token'] : '(unset)') . '</code>, <code>spid_saml_metadata_token=' . esc_html($this->mask_metadata_token($token)) . '</code></p>';
         if ($protected_sp_url !== '') {
@@ -1388,10 +1390,10 @@ class WP_SPID_CIE_OIDC_Admin {
             echo '<p><strong>URL protetta Aggregator (legacy):</strong> <code>' . esc_html($protected_agg_url) . '</code></p>';
         }
 
-        $toggle = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'stato','toggle_metadata_token'=>'1'], admin_url('admin.php')), 'spid_saml_toggle_metadata_token');
+        $toggle = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'spid_saml','toggle_metadata_token'=>'1'], admin_url('admin.php')), 'spid_saml_toggle_metadata_token');
         echo '<p><a class="button button-secondary" href="' . esc_url($toggle) . '">' . ($token_required ? 'Disattiva protezione token' : 'Attiva protezione token') . '</a></p>';
 
-        $regen = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'stato','regen_metadata_token'=>'1'], admin_url('admin.php')), 'spid_saml_regen_token');
+        $regen = wp_nonce_url(add_query_arg(['page'=>$this->plugin_name,'tab'=>'spid_saml','regen_metadata_token'=>'1'], admin_url('admin.php')), 'spid_saml_regen_token');
         echo '<p><a class="button button-secondary" onclick="return confirm(\'Rigenerare il token rendera invalidi i vecchi URL protetti.\');" href="' . esc_url($regen) . '">Rigenera token metadata</a></p>';
     }
 
