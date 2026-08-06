@@ -375,7 +375,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
         $tabs['spid_saml'] = ['label' => 'SPID (SAML)', 'help' => 'Configurazione tecnica e operativa SPID SAML.'];
         $tabs['cie'] = ['label' => 'CIE', 'help' => 'Configurazione CIE OIDC Federation, trust anchor/trust mark e output generati.'];
-        $tabs['stato'] = ['label' => 'Stato', 'help' => 'Dashboard stato, checklist rapida, Home SPID SAML e metadata SPID SAML.'];
+        $tabs['stato'] = ['label' => 'Stato', 'help' => 'Dashboard stato, checklist rapida e strumenti operativi.'];
 
         return $tabs;
     }
@@ -614,8 +614,6 @@ class WP_SPID_CIE_OIDC_Admin {
             echo '<hr>';
             WP_SPID_CIE_OIDC_FiscalCodeMigration::render_panel();
         }
-        echo '<hr>';
-        $this->render_spid_saml_home();
         echo '<hr>';
         $this->render_spid_saml_metadata_subtab();
     }
@@ -1177,7 +1175,7 @@ class WP_SPID_CIE_OIDC_Admin {
         $list = $registry->get_idp_list(false);
         $status = $registry->get_status();
 
-        echo '<h2>Home SPID SAML</h2>';
+        echo '<hr><h3>Stato modulo SPID SAML</h3>';
         echo '<p>Stato modulo: <strong>' . ($enabled ? 'Attivo' : 'Disattivato') . '</strong></p>';
         echo '<p>Config SP: <strong>' . ($ready ? 'OK' : 'Da completare') . '</strong></p>';
         echo '<p>Certificati SP: <strong>' . ($cert_ok ? 'OK' : 'Mancanti') . '</strong></p>';
@@ -1186,7 +1184,7 @@ class WP_SPID_CIE_OIDC_Admin {
         $count = is_array($list) ? count($list) : (int) ($status['count'] ?? 0);
         $source = (string) ($status['source'] ?? 'n/a');
         $fetchedAt = (int) ($status['fetched_at'] ?? 0);
-        echo '<hr><h3>Registry status</h3>';
+        echo '<hr><h4>Registry status</h4>';
         echo '<p>IdP caricati: <strong>' . esc_html((string) $count) . '</strong></p>';
         echo '<p>Sorgente: <strong>' . esc_html(strtoupper($source)) . '</strong></p>';
         echo '<p>Cache aggiornata: <strong>' . ($fetchedAt > 0 ? esc_html(wp_date('d/m/Y H:i:s', $fetchedAt)) : 'n/d') . '</strong></p>';
@@ -1204,7 +1202,7 @@ class WP_SPID_CIE_OIDC_Admin {
 
     private function render_idp_logos_diagnostic($list): void {
         if (!is_array($list) || empty($list)) {
-            echo '<h3>IdP logos diagnostic</h3><p class="description">Nessun IdP disponibile.</p>';
+            echo '<h4>IdP logos diagnostic</h4><p class="description">Nessun IdP disponibile.</p>';
             return;
         }
 
@@ -1216,7 +1214,7 @@ class WP_SPID_CIE_OIDC_Admin {
         $method = new ReflectionMethod($public, 'get_spid_idp_logo_by_entity');
         $method->setAccessible(true);
 
-        echo '<h3>IdP logos diagnostic</h3>';
+        echo '<h4>IdP logos diagnostic</h4>';
         echo '<table class="widefat striped spid-idp-diagnostic-table" role="table"><thead><tr><th>entity_id</th><th>name</th><th>logo_uri (registry, host)</th><th>logo_resolved (local/remote)</th></tr></thead><tbody>';
 
         foreach ($list as $item) {
@@ -1309,6 +1307,7 @@ class WP_SPID_CIE_OIDC_Admin {
         ]);
         $this->render_spid_saml_test_config();
         $this->render_spid_saml_activation_diagnostics($options);
+        $this->render_spid_saml_home();
     }
 
 
