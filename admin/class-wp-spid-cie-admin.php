@@ -519,8 +519,6 @@ class WP_SPID_CIE_OIDC_Admin {
     private function render_status_dashboard(): void {
         $options = get_option($this->plugin_name . '_options', []);
         $spid_enabled = !empty($options['spid_enabled']) && $options['spid_enabled'] === '1';
-        $spid_saml_enabled = isset($options['spid_saml_enabled']) ? (string) $options['spid_saml_enabled'] : '(unset)';
-        $spid_auth_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : 'oidc';
         $spid_saml_effective_enabled = $this->is_spid_saml_effective_enabled(is_array($options) ? $options : []);
 
         $checks = [
@@ -534,7 +532,14 @@ class WP_SPID_CIE_OIDC_Admin {
             echo '<li><strong>' . esc_html($label) . ':</strong> ' . ($ok ? '<span style="color:#0a7f37;">OK</span>' : '<span style="color:#b32d2e;">KO</span>') . '</li>';
         }
         echo '</ul>';
-        echo '<h3>Diagnostica attivazione SPID SAML</h3><ul class="spid-readonly-list">';
+    }
+
+    private function render_spid_saml_activation_diagnostics(array $options): void {
+        $spid_saml_enabled = isset($options['spid_saml_enabled']) ? (string) $options['spid_saml_enabled'] : '(unset)';
+        $spid_auth_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : 'oidc';
+        $spid_saml_effective_enabled = $this->is_spid_saml_effective_enabled($options);
+
+        echo '<hr><h3>Diagnostica attivazione SPID SAML</h3><ul class="spid-readonly-list">';
         echo '<li><strong>spid_enabled:</strong> <code>' . esc_html(isset($options['spid_enabled']) ? (string) $options['spid_enabled'] : '(unset)') . '</code></li>';
         echo '<li><strong>spid_auth_method:</strong> <code>' . esc_html($spid_auth_method !== '' ? $spid_auth_method : '(unset)') . '</code></li>';
         echo '<li><strong>spid_saml_enabled (legacy):</strong> <code>' . esc_html($spid_saml_enabled) . '</code></li>';
@@ -1303,6 +1308,7 @@ class WP_SPID_CIE_OIDC_Admin {
             'desc' => "Tolleranza (secondi) per lo sfasamento tra l'orologio del server e quello dell'IdP nella validazione temporale della Response. Vuoto = 120 (consigliato). Aumenta solo se il server ha un orologio non sincronizzato via NTP e vedi errori saml_not_yet_valid / saml_expired; meglio sincronizzare l'orologio (NTP) che alzare questo valore. Max 600.",
         ]);
         $this->render_spid_saml_test_config();
+        $this->render_spid_saml_activation_diagnostics($options);
     }
 
 
