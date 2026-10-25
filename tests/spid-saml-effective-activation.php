@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/bootstrap.php';
+
 require_once __DIR__ . '/../includes/Core/SpidSamlActivation.php';
 
 $options = [
@@ -23,3 +25,4 @@ if (!isset($aligned['spid_saml_enabled']) || $aligned['spid_saml_enabled'] !== '
 
 echo "effective_saml=true with sticky legacy flag: OK\n";
 echo "legacy alignment: OK\n";
+wp_spid_cie_test_ok('spid-saml-effective-activation');

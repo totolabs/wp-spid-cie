@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/bootstrap.php';
+
 $root = dirname(__DIR__);
 $bootstrap = $root . '/wp-spid-cie.php';
 if (!is_file($bootstrap)) {
@@ -91,4 +93,5 @@ if (strpos($missing, 'includes/Core/SpidSamlMetadataProtection.MISSING.php') ===
 }
 
 echo "OK\n";
+wp_spid_cie_test_ok('spid-plugin-bootstrap-missing-helper-smoke');
 exit(0);

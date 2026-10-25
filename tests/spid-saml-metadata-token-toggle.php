@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/bootstrap.php';
+
 if (!function_exists('wp_generate_password')) {
     function wp_generate_password($length = 12, $special_chars = true, $extra_special_chars = false) {
         return str_repeat('T', max(1, (int) $length));
@@ -153,3 +155,4 @@ if (simulated_metadata_http_status('metadata', $secured_options, '/sp-metadata.x
 }
 
 echo "metadata endpoint policy enforcement simulation: OK\n";
+wp_spid_cie_test_ok('spid-saml-metadata-token-toggle');

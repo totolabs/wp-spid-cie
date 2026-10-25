@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/bootstrap.php';
+
 error_reporting(E_ERROR | E_PARSE);
 
 function trailingslashit($path) {
@@ -78,6 +80,20 @@ function wp_upload_dir() {
 
 function get_option($name, $default = false) {
     return $default;
+}
+
+// /resolve costruisce la trust chain via transient + HTTP (87839d2): shim OFFLINE, nessuna chiamata
+// di rete. wp_remote_get fallisce sempre, quindi il runtime ricade su trust_chain = [self entity config].
+function get_transient($key) {
+    return false;
+}
+
+function set_transient($key, $value, $expiration = 0) {
+    return true;
+}
+
+function wp_remote_get($url, $args = []) {
+    return new WP_Error('offline', 'Rete disabilitata nei test.');
 }
 
 function get_bloginfo($show = '') {
@@ -208,15 +224,15 @@ assert_true(isset($entityRpMetadata['jwks']['keys'][0]), 'La metadata RP deve co
 assert_true(($entityRpMetadata['client_id'] ?? '') === $entityStatementPayload['sub'], 'client_id deve coincidere con l\'entity identifier normalizzato.');
 assert_true(in_array('automatic', $entityRpMetadata['client_registration_types'] ?? [], true), 'client_registration_types deve contenere automatic.');
 assert_true(in_array('authorization_code', $entityRpMetadata['grant_types'] ?? [], true), 'grant_types deve contenere authorization_code.');
-assert_true(!in_array('refresh_token', $entityRpMetadata['grant_types'] ?? [], true), 'grant_types non deve contenere refresh_token (non supportato da CIE OIDC Federation).');
+assert_true(in_array('refresh_token', $entityRpMetadata['grant_types'] ?? [], true), 'grant_types deve contenere refresh_token (ammesso dalla metadata policy del Trust Anchor CIE, reinserito da f58dfa7).');
 assert_true(in_array('code', $entityRpMetadata['response_types'] ?? [], true), 'response_types deve contenere code.');
 foreach (($entityRpMetadata['redirect_uris'] ?? []) as $redirect_uri) {
-    assert_true(strpos((string) $redirect_uri, 'https://example.gov.it?') === 0, 'redirect_uris deve usare HTTPS ed essere coerente con il dominio.');
+    assert_true(strpos((string) $redirect_uri, 'https://example.gov.it/?') === 0, 'redirect_uris deve usare HTTPS, essere coerente con il dominio e avere lo slash prima della query (5f21c10).');
 }
 assert_true(($entityFederationMetadata['organization_name'] ?? '') === 'Comune di Test', 'federation_entity RP deve includere organization_name.');
 assert_true(($entityFederationMetadata['homepage_uri'] ?? '') === 'https://example.gov.it', 'federation_entity RP deve includere homepage_uri.');
 assert_true(($entityFederationMetadata['policy_uri'] ?? '') === 'https://example.gov.it/privacy-policy', 'federation_entity RP deve includere policy_uri.');
-assert_true(($entityFederationMetadata['logo_uri'] ?? '') === 'https://example.gov.it/wp-admin/images/w-logo-blue.png', 'federation_entity RP deve includere logo_uri.');
+assert_true(!array_key_exists('logo_uri', $entityFederationMetadata), 'federation_entity RP non deve esporre logo_uri se non configurato (nessun default hardcoded dal fix aca2590).');
 assert_true(($entityFederationMetadata['contacts'][0] ?? '') === 'servizi@example.gov.it', 'federation_entity RP deve includere contacts.');
 assert_true(($entityFederationMetadata['federation_resolve_endpoint'] ?? '') === 'https://example.gov.it/resolve', 'federation_entity RP deve includere federation_resolve_endpoint.');
 assert_true(!array_key_exists('federation_api_endpoint', $entityFederationMetadata), 'federation_entity RP CIE iniziale non deve esporre federation_api_endpoint.');
@@ -277,3 +293,4 @@ echo "entity configuration CIE initial claims: OK\n";
 echo "entity identifier normalization: OK\n";
 echo "resolve response compatibility: OK\n";
 echo "spid-only federation compatibility: OK\n";
+wp_spid_cie_test_ok('cie-federation-entity-configuration');

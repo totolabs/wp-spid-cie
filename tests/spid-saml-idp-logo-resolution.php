@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/bootstrap.php';
+
 if (!function_exists('add_shortcode')) { function add_shortcode(...$args) {} }
 if (!function_exists('add_action')) { function add_action(...$args) {} }
 if (!function_exists('add_filter')) { function add_filter(...$args) {} }
@@ -48,3 +50,4 @@ foreach ($cases as $case) {
 }
 
 echo "SPID SAML IdP logo resolution: OK\n";
+wp_spid_cie_test_ok('spid-saml-idp-logo-resolution');
