@@ -10,6 +10,7 @@ declare(strict_types=1);
 $tests = [
     'cie-federation-entity-configuration',
     'spid-certificates-integration',
+    'spid-oidc-removal-guard',
     'spid-plugin-bootstrap-missing-helper-smoke',
     'spid-saml-effective-activation',
     'spid-saml-idp-logo-resolution',
@@ -17,6 +18,7 @@ $tests = [
     'spid-saml-metadata-official-path-and-aggregator',
     'spid-saml-metadata-token-toggle',
     'spid-saml-public-enqueue-smoke',
+    'spid-saml-readiness',
 ];
 
 $root = dirname(__DIR__);

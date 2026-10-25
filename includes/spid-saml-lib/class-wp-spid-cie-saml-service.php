@@ -59,6 +59,47 @@ class WP_SPID_CIE_OIDC_Saml_Service {
     }
 
     /**
+     * Collects the local facts used by the SPID SAML readiness policy.
+     *
+     * Local only: no Registry access and no network. helpers_ok and idp_registry_count
+     * are added by the caller.
+     *
+     * @since  1.4.2
+     * @param  array $options Plugin options.
+     * @return array private_key_path, cert_path, private_key_readable, cert_readable,
+     *               cert_valid, sp_entity_source, clock_skew.
+     */
+    public function collect_readiness_facts(array $options): array {
+        $sp = $this->build_sp_config($options);
+        $private_path = (string) $sp['private_key_path'];
+        $cert_path = (string) $sp['cert_path'];
+
+        $cert_valid = false;
+        if (class_exists('WP_SPID_CIE_OIDC_Spid_Certificates')) {
+            $status = WP_SPID_CIE_OIDC_Spid_Certificates::describe_status($options);
+            $cert_valid = !empty($status['valid']);
+        }
+
+        if (!empty($options['spid_saml_entity_id'])) {
+            $entity_source = 'saml_entity_id';
+        } elseif (!empty($options['issuer_override'])) {
+            $entity_source = 'issuer_override';
+        } else {
+            $entity_source = 'home_url';
+        }
+
+        return [
+            'private_key_path' => $private_path,
+            'cert_path' => $cert_path,
+            'private_key_readable' => file_exists($private_path) && is_readable($private_path),
+            'cert_readable' => file_exists($cert_path) && is_readable($cert_path),
+            'cert_valid' => $cert_valid,
+            'sp_entity_source' => $entity_source,
+            'clock_skew' => (int) $sp['clock_skew'],
+        ];
+    }
+
+    /**
      * Reads the manually configured IdP config from plugin options.
      *
      * @since  1.0.0

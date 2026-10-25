@@ -8,7 +8,7 @@ Plugin WordPress per l'autenticazione tramite **SPID** e **CIE** nelle Pubbliche
 
 - **SPID SAML2** — Autenticazione tramite il Sistema Pubblico di Identità Digitale con protocollo SAML 2.0. Supporto a tutti gli Identity Provider del registro AgID (inclusi IdP con firme dual-signature).
 - **CIE OIDC Federation** — Autenticazione tramite Carta d'Identità Elettronica con OpenID Connect Federation 1.0.
-- **SPID OIDC** — Supporto OpenID Connect Federation per SPID (in sviluppo).
+- **SPID solo via SAML** — SPID OIDC non è supportato in questa versione: SPID usa esclusivamente SAML 2.0.
 - **Smart Button** — Pulsante SPID conforme alle linee guida UX AgID con selezione IdP tramite menu a tendina.
 - **Generazione certificati** — Generazione one-click di chiavi RSA e certificato X.509 self-signed conformi al profilo SP pubblico SPID.
 - **Auto-provisioning utenti** — Creazione automatica dell'utente WordPress al primo accesso con username dal codice fiscale SPID/CIE.

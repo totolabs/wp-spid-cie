@@ -36,19 +36,6 @@ if ( ! defined( 'WP_SPID_CIE_OIDC_VERSION' ) ) {
 	define( 'WP_SPID_CIE_OIDC_VERSION', '1.4.1' );
 }
 
-/**
- * Mostra l'interfaccia di configurazione SPID OIDC nel pannello.
- *
- * Il profilo SPID OIDC non e' ancora stabile lato AgID: i relativi campi restano
- * nascosti per non offrire scelte non utilizzabili. Option e codice restano intatti,
- * l'interfaccia riemerge alzando questa costante (anche da wp-config.php).
- *
- * @since 1.4.1
- */
-if ( ! defined( 'WP_SPID_CIE_ENABLE_SPID_OIDC' ) ) {
-	define( 'WP_SPID_CIE_ENABLE_SPID_OIDC', false );
-}
-
 // 1. Load Composer autoloader (external libraries)
 if ( file_exists( plugin_dir_path( __FILE__ ) . 'vendor/autoload.php' ) ) {
     require_once plugin_dir_path( __FILE__ ) . 'vendor/autoload.php';
@@ -104,7 +91,6 @@ if ( ! defined( 'WP_SPID_CIE_OIDC_SAML_MISSING_HELPERS' ) ) {
 
 require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/ProviderProfileInterface.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/DiscoveryResolver.php';
-require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/SpidProviderProfile.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/CieProviderProfile.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/Providers/ProviderRegistry.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/WP/WpUserMapper.php';
@@ -154,7 +140,6 @@ function wp_spid_cie_activate() {
     $defaults = [
         'cie_trust_anchor_preprod' => '',
         'cie_trust_anchor_prod'    => 'https://oidc.registry.servizicie.interno.gov.it',
-        'spid_trust_anchor'        => '',
     ];
 
     $updated = false;

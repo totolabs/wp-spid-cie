@@ -60,6 +60,10 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
                 $this->set_status('lkg', count($lkg));
                 return $lkg;
             }
+            // Registry raggiunto ma senza IdP: stato noto (count=0). Errori tecnici: nessuno status.
+            if ($rows->get_error_code() === 'spid_registry_empty') {
+                $this->set_status($source, 0);
+            }
             return $rows;
         }
 
@@ -72,6 +76,12 @@ class WP_SPID_CIE_OIDC_Spid_Registry_Service {
         }
 
         if (empty($normalized)) {
+            $lkg = get_transient(self::LIST_LKG_TRANSIENT);
+            if (is_array($lkg) && !empty($lkg)) {
+                $this->set_status('lkg', count($lkg));
+                return $lkg;
+            }
+            $this->set_status($source, 0);
             return new WP_Error('spid_registry_empty', __('Registry SPID vuoto.', 'wp-spid-cie'));
         }
 
