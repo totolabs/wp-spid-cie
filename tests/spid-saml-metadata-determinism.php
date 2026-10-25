@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/bootstrap.php';
+
 require_once __DIR__ . '/../vendor/autoload.php';
 
 // Minimal WordPress function shims for offline regression execution.
@@ -19,12 +21,32 @@ if (!function_exists('__')) { function __($text, $domain = null) { return $text;
 if (!function_exists('trailingslashit')) { function trailingslashit($value) { return rtrim((string) $value, '/') . '/'; } }
 if (!function_exists('wp_upload_dir')) {
     function wp_upload_dir() {
-        return ['basedir' => __DIR__ . '/artifacts/uploads'];
+        return ['basedir' => __DIR__ . '/tmp-saml-determinism/uploads'];
     }
 }
 
 require_once __DIR__ . '/../includes/spid-saml-lib/class-wp-spid-cie-saml-service.php';
 require_once __DIR__ . '/../public/class-wp-spid-cie-public.php';
+
+function saml_determinism_test_remove_dir(string $dir): void {
+    if (!is_dir($dir)) {
+        return;
+    }
+    foreach (scandir($dir) ?: [] as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+        $path = $dir . DIRECTORY_SEPARATOR . $entry;
+        is_dir($path) ? saml_determinism_test_remove_dir($path) : @unlink($path);
+    }
+    @rmdir($dir);
+}
+
+// Chiavi e certificato generati vivono solo in tests/tmp-saml-determinism: rimossi a fine processo
+// anche dopo exit anticipato, eccezione o fatal.
+register_shutdown_function(static function (): void {
+    saml_determinism_test_remove_dir(__DIR__ . '/tmp-saml-determinism');
+});
 
 $uploads = wp_upload_dir();
 $keyDir = trailingslashit($uploads['basedir']) . 'wp-spid-cie-keys';
@@ -109,3 +131,4 @@ echo "SHA256#1 {$hash1}\n";
 echo "SHA256#2 {$hash2}\n";
 echo "Deterministic metadata generation: OK\n";
 echo "Signature verification: OK\n";
+wp_spid_cie_test_ok('spid-saml-metadata-determinism');

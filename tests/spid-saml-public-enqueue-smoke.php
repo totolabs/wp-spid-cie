@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/bootstrap.php';
+
 $enqueued_styles = [];
 $enqueued_scripts = [];
 
@@ -52,3 +54,4 @@ if (!in_array('wp-spid-cie', $enqueued_styles, true)) {
 }
 
 echo "public enqueue_styles smoke: OK\n";
+wp_spid_cie_test_ok('spid-saml-public-enqueue-smoke');

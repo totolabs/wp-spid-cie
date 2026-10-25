@@ -1,6 +1,8 @@
 <?php
 declare(strict_types=1);
 
+require_once __DIR__ . '/bootstrap.php';
+
 require_once __DIR__ . '/../vendor/autoload.php';
 
 if (!function_exists('add_shortcode')) { function add_shortcode(...$args) {} }
@@ -74,3 +76,4 @@ if (strpos($output, 'sp-metadata.xml?aggregator=1') === false) {
 }
 
 echo "Official metadata path normalization and aggregator URL: OK\n";
+wp_spid_cie_test_ok('spid-saml-metadata-official-path-and-aggregator');

@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/bootstrap.php';
+
 error_reporting(E_ERROR | E_PARSE);
 
 function trailingslashit($path) {
@@ -65,7 +67,26 @@ $options = [
     'sp_org_display_name' => 'Comune di Test',
 ];
 
+function spid_certificates_test_remove_dir(string $dir): void {
+    if (!is_dir($dir)) {
+        return;
+    }
+    foreach (scandir($dir) ?: [] as $entry) {
+        if ($entry === '.' || $entry === '..') {
+            continue;
+        }
+        $path = $dir . DIRECTORY_SEPARATOR . $entry;
+        is_dir($path) ? spid_certificates_test_remove_dir($path) : @unlink($path);
+    }
+    @rmdir($dir);
+}
+
 $dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir(true);
+// private.key, public.crt, csr.pem e la directory tests/tmp-keys vengono rimossi a fine processo
+// dopo PASS, FAIL o eccezione.
+register_shutdown_function(static function () use ($dir): void {
+    spid_certificates_test_remove_dir($dir);
+});
 if (is_dir($dir)) {
     foreach (glob($dir . '/*') ?: [] as $file) {
         @unlink($file);
@@ -86,3 +107,4 @@ assert_true($status['present'] === true, 'Status present deve essere true.');
 assert_true($status['valid'] === true, 'Status valid deve essere true.');
 
 echo "OK\n";
+wp_spid_cie_test_ok('spid-certificates-integration');

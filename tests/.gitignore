@@ -1,0 +1,3 @@
+# Seconda barriera contro residui dei test: NON sostituisce il cleanup allo shutdown.
+tmp-*/
+artifacts/
