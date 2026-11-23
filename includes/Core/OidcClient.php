@@ -109,7 +109,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
                 // CIE: phone_number best-effort. email NON richiesta nemmeno come
                 // non-essential perche' la sua presenza nel set di claim della authz
                 // request fa rispondere al CIE OP "unauthorized_client" al code
-                // exchange (riprodotto su tsrmpstrpsalerno.it 2026-05-29).
+                // exchange (riprodotto in produzione).
                 $userinfoClaims['phone_number'] = ['essential' => false];
                 $ro_payload['claims'] = ['userinfo' => $userinfoClaims];
             }
