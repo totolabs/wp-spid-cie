@@ -343,9 +343,8 @@ class WP_SPID_CIE_OIDC_Admin {
         add_settings_field('disclaimer_enabled', 'Attiva Messaggio Avviso', array($this, 'render_checkbox_field'), $this->plugin_name . '_disclaimer', 'disclaimer_section', 
             ['id' => 'disclaimer_enabled', 'label_for' => 'disclaimer_enabled', 'desc' => 'Mostra un box di avviso sopra i pulsanti di login.']
         );
-        $default_msg = "⚠️ <strong>Avviso Tecnico:</strong> Il servizio \"Entra con CIE\" è temporaneamente non disponibile per aggiornamento tecnico. Il login con SPID è regolarmente operativo.";
         add_settings_field('disclaimer_text', 'Testo dell\'Avviso', array($this, 'render_textarea_field'), $this->plugin_name . '_disclaimer', 'disclaimer_section', 
-            ['id' => 'disclaimer_text', 'label_for' => 'disclaimer_text', 'default' => $default_msg, 'desc' => 'HTML consentito (es. &lt;strong&gt;, &lt;br&gt;).']
+            ['id' => 'disclaimer_text', 'label_for' => 'disclaimer_text', 'desc' => 'HTML consentito (es. &lt;strong&gt;, &lt;br&gt;).']
         );
 
         // --- 5. SPID SAML (STEP 2) ---
@@ -636,9 +635,10 @@ class WP_SPID_CIE_OIDC_Admin {
 
     private function render_disclaimer_preview(): void {
         $options = get_option($this->plugin_name . '_options', []);
-        $default_msg = "⚠️ <strong>Avviso Tecnico:</strong> Il servizio \"Entra con CIE\" è temporaneamente non disponibile per aggiornamento tecnico. Il login con SPID è regolarmente operativo.";
-        $text = !empty($options['disclaimer_text']) ? (string) $options['disclaimer_text'] : $default_msg;
-
+        $text = !empty($options['disclaimer_text']) ? (string) $options['disclaimer_text'] : '';
+        if ($text === '') {
+            return;
+        }
         echo '<h4>Anteprima disclaimer</h4>';
         echo '<div class="spid-disclaimer-preview">' . wp_kses_post($text) . '</div>';
     }
