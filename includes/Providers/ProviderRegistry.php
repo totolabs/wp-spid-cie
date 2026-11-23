@@ -21,7 +21,7 @@ class WP_SPID_CIE_OIDC_ProviderRegistry {
         $this->discoveryResolver = $discoveryResolver;
         $this->wrapper = $wrapper;
 
-        $this->profiles['spid'] = new WP_SPID_CIE_OIDC_SpidProviderProfile();
+        // SPID usa solo SAML: 'spid' non è un provider OIDC e resolveConfig() lo rifiuta.
         $this->profiles['cie'] = new WP_SPID_CIE_OIDC_CieProviderProfile();
     }
 
@@ -29,8 +29,8 @@ class WP_SPID_CIE_OIDC_ProviderRegistry {
      * Returns the complete provider configuration including discovery and credentials.
      *
      * @since  1.3.0
-     * @param  string      $provider Provider key ('spid' or 'cie').
-     * @param  string|null $idp      Optional IdP identifier (SPID only).
+     * @param  string      $provider Provider key (only 'cie' is supported).
+     * @param  string|null $idp      Optional IdP identifier.
      * @return array|WP_Error Provider configuration array, or error.
      */
     public function resolveConfig(string $provider, ?string $idp = null) {
@@ -59,8 +59,9 @@ class WP_SPID_CIE_OIDC_ProviderRegistry {
     }
 
     private function isProviderEnabledByMode(string $provider, array $options): bool {
+        // provider_mode è un valore legacy in sola lettura: 'spid_only' continua a rendere CIE non disponibile.
         $mode = $options['provider_mode'] ?? 'both';
-        if ($mode === 'spid_only' && $provider !== 'spid') {
+        if ($mode === 'spid_only') {
             return false;
         }
         if ($mode === 'cie_only' && $provider !== 'cie') {
@@ -68,9 +69,6 @@ class WP_SPID_CIE_OIDC_ProviderRegistry {
         }
 
         // Backward compatibility with existing provider toggles.
-        if ($provider === 'spid' && isset($options['spid_enabled']) && $options['spid_enabled'] !== '1') {
-            return false;
-        }
         if ($provider === 'cie' && isset($options['cie_enabled']) && $options['cie_enabled'] !== '1') {
             return false;
         }

@@ -42,6 +42,11 @@ class WP_SPID_CIE_OIDC_OidcClient {
      * @return string|WP_Error Authorization URL, or error.
      */
     public function buildAuthorizationUrl(array $providerConfig, string $targetUrl, string $correlationId, ?callable $requestObjectSigner = null) {
+        // Il provider deve arrivare esplicito dal profilo: nessun fallback implicito.
+        if (empty($providerConfig['provider']) || !is_string($providerConfig['provider'])) {
+            return new WP_Error('oidc_provider_not_configured', __('Provider non configurato.', 'wp-spid-cie'));
+        }
+
         $state = bin2hex(random_bytes(16));
         $nonce = bin2hex(random_bytes(16));
         $verifier = $this->pkce->generateVerifier();
@@ -51,7 +56,7 @@ class WP_SPID_CIE_OIDC_OidcClient {
             'created_at' => time(),
             'nonce' => $nonce,
             'code_verifier' => $verifier,
-            'provider' => $providerConfig['provider'] ?? 'spid',
+            'provider' => $providerConfig['provider'],
             'target_url' => $targetUrl,
             'issuer' => $providerConfig['issuer'] ?? '',
             'correlation_id' => $correlationId,
@@ -95,23 +100,17 @@ class WP_SPID_CIE_OIDC_OidcClient {
                 'prompt' => 'consent login',
             ]);
 
-            if ($provider === 'cie' || $provider === 'spid') {
+            if ($provider === 'cie') {
                 $userinfoClaims = [
                     'given_name'                                   => ['essential' => true],
                     'family_name'                                  => ['essential' => true],
                     'https://attributes.eid.gov.it/fiscal_number' => ['essential' => true],
                 ];
-                if ($provider === 'spid') {
-                    // SPID garantisce sempre l'email (obbligatoria alla registrazione)
-                    $userinfoClaims['email'] = ['essential' => true];
-                }
-                if ($provider === 'cie') {
-                    // CIE: phone_number best-effort. email NON richiesta nemmeno come
-                    // non-essential perche' la sua presenza nel set di claim della authz
-                    // request fa rispondere al CIE OP "unauthorized_client" al code
-                    // exchange (riprodotto su tsrmpstrpsalerno.it 2026-05-29).
-                    $userinfoClaims['phone_number'] = ['essential' => false];
-                }
+                // CIE: phone_number best-effort. email NON richiesta nemmeno come
+                // non-essential perche' la sua presenza nel set di claim della authz
+                // request fa rispondere al CIE OP "unauthorized_client" al code
+                // exchange (riprodotto su tsrmpstrpsalerno.it 2026-05-29).
+                $userinfoClaims['phone_number'] = ['essential' => false];
                 $ro_payload['claims'] = ['userinfo' => $userinfoClaims];
             }
 

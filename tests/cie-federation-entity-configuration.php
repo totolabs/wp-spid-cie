@@ -226,9 +226,7 @@ assert_true(in_array('automatic', $entityRpMetadata['client_registration_types']
 assert_true(in_array('authorization_code', $entityRpMetadata['grant_types'] ?? [], true), 'grant_types deve contenere authorization_code.');
 assert_true(in_array('refresh_token', $entityRpMetadata['grant_types'] ?? [], true), 'grant_types deve contenere refresh_token (ammesso dalla metadata policy del Trust Anchor CIE, reinserito da f58dfa7).');
 assert_true(in_array('code', $entityRpMetadata['response_types'] ?? [], true), 'response_types deve contenere code.');
-foreach (($entityRpMetadata['redirect_uris'] ?? []) as $redirect_uri) {
-    assert_true(strpos((string) $redirect_uri, 'https://example.gov.it/?') === 0, 'redirect_uris deve usare HTTPS, essere coerente con il dominio e avere lo slash prima della query (5f21c10).');
-}
+assert_true(($entityRpMetadata['redirect_uris'] ?? null) === ['https://example.gov.it/?oidc_action=callback&provider=cie'], 'redirect_uris della EC deve contenere solo la callback CIE (HTTPS, slash prima della query da 5f21c10).');
 assert_true(($entityFederationMetadata['organization_name'] ?? '') === 'Comune di Test', 'federation_entity RP deve includere organization_name.');
 assert_true(($entityFederationMetadata['homepage_uri'] ?? '') === 'https://example.gov.it', 'federation_entity RP deve includere homepage_uri.');
 assert_true(($entityFederationMetadata['policy_uri'] ?? '') === 'https://example.gov.it/privacy-policy', 'federation_entity RP deve includere policy_uri.');
@@ -259,13 +257,21 @@ assert_true(($resolveRpMetadata['subject_type'] ?? '') === 'pairwise', 'Resolve 
 assert_true(($resolveRpMetadata['subject_type'] ?? '') !== 'public', 'Resolve non deve esporre subject_type=public.');
 assert_true(!array_key_exists('subject_types_supported', $resolveRpMetadata), 'Resolve RP non deve esporre subject_types_supported.');
 assert_true(!array_key_exists('jwks_uri', $resolveRpMetadata), 'Resolve non deve esporre jwks_uri.');
+assert_true(($resolveRpMetadata['redirect_uris'] ?? null) === ['https://example.gov.it/?oidc_action=callback&provider=cie'], 'redirect_uris in /resolve deve contenere solo la callback CIE.');
 assert_true(($resolveFederationMetadata['federation_resolve_endpoint'] ?? '') === 'https://example.gov.it/resolve', 'Resolve deve continuare a pubblicare l\'endpoint /resolve corretto.');
 assert_true(!array_key_exists('federation_fetch_endpoint', $resolveFederationMetadata), 'Resolve RP CIE non deve esporre federation_fetch_endpoint.');
 assert_true(!array_key_exists('federation_list_endpoint', $resolveFederationMetadata), 'Resolve RP CIE non deve esporre federation_list_endpoint.');
 assert_true(!array_key_exists('federation_trust_mark_status_endpoint', $resolveFederationMetadata), 'Resolve RP CIE non deve esporre federation_trust_mark_status_endpoint.');
 assert_true(($resolvePayload['trust_anchor'] ?? '') === 'https://oidc.registry.servizicie.interno.gov.it', 'trust_anchor deve essere normalizzato senza trailing slash.');
 
-$spidOnlyWrapper = new WP_SPID_CIE_OIDC_Wrapper([
+$expectedRedirectUris = ['https://example.gov.it/?oidc_action=callback&provider=cie'];
+
+// La self entity configuration dentro trust_chain (stub offline: catena a 1 elemento) segue la EC.
+assert_true(isset($resolvePayload['trust_chain'][0]) && is_string($resolvePayload['trust_chain'][0]), 'Resolve deve includere la self entity configuration in trust_chain[0].');
+$trustChainSelf = decode_jwt_segment($resolvePayload['trust_chain'][0], 1);
+assert_true(($trustChainSelf['metadata']['openid_relying_party']['redirect_uris'] ?? null) === $expectedRedirectUris, 'La self EC in trust_chain[0] deve esporre la sola redirect_uri CIE.');
+
+$baseWrapperConfig = [
     'organization_name' => 'Comune di Test',
     'contacts_email' => 'servizi@example.gov.it',
     'ipa_code' => 'cpdtsrs',
@@ -273,24 +279,49 @@ $spidOnlyWrapper = new WP_SPID_CIE_OIDC_Wrapper([
     'base_url' => 'https://example.gov.it',
     'entity_id' => 'https://example.gov.it',
     'key_dir' => $keyDir,
-    'cie_trust_mark_preprod' => '',
+    'cie_trust_mark_preprod' => $trustMark,
     'cie_trust_mark_prod' => '',
     'cie_trust_anchor_preprod' => '',
-    'cie_trust_anchor_prod' => '',
-    'spid_trust_anchor' => '',
-    'cie_enabled' => false,
+    'cie_trust_anchor_prod' => 'https://oidc.registry.servizicie.interno.gov.it',
+    'cie_enabled' => true,
     'spid_enabled' => true,
-]);
+];
 
-$spidOnlyEntityStatement = decode_jwt_segment($spidOnlyWrapper->getEntityStatement(), 1);
-$spidOnlyRpMetadata = (array) ($spidOnlyEntityStatement['metadata']['openid_relying_party'] ?? []);
+$rpInvariantKeys = ['client_id', 'jwks', 'grant_types', 'response_types', 'token_endpoint_auth_method', 'token_endpoint_auth_signing_alg', 'redirect_uris'];
 
-assert_true(($spidOnlyRpMetadata['jwks_uri'] ?? '') === 'https://example.gov.it/jwks.json', 'La entity configuration senza CIE deve continuare a esporre jwks_uri.');
-assert_true(!array_key_exists('authority_hints', $spidOnlyEntityStatement), 'La entity configuration SPID-only senza trust anchor configurato non deve esporre authority_hints.');
-assert_true(isset($spidOnlyEntityStatement['metadata']['federation_entity']['federation_fetch_endpoint']), 'La compatibilita SPID-only deve mantenere federation_fetch_endpoint.');
+// CIE disattivato dall'interfaccia: la EC resta in forma CIE.
+$cieOffWrapper = new WP_SPID_CIE_OIDC_Wrapper(['cie_enabled' => false] + $baseWrapperConfig);
+$cieOnWrapper = new WP_SPID_CIE_OIDC_Wrapper($baseWrapperConfig);
+$cieOffEntityStatement = decode_jwt_segment($cieOffWrapper->getEntityStatement(), 1);
+$cieOnEntityStatement = decode_jwt_segment($cieOnWrapper->getEntityStatement(), 1);
+$cieOffRpMetadata = (array) ($cieOffEntityStatement['metadata']['openid_relying_party'] ?? []);
+$cieOnRpMetadata = (array) ($cieOnEntityStatement['metadata']['openid_relying_party'] ?? []);
+$cieOffFederationMetadata = (array) ($cieOffEntityStatement['metadata']['federation_entity'] ?? []);
+
+assert_true(!array_key_exists('jwks_uri', $cieOffRpMetadata), 'Con CIE disattivato la EC non deve esporre jwks_uri.');
+foreach (['federation_api_endpoint', 'federation_fetch_endpoint', 'federation_list_endpoint', 'federation_trust_mark_status_endpoint', 'ipa_code', 'organization_identifier'] as $legacyField) {
+    assert_true(!array_key_exists($legacyField, $cieOffFederationMetadata), "Con CIE disattivato federation_entity non deve esporre {$legacyField}.");
+}
+assert_true(in_array('https://oidc.registry.servizicie.interno.gov.it', $cieOffEntityStatement['authority_hints'] ?? [], true), 'Con CIE disattivato authority_hints deve contenere il Trust Anchor CIE di produzione.');
+foreach ($rpInvariantKeys as $key) {
+    assert_true(array_key_exists($key, $cieOnRpMetadata) && ($cieOffRpMetadata[$key] ?? null) === $cieOnRpMetadata[$key], "Con CIE disattivato {$key} deve restare identico al wrapper con cie_enabled=true.");
+}
+assert_true(($cieOffRpMetadata['jwks']['keys'][0]['kid'] ?? '') !== '' && ($cieOffRpMetadata['jwks']['keys'][0]['n'] ?? '') !== '' && ($cieOffRpMetadata['jwks']['keys'][0]['e'] ?? '') !== '', 'La jwks deve contenere kid, n ed e.');
+assert_true($cieOffRpMetadata['grant_types'] === ['authorization_code', 'refresh_token'], 'grant_types deve restare authorization_code + refresh_token.');
+assert_true(($cieOffEntityStatement['trust_marks'] ?? null) === ($cieOnEntityStatement['trust_marks'] ?? null), 'Con CIE disattivato i trust_marks devono restare invariati.');
+assert_true(array_keys($cieOffFederationMetadata) === array_keys((array) ($cieOnEntityStatement['metadata']['federation_entity'] ?? [])), 'federation_entity deve avere la stessa forma con CIE attivo o disattivato.');
+
+// Nessun Trust Anchor configurato: authority_hints omesso.
+$noTaEntityStatement = decode_jwt_segment((new WP_SPID_CIE_OIDC_Wrapper(['cie_trust_anchor_prod' => ''] + $baseWrapperConfig))->getEntityStatement(), 1);
+assert_true(!array_key_exists('authority_hints', $noTaEntityStatement), 'Senza Trust Anchor CIE configurato la EC non deve esporre authority_hints.');
+
+// spid_trust_anchor eventualmente ancora presente nel DB: ignorato.
+$spidTaEntityStatement = decode_jwt_segment((new WP_SPID_CIE_OIDC_Wrapper(['spid_trust_anchor' => 'https://spid-ta.example.it'] + $baseWrapperConfig))->getEntityStatement(), 1);
+assert_true(($spidTaEntityStatement['authority_hints'] ?? null) === ['https://oidc.registry.servizicie.interno.gov.it'], 'spid_trust_anchor non deve comparire in authority_hints.');
 
 echo "entity configuration CIE initial claims: OK\n";
 echo "entity identifier normalization: OK\n";
 echo "resolve response compatibility: OK\n";
-echo "spid-only federation compatibility: OK\n";
+echo "cie disabled keeps CIE-shaped entity configuration: OK\n";
+echo "authority_hints from CIE trust anchors only: OK\n";
 wp_spid_cie_test_ok('cie-federation-entity-configuration');

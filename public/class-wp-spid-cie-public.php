@@ -93,10 +93,6 @@ class WP_SPID_CIE_OIDC_Public {
             $this->version,
             'all'
         );
-
-        wp_register_script($this->plugin_name . '-dropdown-inline', '', array(), $this->version, true);
-        wp_enqueue_script($this->plugin_name . '-dropdown-inline');
-        wp_add_inline_script($this->plugin_name . '-dropdown-inline', 'window.toggleSpidDropdown=window.toggleSpidDropdown||function(){var d=document.getElementById("spid-dropdown");var t=document.getElementById("wp-spid-cie-spid-toggle");if(!d)return;var isVisible=d.classList.toggle("visible");if(t){t.setAttribute("aria-expanded",isVisible?"true":"false");}};document.addEventListener("click",function(e){var w=document.querySelector(".spid-button-wrapper");var d=document.getElementById("spid-dropdown");var t=document.getElementById("wp-spid-cie-spid-toggle");if(w&&d&&!w.contains(e.target)){d.classList.remove("visible");if(t){t.setAttribute("aria-expanded","false");}}});');
     }
 
     private function should_enqueue_spid_saml_access_button(): bool {
@@ -120,6 +116,39 @@ class WP_SPID_CIE_OIDC_Public {
             return false;
         }
         return WP_SPID_CIE_OIDC_Spid_Saml_Activation::is_effective_enabled($options);
+    }
+
+    /**
+     * Local SPID SAML readiness: facts from the SAML service, policy from the activation helper.
+     *
+     * @param array            $options  Plugin options.
+     * @param array|WP_Error|null $idp_list Registry IdP list already loaded by the caller.
+     * @return array {ready_local, blockers, warnings, external_checks}
+     */
+    private function get_spid_saml_readiness(array $options, $idp_list): array {
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Activation') && !$this->load_spid_saml_activation_helper()) {
+            return [
+                'ready_local' => false,
+                'blockers' => [['code' => 'saml_helpers_missing', 'message' => 'Helper SAML del plugin non caricati.']],
+                'warnings' => [],
+                'external_checks' => [],
+            ];
+        }
+
+        $facts = $this->get_saml_service()->collect_readiness_facts($options);
+        $facts['helpers_ok'] = defined('WP_SPID_CIE_OIDC_SAML_HELPERS_OK')
+            ? (bool) WP_SPID_CIE_OIDC_SAML_HELPERS_OK
+            : class_exists('WP_SPID_CIE_OIDC_Spid_Saml_Metadata_Protection');
+        // Registry vuoto (array vuoto o spid_registry_empty): 0 noto. Altri errori o non-array: sconosciuto.
+        if (is_array($idp_list)) {
+            $facts['idp_registry_count'] = count($idp_list);
+        } elseif (is_wp_error($idp_list) && $idp_list->get_error_code() === 'spid_registry_empty') {
+            $facts['idp_registry_count'] = 0;
+        } else {
+            $facts['idp_registry_count'] = null;
+        }
+
+        return WP_SPID_CIE_OIDC_Spid_Saml_Activation::evaluate_readiness($options, $facts);
     }
 
     private function load_spid_saml_activation_helper(): bool {
@@ -890,7 +919,9 @@ private function extract_jwt_payload($jwt) {
         $provider = isset($_GET['provider']) ? sanitize_key(wp_unslash($_GET['provider'])) : get_query_var('provider');
         $idp = isset($_GET['idp']) ? sanitize_key(wp_unslash($_GET['idp'])) : get_query_var('idp');
 
-        if (!in_array($action, ['login', 'callback'], true) || !in_array($provider, ['spid', 'cie'], true)) {
+        // Solo CIE usa il flusso OIDC: provider=spid (SPID usa SAML) esce qui come qualsiasi
+        // provider sconosciuto, prima di Factory, logger, registry, state store o redirect.
+        if (!in_array($action, ['login', 'callback'], true) || $provider !== 'cie') {
             return;
         }
 
@@ -1111,40 +1142,27 @@ private function extract_jwt_payload($jwt) {
         } elseif ($provider_mode === 'cie_only') {
             $spid_enabled = false;
         }
-        $spid_method = isset($options['spid_auth_method']) ? sanitize_key((string) $options['spid_auth_method']) : 'oidc';
-        if (!in_array($spid_method, ['saml', 'oidc'], true)) {
-            $spid_method = 'oidc';
-        }
         $spid_visible = $spid_enabled;
-        $show_spid_saml = $spid_visible && $this->is_spid_saml_effective_enabled($options);
-        $show_spid_oidc = $spid_visible && !$show_spid_saml && $spid_method === 'oidc';
+        $show_spid_saml = false;
+        $saml_idps = null;
+        if ($spid_visible) {
+            // Lista Registry letta una sola volta: serve al conteggio della readiness e al menu SAML.
+            $saml_idps = $this->get_spid_registry_idps();
+            $readiness = $this->get_spid_saml_readiness(is_array($options) ? $options : [], $saml_idps);
+            $show_spid_saml = !empty($readiness['ready_local']);
+        }
         $saml_login_url = add_query_arg(['spid_saml_route' => 'login'], home_url('/'));
         
         // Gestione Disclaimer
         $disclaimer_enabled = isset($options['disclaimer_enabled']) && $options['disclaimer_enabled'] === '1';
         $disclaimer_text = !empty($options['disclaimer_text']) ? $options['disclaimer_text'] : '';
 
-        if (!$show_spid_oidc && !$show_spid_saml && !$cie_enabled) {
+        if (!$show_spid_saml && !$cie_enabled) {
             return '';
         }
 
         $base_url = $this->resolve_login_entry_url();
         $login_url_cie = add_query_arg(['oidc_action' => 'login', 'provider' => 'cie'], $base_url);
-
-        if (!class_exists('WP_SPID_CIE_OIDC_Factory')) {
-            require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-factory.php';
-        }
-        $client = WP_SPID_CIE_OIDC_Factory::get_client();
-        $spid_idps = $client->getSpidProviders();
-
-        $keys = array_keys($spid_idps);
-        shuffle($keys);
-        $shuffled_idps = [];
-        foreach ($keys as $key) {
-            $shuffled_idps[$key] = $spid_idps[$key];
-        }
-
-        $assets_url = plugin_dir_url(__FILE__) . 'img/';
 
         ob_start();
         ?>
@@ -1163,43 +1181,12 @@ private function extract_jwt_payload($jwt) {
 
             <span class="spid-cie-title">Accedi con Identità Digitale</span>
 
-            <?php if ($show_spid_oidc || $show_spid_saml): ?>
+            <?php if ($show_spid_saml): ?>
                 <p class="spid-cie-intro-text">SPID, il <strong>Sistema Pubblico di Identità Digitale</strong>, è il sistema di accesso che consente di utilizzare, con un'identità digitale unica, i servizi online della Pubblica Amministrazione e dei privati accreditati. Se sei già in possesso di un'identità digitale, accedi con le credenziali del tuo gestore. Se non hai ancora un'identità digitale, richiedila ad uno dei gestori.</p>
             <?php endif; ?>
 
-            <?php if ($show_spid_oidc): ?>
-                <div class="spid-button-wrapper">
-                    <?php echo $this->render_primary_auth_button('spid', 'Entra con SPID', [
-                        'href' => 'javascript:void(0)',
-                        'onclick' => 'toggleSpidDropdown()',
-                        'id' => 'wp-spid-cie-spid-toggle',
-                        'aria-expanded' => 'false',
-                        'aria-controls' => 'spid-dropdown',
-                    ]); ?>
-                    <ul id="spid-dropdown">
-                        <?php foreach($shuffled_idps as $key => $idp): ?>
-                            <?php 
-                                $url = add_query_arg(['oidc_action' => 'login', 'provider' => 'spid', 'idp' => $key], $base_url);
-                                $logo_src = $assets_url . $idp['logo']; 
-                            ?>
-                            <li class="spid-idp-item">
-                                <a href="<?php echo esc_url($url); ?>" class="spid-idp-link">
-                                    <?php if(!empty($idp['logo'])): ?>
-                                        <img src="<?php echo esc_url($logo_src); ?>" alt="<?php echo esc_attr($idp['name']); ?>" class="spid-idp-icon">
-                                    <?php endif; ?>
-                                    <span class="spid-idp-label"><?php echo esc_html($idp['name']); ?></span>
-                                </a>
-
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                </div>
-            <?php endif; ?>
-
-
             <?php if ($show_spid_saml): ?>
                 <?php
-                    $saml_idps = $this->get_spid_registry_idps();
                     if (is_array($saml_idps)) {
                         foreach ($saml_idps as &$idp_item) {
                             if (!is_array($idp_item)) {
@@ -1253,7 +1240,7 @@ private function extract_jwt_payload($jwt) {
                 </div>
             <?php endif; ?>
 
-            <?php if ($show_spid_oidc || $show_spid_saml): ?>
+            <?php if ($show_spid_saml): ?>
                 <p class="spid-info-links">
                     <a href="https://www.spid.gov.it/" target="_blank" rel="noopener noreferrer">Maggiori informazioni su SPID</a>
                     &nbsp;|&nbsp;

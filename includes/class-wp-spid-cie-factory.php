@@ -52,10 +52,8 @@ class WP_SPID_CIE_OIDC_Factory {
             'spid_saml_locality_name' => $options['spid_saml_locality_name'] ?? '',
             'base_url'          => $base_url,
             'entity_id'         => $entity_id,
-            'test_env'          => isset($options['spid_test_env']) && $options['spid_test_env'] === '1',
 			'cie_trust_anchor_preprod' => $options['cie_trust_anchor_preprod'] ?? '',
 			'cie_trust_anchor_prod'    => $options['cie_trust_anchor_prod'] ?? '',
-			'spid_trust_anchor'        => $options['spid_trust_anchor'] ?? '',
 			'cie_trust_mark_preprod' => $options['cie_trust_mark_preprod'] ?? '',
 			'cie_trust_mark_prod'    => $options['cie_trust_mark_prod'] ?? '',
 			'spid_enabled' => !empty($options['spid_enabled']) && $options['spid_enabled'] === '1',
@@ -165,59 +163,12 @@ class WP_SPID_CIE_OIDC_Wrapper {
 
     private $config;
 
-    private $spid_providers = [
-        'validator' => [
-            'name' => 'SPID Validator (Test)',
-            'issuer' => 'https://validator.spid.gov.it',
-            'auth_endpoint' => 'https://validator.spid.gov.it/oidc/op/authorization',
-            'logo' => 'spid-idp-spiditalia.svg'
-        ],
-        'poste' => [
-            'name' => 'Poste ID',
-            'issuer' => 'https://posteid.poste.it',
-            'auth_endpoint' => 'https://posteid.poste.it/j/oidc/authorization', 
-            'logo' => 'spid-idp-posteid.svg'
-        ],
-        'aruba' => [
-            'name' => 'Aruba ID',
-            'issuer' => 'https://loginspid.aruba.it',
-            'auth_endpoint' => 'https://loginspid.aruba.it/authorization',
-            'logo' => 'spid-idp-arubaid.svg'
-        ],
-        'sielte' => [
-            'name' => 'Sielte ID',
-            'issuer' => 'https://identity.sieltecloud.it',
-            'auth_endpoint' => 'https://identity.sieltecloud.it/simplesaml/module.php/oidc/authorize',
-            'logo' => 'spid-idp-sielteid.svg'
-        ],
-        'namirial' => [
-            'name' => 'Namirial ID',
-            'issuer' => 'https://idp.namirialtsp.com', 
-            'auth_endpoint' => 'https://idp.namirialtsp.com/idp/profile/oidc/authorize', 
-            'logo' => 'spid-idp-namirialid.svg'
-        ],
-    ];
-
     /**
      * @since 1.0.0
      * @param array $config Configuration map (base_url, entity_id, key_dir, etc.).
      */
     public function __construct($config) {
         $this->config = $config;
-    }
-
-    /**
-     * Returns the available SPID providers, excluding the validator in production.
-     *
-     * @since  1.0.0
-     * @return array Associative map keyed by provider ID.
-     */
-    public function getSpidProviders() {
-        $providers = $this->spid_providers;
-        if (empty($this->config['test_env'])) {
-            unset($providers['validator']);
-        }
-        return $providers;
     }
 
     /**
@@ -268,7 +219,6 @@ class WP_SPID_CIE_OIDC_Wrapper {
         $jwks_structure = ['keys' => [$jwk_item]];
 
         $endpoint_base = untrailingslashit((string) ($this->config['base_url'] ?? $sub));
-        $omit_initial_cie_claims = $this->shouldOmitInitialCieClaims();
         $rp_metadata = [
             "application_type" => "web",
             "client_id" => $sub,
@@ -278,7 +228,6 @@ class WP_SPID_CIE_OIDC_Wrapper {
             "contacts" => [$this->config['contacts_email']],
             "grant_types" => ["authorization_code", "refresh_token"],
             "redirect_uris" => [
-                add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], trailingslashit($endpoint_base)),
                 add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], trailingslashit($endpoint_base))
             ],
             "response_types" => ["code"],
@@ -291,10 +240,6 @@ class WP_SPID_CIE_OIDC_Wrapper {
             "token_endpoint_auth_signing_alg" => "RS256"
         ];
 
-        if (!$omit_initial_cie_claims) {
-            $rp_metadata["jwks_uri"] = $endpoint_base . '/jwks.json';
-        }
-
         $payload = [
             "iss" => $sub,
             "sub" => $sub,
@@ -303,7 +248,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
             "jwks" => $jwks_structure,
             "metadata" => [
                 "openid_relying_party" => $rp_metadata,
-                "federation_entity" => $this->buildFederationEntityMetadata($endpoint_base, !$omit_initial_cie_claims)
+                "federation_entity" => $this->buildFederationEntityMetadata($endpoint_base)
             ]
         ];
 
@@ -346,7 +291,6 @@ class WP_SPID_CIE_OIDC_Wrapper {
         $jwks_structure = ['keys' => [$jwk_item]];
 
         $endpoint_base = untrailingslashit((string) ($this->config['base_url'] ?? $base_sub));
-        $omit_initial_cie_claims = $this->shouldOmitInitialCieClaims();
 
         $payload = [
             'iss' => $base_sub,
@@ -364,7 +308,6 @@ class WP_SPID_CIE_OIDC_Wrapper {
                     'contacts' => [$this->config['contacts_email']],
                     'grant_types' => ['authorization_code', 'refresh_token'],
                     'redirect_uris' => [
-                        add_query_arg(['oidc_action' => 'callback', 'provider' => 'spid'], trailingslashit($endpoint_base)),
                         add_query_arg(['oidc_action' => 'callback', 'provider' => 'cie'], trailingslashit($endpoint_base))
                     ],
                     'response_types' => ['code'],
@@ -376,7 +319,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
                     'token_endpoint_auth_method' => 'private_key_jwt',
                     'token_endpoint_auth_signing_alg' => 'RS256'
                 ],
-                'federation_entity' => $this->buildFederationEntityMetadata($endpoint_base, !$omit_initial_cie_claims)
+                'federation_entity' => $this->buildFederationEntityMetadata($endpoint_base)
             ]
         ];
 
@@ -562,7 +505,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
         return $this->base64url_encode(hash('sha256', $verifier, true));
     }
 
-    private function buildFederationEntityMetadata(string $endpoint_base, bool $include_extended_fields): array {
+    private function buildFederationEntityMetadata(string $endpoint_base): array {
         $metadata = [
             'organization_name' => $this->config['organization_name'],
             'homepage_uri' => $endpoint_base,
@@ -574,22 +517,6 @@ class WP_SPID_CIE_OIDC_Wrapper {
         if (!empty($this->config['logo_uri'])) {
             $metadata['logo_uri'] = $this->config['logo_uri'];
         }
-
-        if (!$include_extended_fields) {
-            return $metadata;
-        }
-
-        $org_id_val = $this->config['ipa_code'];
-        if (!empty($this->config['fiscal_number'])) {
-            $org_id_val = $this->config['fiscal_number'];
-        }
-
-        $metadata['federation_api_endpoint'] = $endpoint_base . '/.well-known/openid-federation';
-        $metadata['federation_fetch_endpoint'] = $endpoint_base . '/fetch';
-        $metadata['federation_list_endpoint'] = $endpoint_base . '/list';
-        $metadata['federation_trust_mark_status_endpoint'] = $endpoint_base . '/trust_mark_status';
-        $metadata['ipa_code'] = $this->config['ipa_code'];
-        $metadata['organization_identifier'] = 'PA:IT-' . $org_id_val;
 
         return $metadata;
     }
@@ -614,25 +541,16 @@ class WP_SPID_CIE_OIDC_Wrapper {
         return untrailingslashit(trim($value));
     }
 
-    private function shouldOmitInitialCieClaims(): bool {
-        return !empty($this->config['cie_enabled']);
-    }
-
     private function buildAuthorityHints(): array {
         $authority_hints = [];
 
-        if (!empty($this->config['cie_enabled'])) {
-            if (!empty($this->config['cie_trust_anchor_preprod'])) {
-                $authority_hints[] = untrailingslashit((string) $this->config['cie_trust_anchor_preprod']);
-            }
-
-            if (!empty($this->config['cie_trust_anchor_prod'])) {
-                $authority_hints[] = untrailingslashit((string) $this->config['cie_trust_anchor_prod']);
-            }
+        // Dipende solo dai Trust Anchor CIE configurati, non dal flag cie_enabled dell'interfaccia.
+        if (!empty($this->config['cie_trust_anchor_preprod'])) {
+            $authority_hints[] = untrailingslashit((string) $this->config['cie_trust_anchor_preprod']);
         }
 
-        if (!empty($this->config['spid_enabled']) && !empty($this->config['spid_trust_anchor'])) {
-            $authority_hints[] = untrailingslashit((string) $this->config['spid_trust_anchor']);
+        if (!empty($this->config['cie_trust_anchor_prod'])) {
+            $authority_hints[] = untrailingslashit((string) $this->config['cie_trust_anchor_prod']);
         }
 
         return array_values(array_unique(array_filter($authority_hints)));
