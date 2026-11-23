@@ -165,9 +165,9 @@ function build_test_jwt(array $payload): string {
 
 $certificateOptions = [
     'organization_name' => 'Comune di Test',
-    'spid_saml_locality_name' => 'Salerno',
+    'spid_saml_locality_name' => 'Roma',
     'issuer_override' => 'https://example.gov.it/',
-    'ipa_code' => 'cpdtsrs',
+    'ipa_code' => 'c_test',
     'spid_saml_common_name' => 'Comune di Test',
     'sp_org_display_name' => 'Comune di Test',
 ];
@@ -187,7 +187,7 @@ $trustMark = build_test_jwt(['id' => 'https://example.gov.it/trust-mark/test']);
 $wrapper = new WP_SPID_CIE_OIDC_Wrapper([
     'organization_name' => 'Comune di Test',
     'contacts_email' => 'servizi@example.gov.it',
-    'ipa_code' => 'cpdtsrs',
+    'ipa_code' => 'c_test',
     'fiscal_number' => '',
     'base_url' => 'https://example.gov.it',
     'entity_id' => 'https://example.gov.it/',
@@ -274,7 +274,7 @@ assert_true(($trustChainSelf['metadata']['openid_relying_party']['redirect_uris'
 $baseWrapperConfig = [
     'organization_name' => 'Comune di Test',
     'contacts_email' => 'servizi@example.gov.it',
-    'ipa_code' => 'cpdtsrs',
+    'ipa_code' => 'c_test',
     'fiscal_number' => '',
     'base_url' => 'https://example.gov.it',
     'entity_id' => 'https://example.gov.it',

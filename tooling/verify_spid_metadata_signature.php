@@ -19,11 +19,11 @@ $metadataPath = $outDir . '/sp-metadata.xml';
 
 $dn = [
     'countryName' => 'IT',
-    'stateOrProvinceName' => 'Campania',
-    'localityName' => 'Salerno',
-    'organizationName' => 'Totolabs',
-    'commonName' => 'tsrmpstrpsalerno.it',
-    'emailAddress' => 'info@tsrmpstrpsalerno.it',
+    'stateOrProvinceName' => 'Lazio',
+    'localityName' => 'Roma',
+    'organizationName' => 'Ente di Test',
+    'commonName' => 'sp.example.test',
+    'emailAddress' => 'spid@example.test',
 ];
 
 $keyResource = openssl_pkey_new([
@@ -61,7 +61,7 @@ $doc->formatOutput = false;
 $entity = $doc->createElementNS('urn:oasis:names:tc:SAML:2.0:metadata', 'md:EntityDescriptor');
 $entity->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:ds', 'http://www.w3.org/2000/09/xmldsig#');
 $entity->setAttributeNS('http://www.w3.org/2000/xmlns/', 'xmlns:spid', 'https://spid.gov.it/saml-extensions');
-$entity->setAttribute('entityID', 'https://tsrmpstrpsalerno.it');
+$entity->setAttribute('entityID', 'https://sp.example.test');
 $entity->setAttribute('ID', 'spid-metadata');
 $entity->setIdAttribute('ID', true);
 $doc->appendChild($entity);

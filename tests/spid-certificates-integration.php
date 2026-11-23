@@ -60,9 +60,9 @@ function assert_true($condition, $message) {
 
 $options = [
     'organization_name' => 'Comune di Test',
-    'spid_saml_locality_name' => 'Salerno',
-    'spid_saml_entity_id' => 'https://tsrmpstrpsalerno.it',
-    'ipa_code' => 'cpdtsrs',
+    'spid_saml_locality_name' => 'Roma',
+    'spid_saml_entity_id' => 'https://sp.example.test',
+    'ipa_code' => 'c_test',
     'spid_saml_common_name' => 'Comune di Test',
     'sp_org_display_name' => 'Comune di Test',
 ];

@@ -84,3 +84,6 @@ tests/test_spid_error_mapping.php
 
 # Documentation PDFs — local reference only
 docs/*.pdf
+
+# Tooling artifacts (generated test key/cert: never commit)
+/tooling/artifacts/

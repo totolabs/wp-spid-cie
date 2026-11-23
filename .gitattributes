@@ -1,0 +1,24 @@
+# Development/repository-only files: excluded from `git archive` release artifacts.
+# All project-specific patterns are anchored to the repository root.
+
+/.gitattributes export-ignore
+/.gitignore export-ignore
+/CONTRIBUTING.md export-ignore
+/README.md export-ignore
+/composer.json export-ignore
+/composer.lock export-ignore
+
+/docs export-ignore
+/docs/** export-ignore
+/tests export-ignore
+/tests/** export-ignore
+/tooling export-ignore
+/tooling/** export-ignore
+/lib export-ignore
+/lib/** export-ignore
+
+/languages/.gitkeep export-ignore
+
+# Dead legacy shim: invalid PHP and unused at runtime.
+# Kept in source history until workstream B removes it.
+/includes/class-wp-spid-cie-xmlseclibs.php export-ignore

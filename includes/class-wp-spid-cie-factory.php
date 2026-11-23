@@ -402,7 +402,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
     // un'interpretazione errata: la causa di "La sessione non e' piu' valida" del
     // CIE OP era il claim "sub" nel payload (rimosso in 4141bb1), non il typ. Lasciare
     // entity-statement+jwt qui causa unauthorized_client al code exchange (riprodotto
-    // su tsrmpstrpsalerno.it 2026-05-29 con correlation_id e40e529b6778c1bc).
+    // in produzione).
     public function signRequestObject(array $payload): string {
         return $this->signGenericJwt($payload, 'oauth-authz-req+jwt');
     }
