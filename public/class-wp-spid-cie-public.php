@@ -835,25 +835,11 @@ class WP_SPID_CIE_OIDC_Public {
 	}
 
 	private function resolve_spid_saml_active_key_dir(): string {
-		$upload_dir = wp_upload_dir();
-		$base_dir = trailingslashit($upload_dir['basedir']);
-
-		$primary_dir = $base_dir . 'wp-spid-cie-keys';
-		$fallback_dir = $base_dir . 'spid-cie-oidc-keys';
-		$primary_private = trailingslashit($primary_dir) . 'private.key';
-		$primary_cert = trailingslashit($primary_dir) . 'public.crt';
-		$fallback_private = trailingslashit($fallback_dir) . 'private.key';
-		$fallback_cert = trailingslashit($fallback_dir) . 'public.crt';
-
-		if (file_exists($primary_private) && is_readable($primary_private) && file_exists($primary_cert) && is_readable($primary_cert)) {
-			return $primary_dir;
+		// Un solo resolver nel plugin: PRIMARY-only (vedi WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir).
+		if (!class_exists('WP_SPID_CIE_OIDC_Factory')) {
+			require_once dirname(__DIR__) . '/includes/class-wp-spid-cie-factory.php';
 		}
-
-		if (file_exists($fallback_private) && is_readable($fallback_private) && file_exists($fallback_cert) && is_readable($fallback_cert)) {
-			return $fallback_dir;
-		}
-
-		return $primary_dir;
+		return WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir(false);
 	}
 
 	private function resolve_spid_saml_key_path(string $filename): string {
