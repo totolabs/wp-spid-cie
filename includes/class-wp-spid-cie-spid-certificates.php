@@ -26,11 +26,30 @@ class WP_SPID_CIE_OIDC_Spid_Certificates {
         $cert_path = trailingslashit($key_dir) . 'public.crt';
         $csr_path = trailingslashit($key_dir) . 'csr.pem';
 
-        if (!$force && file_exists($private_path) && file_exists($cert_path)) {
+        // Fail-closed: senza $force si genera SOLO se la primaria non contiene ne' private.key ne' public.crt.
+        // Qualunque file gia' presente (anche non leggibile) blocca la generazione: nessuna sovrascrittura
+        // e nessuna nuova identita' implicita. $force === true resta la rotazione esplicita.
+        if (!$force && (file_exists($private_path) || file_exists($cert_path))) {
+            $pair = self::inspect_key_pair($private_path, $cert_path);
+            $blocked = [
+                'partial' => 'Coppia chiave/certificato incompleta: generazione automatica bloccata. Ripristinare la coppia dal backup o rigenerarla esplicitamente.',
+                'missing' => 'Chiave privata/certificato presenti ma non leggibili: generazione automatica bloccata. Verificare i permessi o ripristinare dal backup.',
+                'invalid' => 'Chiave privata o certificato non validi: generazione automatica bloccata. Ripristinare la coppia dal backup o rigenerarla esplicitamente.',
+                'mismatch' => 'La chiave privata non combacia con il certificato: generazione automatica bloccata. Ripristinare la coppia dal backup o rigenerarla esplicitamente.',
+            ];
+            if (isset($blocked[$pair['state']])) {
+                return ['success' => false, 'errors' => [$blocked[$pair['state']]]];
+            }
+
             $status = self::validate($private_path, $cert_path, $options);
             if ($status['valid']) {
                 return ['success' => true, 'paths' => ['private' => $private_path, 'cert' => $cert_path, 'csr' => $csr_path], 'errors' => []];
             }
+
+            return ['success' => false, 'errors' => array_merge(
+                ['Coppia esistente non conforme ai requisiti SPID/configurazione: generazione automatica bloccata (usare la rigenerazione esplicita).'],
+                $status['errors']
+            )];
         }
 
         if (!extension_loaded('openssl')) {
@@ -251,21 +270,89 @@ class WP_SPID_CIE_OIDC_Spid_Certificates {
             $errors[] = 'certificatePolicies non contiene gli OID SPID richiesti.';
         }
 
-        $private_key = openssl_pkey_get_private($private_pem);
-        $public_key = openssl_pkey_get_public($cert_pem);
-        if ($private_key === false || $public_key === false) {
+        $pair = self::inspect_key_pair($private_path, $cert_path);
+        if ($pair['state'] === 'mismatch') {
+            $errors[] = 'La chiave privata non combacia con il certificato (modulus mismatch).';
+        } elseif ($pair['state'] !== 'valid') {
             $errors[] = 'Impossibile caricare chiave privata/pubblica per verifica modulus.';
-        } else {
-            $private_details = openssl_pkey_get_details($private_key);
-            $public_details = openssl_pkey_get_details($public_key);
-            $private_modulus = isset($private_details['rsa']['n']) ? bin2hex($private_details['rsa']['n']) : '';
-            $public_modulus = isset($public_details['rsa']['n']) ? bin2hex($public_details['rsa']['n']) : '';
-            if ($private_modulus === '' || $public_modulus === '' || !hash_equals($private_modulus, $public_modulus)) {
-                $errors[] = 'La chiave privata non combacia con il certificato (modulus mismatch).';
-            }
         }
 
         return ['valid' => empty($errors), 'errors' => $errors, 'cert' => $cert_data];
+    }
+
+    /**
+     * Ispeziona la coppia private.key/public.crt senza scrivere nulla e senza mai sollevare eccezioni.
+     *
+     * state: 'missing'  entrambi assenti o non leggibili;
+     *        'partial'  solo uno dei due presente e leggibile;
+     *        'invalid'  entrambi leggibili ma almeno uno non caricabile come chiave privata RSA / certificato X.509;
+     *        'mismatch' entrambi validi ma con modulus RSA diverso (identita' diverse);
+     *        'valid'    entrambi validi e con lo stesso modulus.
+     * I messaggi non contengono mai PEM, path o altro materiale crittografico.
+     *
+     * @param  string $private_path Path della chiave privata.
+     * @param  string $cert_path    Path del certificato X.509.
+     * @return array{state:string, private_readable:bool, cert_readable:bool, coherent:bool|null, errors:array}
+     */
+    public static function inspect_key_pair(string $private_path, string $cert_path): array {
+        $private_readable = is_file($private_path) && is_readable($private_path);
+        $cert_readable = is_file($cert_path) && is_readable($cert_path);
+        $result = [
+            'state' => 'missing',
+            'private_readable' => $private_readable,
+            'cert_readable' => $cert_readable,
+            'coherent' => null,
+            'errors' => [],
+        ];
+
+        if (!$private_readable && !$cert_readable) {
+            $result['errors'][] = 'Chiave privata e certificato assenti o non leggibili.';
+            return $result;
+        }
+        if ($private_readable !== $cert_readable) {
+            $result['state'] = 'partial';
+            $result['errors'][] = $private_readable ? 'Certificato assente o non leggibile.' : 'Chiave privata assente o non leggibile.';
+            return $result;
+        }
+
+        $private_modulus = '';
+        $cert_modulus = '';
+        try {
+            $private_pem = @file_get_contents($private_path);
+            $cert_pem = @file_get_contents($cert_path);
+            if (is_string($private_pem) && is_string($cert_pem) && @openssl_x509_parse($cert_pem, false) !== false) {
+                $private_key = @openssl_pkey_get_private($private_pem);
+                $public_key = @openssl_pkey_get_public($cert_pem);
+                if ($private_key !== false && $public_key !== false) {
+                    $private_details = @openssl_pkey_get_details($private_key);
+                    $public_details = @openssl_pkey_get_details($public_key);
+                    $private_modulus = isset($private_details['rsa']['n']) ? bin2hex($private_details['rsa']['n']) : '';
+                    $cert_modulus = isset($public_details['rsa']['n']) ? bin2hex($public_details['rsa']['n']) : '';
+                }
+            }
+        } catch (\Throwable $e) {
+            $private_modulus = '';
+            $cert_modulus = '';
+        }
+        while (openssl_error_string() !== false) {
+            // Svuota la coda errori OpenSSL: non deve inquinare i messaggi di operazioni successive.
+        }
+
+        if ($private_modulus === '' || $cert_modulus === '') {
+            $result['state'] = 'invalid';
+            $result['errors'][] = 'Chiave privata RSA o certificato X.509 non caricabili.';
+            return $result;
+        }
+
+        $result['coherent'] = hash_equals($private_modulus, $cert_modulus);
+        if (!$result['coherent']) {
+            $result['state'] = 'mismatch';
+            $result['errors'][] = 'La chiave privata non combacia con il certificato (modulus mismatch).';
+            return $result;
+        }
+
+        $result['state'] = 'valid';
+        return $result;
     }
 
     /**

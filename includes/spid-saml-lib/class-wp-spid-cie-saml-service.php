@@ -12,25 +12,11 @@ class WP_SPID_CIE_OIDC_Saml_Service {
     const RESP_TTL = 600;
 
     private function resolve_active_key_dir(): string {
-        $upload_dir = wp_upload_dir();
-        $base_dir = trailingslashit($upload_dir['basedir']);
-
-        $primary_dir = $base_dir . 'wp-spid-cie-keys';
-        $fallback_dir = $base_dir . 'spid-cie-oidc-keys';
-
-        $primary_private = trailingslashit($primary_dir) . 'private.key';
-        $primary_cert = trailingslashit($primary_dir) . 'public.crt';
-        if (file_exists($primary_private) && is_readable($primary_private) && file_exists($primary_cert) && is_readable($primary_cert)) {
-            return $primary_dir;
+        // Un solo resolver nel plugin: PRIMARY-only (vedi WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir).
+        if (!class_exists('WP_SPID_CIE_OIDC_Factory')) {
+            require_once dirname(__DIR__) . '/class-wp-spid-cie-factory.php';
         }
-
-        $fallback_private = trailingslashit($fallback_dir) . 'private.key';
-        $fallback_cert = trailingslashit($fallback_dir) . 'public.crt';
-        if (file_exists($fallback_private) && is_readable($fallback_private) && file_exists($fallback_cert) && is_readable($fallback_cert)) {
-            return $fallback_dir;
-        }
-
-        return $primary_dir;
+        return WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir(false);
     }
 
     /**
@@ -152,7 +138,20 @@ class WP_SPID_CIE_OIDC_Saml_Service {
      * @param  array  $requestContext Additional context stored with the request ID.
      * @return string Redirect URL with SAMLRequest and Signature query params.
      */
-    public function build_authn_request_redirect(array $sp, array $idp, string $relayState, array $requestContext = []): string {
+    /**
+     * @return string|WP_Error URL di redirect firmato, oppure WP_Error se la configurazione SP non e' utilizzabile.
+     *                        (Nessun tipo di ritorno dichiarato: con ': string' i rami WP_Error causerebbero TypeError.)
+     */
+    public function build_authn_request_redirect(array $sp, array $idp, string $relayState, array $requestContext = []) {
+        // Non firmare con una coppia assente/parziale/invalida/incoerente (stesso controllo canonico di H2).
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Certificates')) {
+            require_once dirname(__DIR__) . '/class-wp-spid-cie-spid-certificates.php';
+        }
+        $pair = WP_SPID_CIE_OIDC_Spid_Certificates::inspect_key_pair((string) ($sp['private_key_path'] ?? ''), (string) ($sp['cert_path'] ?? ''));
+        if (($pair['state'] ?? '') !== 'valid') {
+            return new WP_Error('saml_sp_key_pair_invalid', __('Configurazione SPID SAML incompleta.', 'wp-spid-cie'));
+        }
+
         if (strlen($relayState) > 512) {
             $relayState = home_url('/');
         }

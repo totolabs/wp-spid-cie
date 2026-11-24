@@ -9,8 +9,10 @@ defined( 'ABSPATH' ) || exit;
  * @subpackage WP_SPID_CIE_OIDC/includes
  */
 
-if ( file_exists( plugin_dir_path( dirname( __FILE__ ) ) . 'vendor/autoload.php' ) ) {
-    require_once plugin_dir_path( dirname( __FILE__ ) ) . 'vendor/autoload.php';
+// Path relativo al file (equivalente a plugin_dir_path(dirname(__FILE__))): la Factory deve poter essere
+// caricata on demand dai consumer SAML anche prima che le funzioni WordPress siano disponibili.
+if ( file_exists( dirname( __DIR__ ) . '/vendor/autoload.php' ) ) {
+    require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 }
 
 use SPID_CIE_OIDC_PHP\Core\Util;
@@ -66,29 +68,23 @@ class WP_SPID_CIE_OIDC_Factory {
     }
 
     /**
-     * Resolves the filesystem path to the active key directory.
+     * Resolves the filesystem path to the plugin key directory.
+     *
+     * The ONLY runtime key identity is the primary directory uploads/wp-spid-cie-keys: the legacy
+     * uploads/spid-cie-oidc-keys is never used as a key source (no automatic fallback), so a damaged
+     * or missing primary pair can never silently switch the published identity (kid/certificate).
      *
      * @since  1.0.0
-     * @param  bool $for_generation When true, always returns (and creates) the primary dir.
-     * @return string Absolute path to the key directory.
+     * @param  bool $for_generation false = pure read: no directory or file is created.
+     *                              true  = generation path: creates the primary dir and its .htaccess if missing.
+     * @return string Absolute path to the primary key directory (always the same identity).
      */
     public static function resolve_spid_key_dir(bool $for_generation = false): string {
-        $upload_dir = wp_upload_dir();
-        $base_dir = trailingslashit($upload_dir['basedir']);
+        $upload_dir = wp_upload_dir(null, $for_generation);
+        $primary_dir = trailingslashit($upload_dir['basedir']) . 'wp-spid-cie-keys';
 
-        $primary_dir = $base_dir . 'wp-spid-cie-keys';
-        $fallback_dir = $base_dir . 'spid-cie-oidc-keys';
-        $primary_private = trailingslashit($primary_dir) . 'private.key';
-        $primary_cert = trailingslashit($primary_dir) . 'public.crt';
-        $fallback_private = trailingslashit($fallback_dir) . 'private.key';
-        $fallback_cert = trailingslashit($fallback_dir) . 'public.crt';
-
-        if (file_exists($primary_private) && is_readable($primary_private) && file_exists($primary_cert) && is_readable($primary_cert)) {
+        if (!$for_generation) {
             return $primary_dir;
-        }
-
-        if (!$for_generation && file_exists($fallback_private) && is_readable($fallback_private) && file_exists($fallback_cert) && is_readable($fallback_cert)) {
-            return $fallback_dir;
         }
 
         if (!is_dir($primary_dir)) {
@@ -154,6 +150,19 @@ class WP_SPID_CIE_OIDC_Factory {
 }
 
 /**
+ * Coppia chiave privata/certificato del plugin non utilizzabile (assente, parziale, invalida o incoerente).
+ * Il messaggio e' fisso e generico: non contiene mai path, PEM o dettagli OpenSSL/phpseclib e non va
+ * usato come body HTTP.
+ *
+ * @since 1.4.2
+ */
+class WP_SPID_CIE_OIDC_Key_Unavailable_Exception extends \RuntimeException {
+    public function __construct() {
+        parent::__construct('Coppia chiave/certificato del plugin non disponibile.');
+    }
+}
+
+/**
  * Wraps SPID/CIE provider configuration and JWT-signing operations.
  *
  * @since   1.0.0
@@ -195,6 +204,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
      * @return string JSON-encoded JWK Set.
      */
     public function getJwks() {
+        $this->assert_usable_key_pair();
         $jwk_item = $this->buildJwkItem();
         $jwks = ['keys' => [$jwk_item]];
         return json_encode($jwks);
@@ -208,6 +218,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
      * @throws Exception On signing or key-loading failure.
      */
     public function getEntityStatement() {
+        $this->assert_usable_key_pair();
         $now = time();
         $exp = $now + 21600; // 6 hours
         $sub = $this->getEntityId();
@@ -275,6 +286,7 @@ class WP_SPID_CIE_OIDC_Wrapper {
      * @throws Exception On signing or key-loading failure.
      */
     public function getResolveResponse($sub = '', $trust_anchor = '') {
+        $this->assert_usable_key_pair();
         $base_sub = $this->getEntityId();
         if ($base_sub === '') {
             throw new Exception('Issuer base_url non configurato');
@@ -370,8 +382,10 @@ class WP_SPID_CIE_OIDC_Wrapper {
     // --- Private Helpers ---
 
     private function buildJwkItem() {
-        $crt_content = file_get_contents($this->config['key_dir'] . '/public.crt');
-        if (!$crt_content) throw new Exception("Chiave pubblica non trovata.");
+        $crt_content = @file_get_contents($this->config['key_dir'] . '/public.crt');
+        if (!is_string($crt_content) || $crt_content === '') {
+            throw new WP_SPID_CIE_OIDC_Key_Unavailable_Exception();
+        }
         $key = \phpseclib3\Crypt\PublicKeyLoader::load($crt_content);
         $jwk_native = json_decode($key->toString('JWK'), true);
         if (isset($jwk_native['keys'][0])) $jwk_native = $jwk_native['keys'][0];
@@ -404,11 +418,13 @@ class WP_SPID_CIE_OIDC_Wrapper {
     // entity-statement+jwt qui causa unauthorized_client al code exchange (riprodotto
     // in produzione).
     public function signRequestObject(array $payload): string {
+        $this->assert_usable_key_pair();
         return $this->signGenericJwt($payload, 'oauth-authz-req+jwt');
     }
 
     // Sign client_assertion (private_key_jwt) per token endpoint CIE/SPID OIDC
     public function signClientAssertion(array $payload): string {
+        $this->assert_usable_key_pair();
         return $this->signGenericJwt($payload, 'JWT');
     }
 
@@ -418,13 +434,14 @@ class WP_SPID_CIE_OIDC_Wrapper {
      * userinfo_encrypted_response_enc=A256CBC-HS512 (policy registry consente anche
      * RSA-OAEP-256 / A128CBC-HS256). Ritorna il payload del JWS interno (compact form).
      *
-     * @throws \Exception su errore di caricamento chiave o decryption fallita.
+     * @throws WP_SPID_CIE_OIDC_Key_Unavailable_Exception se la coppia di chiavi non e' utilizzabile.
+     * @throws \Exception su decryption fallita.
      */
     public function decryptUserInfoJwe(string $jwe): string {
-        $privateKeyPath = $this->config['key_dir'] . '/private.key';
-        $privateKeyPem  = @file_get_contents($privateKeyPath);
-        if ($privateKeyPem === false) {
-            throw new \Exception('Private key not found at ' . $privateKeyPath);
+        $this->assert_usable_key_pair();
+        $privateKeyPem = @file_get_contents($this->config['key_dir'] . '/private.key');
+        if (!is_string($privateKeyPem) || $privateKeyPem === '') {
+            throw new WP_SPID_CIE_OIDC_Key_Unavailable_Exception();
         }
 
         $jwk = \Jose\Component\KeyManagement\JWKFactory::createFromKey($privateKeyPem);
@@ -456,7 +473,10 @@ class WP_SPID_CIE_OIDC_Wrapper {
     }
 
     private function signGenericJwt($payload, $typ) {
-        $privateKeyContent = file_get_contents($this->config['key_dir'] . '/private.key');
+        $privateKeyContent = @file_get_contents($this->config['key_dir'] . '/private.key');
+        if (!is_string($privateKeyContent) || $privateKeyContent === '') {
+            throw new WP_SPID_CIE_OIDC_Key_Unavailable_Exception();
+        }
         $rsa = \phpseclib3\Crypt\RSA::load($privateKeyContent);
         $rsa = $rsa->withHash('sha256')->withPadding(\phpseclib3\Crypt\RSA::SIGNATURE_PKCS1);
 
@@ -484,7 +504,10 @@ class WP_SPID_CIE_OIDC_Wrapper {
     }
 
     private function getKid() {
-        $crt = file_get_contents($this->config['key_dir'] . '/public.crt');
+        $crt = @file_get_contents($this->config['key_dir'] . '/public.crt');
+        if (!is_string($crt) || $crt === '') {
+            throw new WP_SPID_CIE_OIDC_Key_Unavailable_Exception();
+        }
         $key = \phpseclib3\Crypt\PublicKeyLoader::load($crt);
         $jwk_native = json_decode($key->toString('JWK'), true);
         if (isset($jwk_native['keys'][0])) $jwk_native = $jwk_native['keys'][0];
@@ -492,6 +515,26 @@ class WP_SPID_CIE_OIDC_Wrapper {
         ksort($jwk);
         $json = json_encode($jwk, JSON_UNESCAPED_SLASHES);
         return $this->base64url_encode(hash('sha256', $json, true));
+    }
+
+    /**
+     * Preflight della coppia PRIMARY: prosegue solo se inspect_key_pair() la classifica 'valid'.
+     * Non modifica il calcolo di kid/JWK/x5c (e' solo una guardia) e non scrive nulla.
+     *
+     * @throws WP_SPID_CIE_OIDC_Key_Unavailable_Exception se la coppia non e' utilizzabile.
+     */
+    private function assert_usable_key_pair(): void {
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Certificates')) {
+            require_once __DIR__ . '/class-wp-spid-cie-spid-certificates.php';
+        }
+        $key_dir = rtrim((string) ($this->config['key_dir'] ?? ''), '/\\');
+        if ($key_dir === '') {
+            throw new WP_SPID_CIE_OIDC_Key_Unavailable_Exception();
+        }
+        $pair = WP_SPID_CIE_OIDC_Spid_Certificates::inspect_key_pair($key_dir . '/private.key', $key_dir . '/public.crt');
+        if (($pair['state'] ?? '') !== 'valid') {
+            throw new WP_SPID_CIE_OIDC_Key_Unavailable_Exception();
+        }
     }
 
     private function base64url_encode($data) {

@@ -1418,6 +1418,7 @@ class WP_SPID_CIE_OIDC_Admin {
     public function handle_key_generation() {
         if ( isset( $_GET['action'], $_GET['_wpnonce'] ) && $_GET['action'] === 'generate_oidc_keys' ) {
             if ( ! wp_verify_nonce( $_GET['_wpnonce'], 'generate_oidc_keys_nonce' ) ) { wp_die('Security check failed'); }
+            if ( ! current_user_can( 'manage_options' ) ) { wp_die('Permessi insufficienti.'); }
             
             if (!class_exists('WP_SPID_CIE_OIDC_Factory')) {
                  require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-factory.php';
@@ -1769,6 +1770,36 @@ class WP_SPID_CIE_OIDC_Admin {
     }
 
     /**
+     * Classifica lo stato delle chiavi per l'autogenerazione durante il salvataggio admin.
+     *
+     * Invariante: il salvataggio genera una coppia SOLO al bootstrap realmente vergine, cioe' quando
+     * la directory attiva coincide con la primaria e nella primaria mancano ENTRAMBI i file.
+     * Mai "manca almeno un file -> genera": una coppia parziale o una directory attiva diversa
+     * dalla primaria non devono produrre una nuova identita' crittografica implicita.
+     * Nessun side effect: solo verifiche di esistenza sui path ricevuti.
+     *
+     * @param  string $active_dir  Directory chiavi attiva (resolve_spid_key_dir(false)).
+     * @param  string $primary_dir Directory chiavi primaria (resolve_spid_key_dir(true)).
+     * @return string 'generate' | 'complete' | 'partial' | 'active_not_primary'
+     */
+    private function classify_initial_key_generation(string $active_dir, string $primary_dir): string {
+        $primary_dir = untrailingslashit($primary_dir);
+        $has_private = file_exists($primary_dir . '/private.key');
+        $has_cert = file_exists($primary_dir . '/public.crt');
+
+        if ($has_private !== $has_cert) {
+            return 'partial';
+        }
+        if ($has_private && $has_cert) {
+            return 'complete';
+        }
+        if (untrailingslashit($active_dir) !== $primary_dir) {
+            return 'active_not_primary';
+        }
+        return 'generate';
+    }
+
+    /**
      * Sanitizes and persists plugin options submitted via the settings form.
      *
      * @since  1.0.0
@@ -1945,12 +1976,23 @@ class WP_SPID_CIE_OIDC_Admin {
 
         $auto_generate_tabs = ['spid_saml', 'ente', 'impostazioni'];
         if (in_array($current_tab, $auto_generate_tabs, true)) {
-            $key_dir = WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir();
-            $private_path = trailingslashit($key_dir) . 'private.key';
-            $cert_path = trailingslashit($key_dir) . 'public.crt';
-            $must_generate = !file_exists($private_path) || !file_exists($cert_path);
+            // Il normale salvataggio non deve mai rigenerare/sovrascrivere un'identita' crittografica
+            // esistente o degradata: genera SOLO al bootstrap realmente vergine (vedi helper).
+            $key_state = $this->classify_initial_key_generation(
+                WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir(),
+                WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir(true)
+            );
 
-            if ($must_generate) {
+            if ($key_state === 'partial') {
+                add_settings_error(
+                    $this->plugin_name . '_options',
+                    'spid_cie_key_pair_incomplete',
+                    'Salvataggio completato, ma la coppia chiave privata/certificato del plugin è incompleta: nessuna chiave è stata generata o modificata automaticamente. Ripristina la coppia dal backup oppure rigenerala esplicitamente con il pulsante dedicato (la rigenerazione cambia l\'identità pubblicata presso AgID/CIE).',
+                    'error'
+                );
+            }
+
+            if ($key_state === 'generate') {
                 $generation = WP_SPID_CIE_OIDC_Spid_Certificates::generate($new_input, false);
                 if (!$generation['success']) {
                     add_settings_error(

@@ -265,17 +265,6 @@ class WP_SPID_CIE_OIDC_Public {
 			@ob_end_clean();
 		}
 
-		// Log hits (without depending on Factory)
-		$uploads = wp_upload_dir();
-		$keyDir  = trailingslashit($uploads['basedir']) . 'spid-cie-oidc-keys';
-		if ( ! is_dir($keyDir) ) {
-			@wp_mkdir_p($keyDir);
-		}
-		@file_put_contents(
-			$keyDir . '/hits.log',
-			'[' . gmdate('c') . '] action=' . $action . ' host=' . ($_SERVER['HTTP_HOST'] ?? '') . ' uri=' . ($_SERVER['REQUEST_URI'] ?? '') . "\n",
-			FILE_APPEND
-		);
 
 		if ( ! class_exists('WP_SPID_CIE_OIDC_Factory') ) {
 			require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-factory.php';
@@ -356,10 +345,17 @@ class WP_SPID_CIE_OIDC_Public {
 			echo 'Not found';
 			exit;
 
-		} catch (Exception $e) {
+		} catch (WP_SPID_CIE_OIDC_Key_Unavailable_Exception $e) {
+			@error_log('[wp-spid-cie federation] action=' . $action . ' error=key_unavailable');
+			status_header(503);
+			header('Content-Type: text/plain; charset=utf-8');
+			echo 'Servizio temporaneamente non disponibile.';
+			exit;
+		} catch (\Throwable $e) {
+			@error_log('[wp-spid-cie federation] action=' . $action . ' error=' . get_class($e));
 			status_header(500);
 			header('Content-Type: text/plain; charset=utf-8');
-			echo 'Errore OIDC Federation: ' . $e->getMessage();
+			echo 'Errore interno del servizio.';
 			exit;
 		}
 	}
@@ -461,6 +457,15 @@ class WP_SPID_CIE_OIDC_Public {
 			status_header(403);
 			header('Content-Type: text/plain; charset=utf-8');
 			echo 'Forbidden';
+			exit;
+		}
+
+		// Mai metadata non firmato in silenzio: con coppia non utilizzabile 503 generico, nessun XML.
+		if (!$this->is_spid_saml_key_pair_usable()) {
+			@error_log('[wp-spid-cie saml] route=metadata error=key_unavailable');
+			status_header(503);
+			header('Content-Type: text/plain; charset=utf-8');
+			echo 'Servizio temporaneamente non disponibile.';
 			exit;
 		}
 
@@ -835,25 +840,22 @@ class WP_SPID_CIE_OIDC_Public {
 	}
 
 	private function resolve_spid_saml_active_key_dir(): string {
-		$upload_dir = wp_upload_dir();
-		$base_dir = trailingslashit($upload_dir['basedir']);
-
-		$primary_dir = $base_dir . 'wp-spid-cie-keys';
-		$fallback_dir = $base_dir . 'spid-cie-oidc-keys';
-		$primary_private = trailingslashit($primary_dir) . 'private.key';
-		$primary_cert = trailingslashit($primary_dir) . 'public.crt';
-		$fallback_private = trailingslashit($fallback_dir) . 'private.key';
-		$fallback_cert = trailingslashit($fallback_dir) . 'public.crt';
-
-		if (file_exists($primary_private) && is_readable($primary_private) && file_exists($primary_cert) && is_readable($primary_cert)) {
-			return $primary_dir;
+		// Un solo resolver nel plugin: PRIMARY-only (vedi WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir).
+		if (!class_exists('WP_SPID_CIE_OIDC_Factory')) {
+			require_once dirname(__DIR__) . '/includes/class-wp-spid-cie-factory.php';
 		}
+		return WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir(false);
+	}
 
-		if (file_exists($fallback_private) && is_readable($fallback_private) && file_exists($fallback_cert) && is_readable($fallback_cert)) {
-			return $fallback_dir;
+	private function is_spid_saml_key_pair_usable(): bool {
+		if (!class_exists('WP_SPID_CIE_OIDC_Spid_Certificates')) {
+			require_once dirname(__DIR__) . '/includes/class-wp-spid-cie-spid-certificates.php';
 		}
-
-		return $primary_dir;
+		$pair = WP_SPID_CIE_OIDC_Spid_Certificates::inspect_key_pair(
+			$this->resolve_spid_saml_key_path('private.key'),
+			$this->resolve_spid_saml_key_path('public.crt')
+		);
+		return ($pair['state'] ?? '') === 'valid';
 	}
 
 	private function resolve_spid_saml_key_path(string $filename): string {
