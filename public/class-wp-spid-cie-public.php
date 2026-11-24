@@ -265,17 +265,6 @@ class WP_SPID_CIE_OIDC_Public {
 			@ob_end_clean();
 		}
 
-		// Log hits (without depending on Factory)
-		$uploads = wp_upload_dir();
-		$keyDir  = trailingslashit($uploads['basedir']) . 'spid-cie-oidc-keys';
-		if ( ! is_dir($keyDir) ) {
-			@wp_mkdir_p($keyDir);
-		}
-		@file_put_contents(
-			$keyDir . '/hits.log',
-			'[' . gmdate('c') . '] action=' . $action . ' host=' . ($_SERVER['HTTP_HOST'] ?? '') . ' uri=' . ($_SERVER['REQUEST_URI'] ?? '') . "\n",
-			FILE_APPEND
-		);
 
 		if ( ! class_exists('WP_SPID_CIE_OIDC_Factory') ) {
 			require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-factory.php';
@@ -356,10 +345,17 @@ class WP_SPID_CIE_OIDC_Public {
 			echo 'Not found';
 			exit;
 
-		} catch (Exception $e) {
+		} catch (WP_SPID_CIE_OIDC_Key_Unavailable_Exception $e) {
+			@error_log('[wp-spid-cie federation] action=' . $action . ' error=key_unavailable');
+			status_header(503);
+			header('Content-Type: text/plain; charset=utf-8');
+			echo 'Servizio temporaneamente non disponibile.';
+			exit;
+		} catch (\Throwable $e) {
+			@error_log('[wp-spid-cie federation] action=' . $action . ' error=' . get_class($e));
 			status_header(500);
 			header('Content-Type: text/plain; charset=utf-8');
-			echo 'Errore OIDC Federation: ' . $e->getMessage();
+			echo 'Errore interno del servizio.';
 			exit;
 		}
 	}
@@ -461,6 +457,15 @@ class WP_SPID_CIE_OIDC_Public {
 			status_header(403);
 			header('Content-Type: text/plain; charset=utf-8');
 			echo 'Forbidden';
+			exit;
+		}
+
+		// Mai metadata non firmato in silenzio: con coppia non utilizzabile 503 generico, nessun XML.
+		if (!$this->is_spid_saml_key_pair_usable()) {
+			@error_log('[wp-spid-cie saml] route=metadata error=key_unavailable');
+			status_header(503);
+			header('Content-Type: text/plain; charset=utf-8');
+			echo 'Servizio temporaneamente non disponibile.';
 			exit;
 		}
 
@@ -840,6 +845,17 @@ class WP_SPID_CIE_OIDC_Public {
 			require_once dirname(__DIR__) . '/includes/class-wp-spid-cie-factory.php';
 		}
 		return WP_SPID_CIE_OIDC_Factory::resolve_spid_key_dir(false);
+	}
+
+	private function is_spid_saml_key_pair_usable(): bool {
+		if (!class_exists('WP_SPID_CIE_OIDC_Spid_Certificates')) {
+			require_once dirname(__DIR__) . '/includes/class-wp-spid-cie-spid-certificates.php';
+		}
+		$pair = WP_SPID_CIE_OIDC_Spid_Certificates::inspect_key_pair(
+			$this->resolve_spid_saml_key_path('private.key'),
+			$this->resolve_spid_saml_key_path('public.crt')
+		);
+		return ($pair['state'] ?? '') === 'valid';
 	}
 
 	private function resolve_spid_saml_key_path(string $filename): string {

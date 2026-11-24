@@ -1418,6 +1418,7 @@ class WP_SPID_CIE_OIDC_Admin {
     public function handle_key_generation() {
         if ( isset( $_GET['action'], $_GET['_wpnonce'] ) && $_GET['action'] === 'generate_oidc_keys' ) {
             if ( ! wp_verify_nonce( $_GET['_wpnonce'], 'generate_oidc_keys_nonce' ) ) { wp_die('Security check failed'); }
+            if ( ! current_user_can( 'manage_options' ) ) { wp_die('Permessi insufficienti.'); }
             
             if (!class_exists('WP_SPID_CIE_OIDC_Factory')) {
                  require_once plugin_dir_path( dirname( __FILE__ ) ) . 'includes/class-wp-spid-cie-factory.php';

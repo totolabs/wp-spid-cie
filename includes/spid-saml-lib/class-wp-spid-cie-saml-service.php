@@ -138,7 +138,20 @@ class WP_SPID_CIE_OIDC_Saml_Service {
      * @param  array  $requestContext Additional context stored with the request ID.
      * @return string Redirect URL with SAMLRequest and Signature query params.
      */
-    public function build_authn_request_redirect(array $sp, array $idp, string $relayState, array $requestContext = []): string {
+    /**
+     * @return string|WP_Error URL di redirect firmato, oppure WP_Error se la configurazione SP non e' utilizzabile.
+     *                        (Nessun tipo di ritorno dichiarato: con ': string' i rami WP_Error causerebbero TypeError.)
+     */
+    public function build_authn_request_redirect(array $sp, array $idp, string $relayState, array $requestContext = []) {
+        // Non firmare con una coppia assente/parziale/invalida/incoerente (stesso controllo canonico di H2).
+        if (!class_exists('WP_SPID_CIE_OIDC_Spid_Certificates')) {
+            require_once dirname(__DIR__) . '/class-wp-spid-cie-spid-certificates.php';
+        }
+        $pair = WP_SPID_CIE_OIDC_Spid_Certificates::inspect_key_pair((string) ($sp['private_key_path'] ?? ''), (string) ($sp['cert_path'] ?? ''));
+        if (($pair['state'] ?? '') !== 'valid') {
+            return new WP_Error('saml_sp_key_pair_invalid', __('Configurazione SPID SAML incompleta.', 'wp-spid-cie'));
+        }
+
         if (strlen($relayState) > 512) {
             $relayState = home_url('/');
         }

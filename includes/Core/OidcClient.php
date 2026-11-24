@@ -114,7 +114,16 @@ class WP_SPID_CIE_OIDC_OidcClient {
                 $ro_payload['claims'] = ['userinfo' => $userinfoClaims];
             }
 
-            $request_jwt = $requestObjectSigner($ro_payload);
+            try {
+                $request_jwt = $requestObjectSigner($ro_payload);
+            } catch (\Throwable $e) {
+                // Nessun payload/JWT/path/materiale di chiave nel log: solo correlazione e classe errore.
+                $this->logger->error('OIDC request object signing failed', [
+                    'correlation_id' => $correlationId,
+                    'error_class' => get_class($e),
+                ]);
+                return new WP_Error('oidc_signing_key_unavailable', __('Servizio di autenticazione temporaneamente non disponibile.', 'wp-spid-cie'));
+            }
             $outer = [
                 'client_id'             => $providerConfig['client_id'],
                 'response_type'         => 'code',
@@ -322,8 +331,18 @@ class WP_SPID_CIE_OIDC_OidcClient {
                 'exp' => $now + 300,
                 'jti' => wp_generate_uuid4(),
             ];
+            try {
+                $client_assertion = $clientAssertionSigner($ca_payload);
+            } catch (\Throwable $e) {
+                // Il token endpoint NON viene contattato. Nessun code/verifier/assertion/token nel log.
+                $this->logger->error('OIDC client assertion signing failed', [
+                    'correlation_id' => $correlationId,
+                    'error_class' => get_class($e),
+                ]);
+                return new WP_Error('oidc_signing_key_unavailable', __('Servizio di autenticazione temporaneamente non disponibile.', 'wp-spid-cie'));
+            }
             $body['client_assertion_type'] = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
-            $body['client_assertion']      = $clientAssertionSigner($ca_payload);
+            $body['client_assertion']      = $client_assertion;
         }
 
         $response = wp_remote_post($tokenEndpoint, [
