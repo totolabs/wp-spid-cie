@@ -9,6 +9,7 @@ declare(strict_types=1);
 // e file non della suite.
 $tests = [
     'cie-federation-entity-configuration',
+    'cie-key-autogeneration-guard',
     'disclaimer-defaults',
     'spid-certificates-integration',
     'spid-oidc-removal-guard',
