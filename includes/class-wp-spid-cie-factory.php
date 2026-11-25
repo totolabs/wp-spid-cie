@@ -3,7 +3,8 @@ defined( 'ABSPATH' ) || exit;
 
 /**
  * Factory for creating and configuring the OIDC client instance.
- * Wrapper for the SPID_CIE_OIDC_PHP library.
+ * Also defines the key directory resolver and the Wrapper used for JWT signing,
+ * JWK publication and JWE (UserInfo) decryption.
  *
  * @package    WP_SPID_CIE_OIDC
  * @subpackage WP_SPID_CIE_OIDC/includes
@@ -14,8 +15,6 @@ defined( 'ABSPATH' ) || exit;
 if ( file_exists( dirname( __DIR__ ) . '/vendor/autoload.php' ) ) {
     require_once dirname( __DIR__ ) . '/vendor/autoload.php';
 }
-
-use SPID_CIE_OIDC_PHP\Core\Util;
 
 /**
  * Factory for creating and configuring the OIDC client instance.
