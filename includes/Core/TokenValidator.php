@@ -8,6 +8,19 @@ defined( 'ABSPATH' ) || exit;
  * @package WP_SPID_CIE_OIDC
  */
 class WP_SPID_CIE_OIDC_TokenValidator {
+    /**
+     * Algoritmi ammessi per il JWS interno della UserInfo: solo quello registrato dal RP nella
+     * Entity Configuration (userinfo_signed_response_alg = RS256). Da allargare solo se i metadata
+     * registrati lo prevedono.
+     */
+    const USERINFO_ALLOWED_ALGS = ['RS256'];
+
+    /** Dimensione minima in bit del modulo RSA della chiave di firma dell'OP per la UserInfo. */
+    const USERINFO_MIN_RSA_BITS = 2048;
+
+    /** Tolleranza di orologio in secondi per exp/iat/nbf della UserInfo: la stessa dell'ID Token. */
+    const USERINFO_CLOCK_SKEW = 60;
+
     private $logger;
 
     /**
@@ -104,6 +117,254 @@ class WP_SPID_CIE_OIDC_TokenValidator {
         }
 
         return $payload;
+    }
+
+    /**
+     * Verifica il JWS interno (compact) della UserInfo CIE, gia' decifrato dalla JWE.
+     *
+     * Ordine vincolante: struttura, header (alg, crit, kid), chiave dal JWKS di
+     * providerConfig['jwks_uri'], firma sui byte originali, poi iss/aud/exp/iat/nbf.
+     * La chiave dell'OP proviene dalla configurazione del provider ed e' protetta da TLS/WebPKI,
+     * come per l'ID Token (non dalla trust chain della federazione). Le chiavi e gli URL presenti
+     * nell'header del token (jku, jwk, x5u, x5c, x5t) non vengono mai letti.
+     * Il sub NON e' verificato qui: resta il controllo H-UI-1 in OidcClient, dopo questo metodo.
+     *
+     * @since  1.4.2
+     * @param  string $jws            JWS compact interno alla JWE.
+     * @param  array  $providerConfig Configurazione risolta (jwks_uri, issuer, client_id).
+     * @param  string $correlationId  Identificativo della richiesta per il log.
+     * @return array|WP_Error Payload verificato, oppure WP_Error con codice dedicato.
+     */
+    public function validateUserInfoJws(string $jws, array $providerConfig, string $correlationId) {
+        // 1. Struttura: 3 segmenti; header e payload base64url stretti e JSON oggetto.
+        $parts = explode('.', $jws);
+        if (count($parts) !== 3) {
+            return $this->rejectUserInfo('oidc_userinfo_format_invalid', 'malformed_jws', $correlationId);
+        }
+        $header = $this->decodeUserInfoSegment($parts[0]);
+        $decodedPayload = $this->decodeUserInfoSegment($parts[1]);
+        if ($header === null || $decodedPayload === null) {
+            return $this->rejectUserInfo('oidc_userinfo_format_invalid', 'malformed_jws', $correlationId);
+        }
+        $header = $header['array'];
+        $payloadObject = $decodedPayload['object'];
+        $payload = $decodedPayload['array'];
+
+        // 2. alg in allowlist, prima di toccare il segmento firma.
+        $alg = $header['alg'] ?? null;
+        if (!is_string($alg) || !in_array($alg, self::USERINFO_ALLOWED_ALGS, true)) {
+            return $this->rejectUserInfo('oidc_userinfo_signature_invalid', 'alg_not_allowed', $correlationId);
+        }
+
+        // 3. Nessuna estensione critica supportata.
+        if (array_key_exists('crit', $header)) {
+            return $this->rejectUserInfo('oidc_userinfo_signature_invalid', 'crit_unsupported', $correlationId);
+        }
+
+        // 4. kid obbligatorio: nessun fallback alla prima chiave del JWKS.
+        $kid = $header['kid'] ?? null;
+        if (!is_string($kid) || $kid === '') {
+            return $this->rejectUserInfo('oidc_userinfo_signature_invalid', 'kid_missing', $correlationId);
+        }
+
+        // 6. JWKS solo dal jwks_uri configurato (stessa fonte dell'ID Token).
+        $jwksUri = (string) ($providerConfig['jwks_uri'] ?? '');
+        if ($jwksUri === '') {
+            return $this->rejectUserInfo('oidc_userinfo_signature_invalid', 'jwks_unavailable', $correlationId);
+        }
+        $jwks = $this->fetchJwks($jwksUri, $correlationId);
+        if (is_wp_error($jwks)) {
+            return $this->rejectUserInfo('oidc_userinfo_signature_invalid', 'jwks_unavailable', $correlationId);
+        }
+
+        // 7. Selezione univoca della chiave per kid esatto.
+        $jwk = $this->selectUserInfoJwk($jwks, $kid, $alg);
+        if (is_string($jwk)) {
+            return $this->rejectUserInfo('oidc_userinfo_signature_invalid', $jwk, $correlationId);
+        }
+
+        // 8. Firma sui byte originali header.payload, con JWK minimale {kty, n, e}.
+        $signature = $this->base64urlDecodeStrict($parts[2]);
+        if ($signature === null || !$this->verifySignature($parts[0] . '.' . $parts[1], $signature, $jwk, $alg)) {
+            return $this->rejectUserInfo('oidc_userinfo_signature_invalid', 'bad_signature', $correlationId);
+        }
+
+        // 9. iss === issuer configurato.
+        $issuer = (string) ($providerConfig['issuer'] ?? '');
+        if (!array_key_exists('iss', $payload)) {
+            return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'iss_mismatch', $correlationId);
+        }
+        if (!is_string($payload['iss'])) {
+            return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'invalid_claim_type', $correlationId);
+        }
+        if ($issuer === '' || $payload['iss'] !== $issuer) {
+            return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'iss_mismatch', $correlationId);
+        }
+
+        // 10. aud: stringa === client_id, oppure array JSON che lo contiene. Il tipo si valuta sulla
+        // decodifica a oggetti: un oggetto JSON non e' un elenco di audience.
+        $clientId = (string) ($providerConfig['client_id'] ?? '');
+        if (!property_exists($payloadObject, 'aud')) {
+            return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'aud_mismatch', $correlationId);
+        }
+        $aud = $payloadObject->aud;
+        if (is_string($aud)) {
+            if ($clientId === '' || $aud !== $clientId) {
+                return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'aud_mismatch', $correlationId);
+            }
+        } elseif (is_array($aud)) {
+            if ($clientId === '' || !in_array($clientId, $aud, true)) {
+                return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'aud_mismatch', $correlationId);
+            }
+        } else {
+            return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'invalid_claim_type', $correlationId);
+        }
+
+        // 11-13. exp/iat obbligatori, nbf se presente. is_int e' una restrizione del profilo del plugin.
+        $now = $this->currentTime();
+        $skew = self::USERINFO_CLOCK_SKEW;
+        if (!array_key_exists('exp', $payload)) {
+            return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'exp_missing', $correlationId);
+        }
+        if (!is_int($payload['exp'])) {
+            return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'invalid_claim_type', $correlationId);
+        }
+        if (($now - $skew) >= $payload['exp']) {
+            return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'expired', $correlationId);
+        }
+        if (!array_key_exists('iat', $payload)) {
+            return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'iat_missing', $correlationId);
+        }
+        if (!is_int($payload['iat'])) {
+            return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'invalid_claim_type', $correlationId);
+        }
+        if ($payload['iat'] > ($now + $skew)) {
+            return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'iat_future', $correlationId);
+        }
+        if (array_key_exists('nbf', $payload)) {
+            if (!is_int($payload['nbf'])) {
+                return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'invalid_claim_type', $correlationId);
+            }
+            if ($payload['nbf'] > ($now + $skew)) {
+                return $this->rejectUserInfo('oidc_userinfo_claims_invalid', 'nbf_future', $correlationId);
+            }
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Orologio della verifica UserInfo (sovrascrivibile nei test).
+     */
+    protected function currentTime(): int {
+        return time();
+    }
+
+    private function rejectUserInfo(string $code, string $reason, string $correlationId): WP_Error {
+        // Solo correlazione e motivo enumerato: mai token, JWS, kid, sub, claim o dati personali.
+        $this->logger->error('OIDC userinfo JWS rejected', [
+            'correlation_id' => $correlationId,
+            'reason'         => $reason,
+        ]);
+        return new WP_Error($code, __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
+    }
+
+    /**
+     * Seleziona l'unica chiave di firma utilizzabile per il kid dato.
+     *
+     * @return array|string JWK minimale {kty, n, e}, oppure il motivo di rifiuto
+     *                      ('kid_not_found', 'jwk_unusable', 'kid_ambiguous').
+     */
+    private function selectUserInfoJwk(array $jwks, string $kid, string $alg) {
+        $candidates = 0;
+        $usable = [];
+        foreach ($jwks['keys'] as $key) {
+            if (!is_array($key) || !array_key_exists('kid', $key) || $key['kid'] !== $kid) {
+                continue;
+            }
+            $candidates++;
+            $jwk = $this->usableUserInfoJwk($key, $alg);
+            if ($jwk !== null) {
+                $usable[] = $jwk;
+            }
+        }
+
+        if ($candidates === 0) {
+            return 'kid_not_found';
+        }
+        if ($usable === []) {
+            return 'jwk_unusable';
+        }
+        if (count($usable) > 1) {
+            return 'kid_ambiguous';
+        }
+        return $usable[0];
+    }
+
+    private function usableUserInfoJwk(array $key, string $alg): ?array {
+        if (($key['kty'] ?? null) !== 'RSA') {
+            return null;
+        }
+        $n = $key['n'] ?? null;
+        $e = $key['e'] ?? null;
+        if (!is_string($n) || $n === '' || !is_string($e) || $e === '') {
+            return null;
+        }
+        if (array_key_exists('use', $key) && $key['use'] !== 'sig') {
+            return null;
+        }
+        if (array_key_exists('key_ops', $key) && (!is_array($key['key_ops']) || !in_array('verify', $key['key_ops'], true))) {
+            return null;
+        }
+        if (array_key_exists('alg', $key) && $key['alg'] !== $alg) {
+            return null;
+        }
+
+        // n/e: base64url, padding finale tollerato (sono metadati di chiave, non il token firmato).
+        $n = rtrim($n, '=');
+        $e = rtrim($e, '=');
+        $modulus = $this->base64urlDecodeStrict($n);
+        if ($modulus === null || $this->base64urlDecodeStrict($e) === null) {
+            return null;
+        }
+        $modulus = ltrim($modulus, "\0");
+        if ($modulus === '' || ((strlen($modulus) - 1) * 8 + strlen(decbin(ord($modulus[0])))) < self::USERINFO_MIN_RSA_BITS) {
+            return null;
+        }
+
+        return ['kty' => 'RSA', 'n' => $n, 'e' => $e];
+    }
+
+    /**
+     * Decodifica un segmento header/payload: base64url stretto e JSON oggetto.
+     *
+     * @return array|null ['object' => stdClass, 'array' => array], oppure null se non valido.
+     */
+    private function decodeUserInfoSegment(string $segment): ?array {
+        $raw = $this->base64urlDecodeStrict($segment);
+        if ($raw === null) {
+            return null;
+        }
+        $object = json_decode($raw, false);
+        if (!($object instanceof \stdClass)) {
+            return null;
+        }
+        $array = json_decode($raw, true);
+        if (!is_array($array)) {
+            return null;
+        }
+        return ['object' => $object, 'array' => $array];
+    }
+
+    /**
+     * base64url senza padding e senza caratteri fuori alfabeto; null se non valido.
+     */
+    private function base64urlDecodeStrict(string $data): ?string {
+        if ($data === '' || preg_match('/^[A-Za-z0-9_-]+$/', $data) !== 1 || strlen($data) % 4 === 1) {
+            return null;
+        }
+        $decoded = base64_decode(strtr($data, '-_', '+/') . str_repeat('=', (4 - strlen($data) % 4) % 4), true);
+        return $decoded === false ? null : $decoded;
     }
 
     private function fetchJwks(string $jwksUri, string $correlationId) {

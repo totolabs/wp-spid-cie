@@ -7,10 +7,13 @@ require_once __DIR__ . '/bootstrap.php';
 // OpenID Connect Core 1.0 §5.3.2 e regole tecniche SPID/CIE OIDC: il JWS interno della UserInfo DEVE
 // contenere sub e il RP DEVE verificare che coincida ESATTAMENTE con quello dell'ID Token; altrimenti i
 // valori della UserInfo NON vanno usati.
-// Solo fixture sintetiche e stub: nessuna rete, nessuna chiave, nessun provider reale.
+// Solo fixture sintetiche e stub: nessuna rete, nessuna chiave reale o storica, nessun provider reale.
 // La "JWE" usata qui e' una busta compact a 5 parti aperta da un decrypter STUB: esercita il PERCORSO
-// applicativo di fetchUserInfo (JWE -> JWS interno / JSON interno), NON la crittografia RSA-OAEP/AES.
-// La verifica crittografica della firma del JWS interno (e di iss/aud) non e' oggetto di questo test.
+// applicativo di fetchUserInfo, NON la crittografia RSA-OAEP/AES.
+// Con H-UI-3 l'unica forma accettata e' JWE -> JWS firmato dall'OP: il JWS interno qui e' firmato DAVVERO
+// con una coppia RSA sintetica generata a runtime e verificato dal TokenValidator reale (ereditato), cosi'
+// il controllo del sub e' esercitato DIETRO una firma valida. La matrice completa di firma e claim
+// (iss/aud/exp/iat/nbf, alg, kid, JWKS) e' in cie-userinfo-signature.php.
 
 error_reporting(E_ALL);
 
@@ -39,7 +42,16 @@ $GLOBALS['ub_userinfo_calls'] = 0;
 function wp_remote_post($url, $args = []) {
     return ['response' => ['code' => 200], 'body' => json_encode(['access_token' => $GLOBALS['ub_access_token'], 'id_token' => UB_ID_TOKEN, 'token_type' => 'Bearer'])];
 }
+const UB_USERINFO_URL = 'https://op.example.test/userinfo';
+const UB_JWKS_URL = 'https://op.example.test/jwks';
+const UB_KID = 'ub-kid-op-SEGRETO-0a1b2c3d';
+$GLOBALS['ub_jwks_body'] = '';
+// Lo stub risponde per URL: ub_userinfo_calls conta SOLO le richieste all'endpoint UserInfo.
 function wp_remote_get($url, $args = []) {
+    if ((string) $url === UB_JWKS_URL) {
+        return ['response' => ['code' => 200], 'body' => $GLOBALS['ub_jwks_body']];
+    }
+    if ((string) $url !== UB_USERINFO_URL) { return new WP_Error('unexpected_url', 'URL non previsto nei test.'); }
     $GLOBALS['ub_userinfo_calls']++;
     if ($GLOBALS['ub_userinfo_net_error']) { return new WP_Error('offline', 'Rete disabilitata nei test.'); }
     return ['response' => ['code' => 200], 'body' => $GLOBALS['ub_userinfo_body']];
@@ -47,6 +59,10 @@ function wp_remote_get($url, $args = []) {
 function wp_remote_retrieve_response_code($r) { return $r['response']['code'] ?? 0; }
 function wp_remote_retrieve_body($r) { return $r['body'] ?? ''; }
 
+// Il vendor emette deprecation di terze parti su PHP recenti al caricamento: silenziate SOLO durante l'include.
+error_reporting(E_ALL & ~E_DEPRECATED & ~E_USER_DEPRECATED);
+require_once __DIR__ . '/../vendor/autoload.php';
+error_reporting(E_ALL);
 require_once __DIR__ . '/../includes/Logging/Logger.php';
 require_once __DIR__ . '/../includes/Core/PkceService.php';
 require_once __DIR__ . '/../includes/Core/StateNonceStore.php';
@@ -89,8 +105,16 @@ function ub_b64u_dec(string $s): string {
     return (string) base64_decode($s . str_repeat('=', (4 - strlen($s) % 4) % 4));
 }
 function ub_json(array $claims): string { return (string) json_encode($claims, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE); }
+// Coppia OP sintetica generata a runtime (mai committata); JWKS con n/e dai componenti Raw.
+$UB_OP_KEY = \phpseclib3\Crypt\RSA::createKey(2048);
+$ubRaw = $UB_OP_KEY->getPublicKey()->toString('Raw');
+$GLOBALS['ub_jwks_body'] = (string) json_encode(['keys' => [['kty' => 'RSA', 'kid' => UB_KID, 'use' => 'sig', 'alg' => 'RS256',
+    'n' => ub_b64u($ubRaw['n']->toBytes()), 'e' => ub_b64u($ubRaw['e']->toBytes())]]]);
+// JWS firmato DAVVERO (RS256) con la chiave OP sintetica.
 function ub_jws(string $json): string {
-    return ub_b64u('{"alg":"RS256","typ":"JWT"}') . '.' . ub_b64u($json) . '.' . ub_b64u('firma-non-verificata');
+    global $UB_OP_KEY;
+    $input = ub_b64u('{"alg":"RS256","kid":"' . UB_KID . '"}') . '.' . ub_b64u($json);
+    return $input . '.' . ub_b64u($UB_OP_KEY->withPadding(\phpseclib3\Crypt\RSA::SIGNATURE_PKCS1)->withHash('sha256')->sign($input));
 }
 function ub_jwe(string $inner): string {
     return ub_b64u('{"alg":"RSA-OAEP","enc":"A256CBC-HS512"}') . '.' . ub_b64u('cek') . '.' . ub_b64u('iv') . '.' . ub_b64u($inner) . '.' . ub_b64u('tag');
@@ -125,8 +149,12 @@ $OTHER = [
     'https://attributes.eid.gov.it/fiscal_number' => 'TINIT-LTRLBA85B41F205X',
     'email' => 'altro.soggetto@example.test', 'phone_number' => '+390000000002',
 ];
+// Claim di protocollo validi del JWS interno (H-UI-3): il sub e' controllato solo dopo firma e claim.
+$PROTO = ['iss' => 'https://op.example.test', 'aud' => 'https://sp.example.test', 'iat' => time(), 'exp' => time() + 300];
+$SELF += $PROTO;
+$OTHER += $PROTO;
 $FORBIDDEN_IN_LOG = [
-    $SUB, $OTHER_SUB, $SUB_NFC, $SUB_NFD, UB_ACCESS_TOKEN, UB_ID_TOKEN,
+    $SUB, $OTHER_SUB, $SUB_NFC, $SUB_NFD, UB_ACCESS_TOKEN, UB_ID_TOKEN, UB_KID,
     'BNDUGO80A01H501Z', 'LTRLBA85B41F205X', 'Ugo', 'Binder', 'Alba', 'Altrove',
     'altro.soggetto@example.test', '+390000000001', '+390000000002', 'eyJ',
 ];
@@ -171,7 +199,9 @@ $idPayload = static function ($sub, bool $present = true): array {
     return $p;
 };
 
-$FORMATS = ['json', 'jws', 'jwe_jws', 'jwe_json'];
+// H-UI-3: l'unico formato positivo e' jwe_jws firmato; gli altri sono rifiuti di formato (motivo atteso).
+$FORMATS = ['jwe_jws'];
+$REJECTED_FORMATS = ['json' => 'plain_json', 'jws' => 'unencrypted_jws', 'jwe_json' => 'unsigned_payload'];
 $ABSENT = new stdClass();
 // [etichetta, valore del sub UserInfo (ABSENT = chiave assente), motivo atteso nel log]
 $NEGATIVES = [
@@ -220,11 +250,23 @@ foreach ($FORMATS as $f) {
     $res = $run($idPayload($SUB_NFC), ub_body($f, ub_json(['sub' => $SUB_NFC] + $SELF)));
     ub_check(is_array($res) && ($res['claims']['sub'] ?? null) === $SUB_NFC, "M3 [$f]: sub Unicode identico byte per byte va accettato.");
 
-    // M4 UserInfo '{}' effettivamente ottenuta e deserializzata: json_decode('{}', true) === [], ma la distinzione
-    // da "non ottenuta" e' posizionale (i rami di fallimento ritornano [] prima del controllo), non per valore.
-    $res = $run($idPayload($SUB), ub_body($f, '{}'));
-    ub_check($isCode($res, 'oidc_userinfo_subject_invalid'), "M4 [$f]: UserInfo '{}' ottenuta va rifiutata (sub mancante), non trattata come 'non ottenuta'.");
+    // M4 UserInfo senza sub ma con firma e claim di protocollo validi: rifiutata (sub mancante), non trattata come
+    // "non ottenuta". La distinzione da [] e' posizionale (i rami di fallimento ritornano [] prima del controllo).
+    $res = $run($idPayload($SUB), ub_body($f, ub_json($PROTO)));
+    ub_check($isCode($res, 'oidc_userinfo_subject_invalid'), "M4 [$f]: UserInfo firmata senza sub va rifiutata (sub mancante), non trattata come 'non ottenuta'.");
     ub_check($lastReason() === 'missing', "M4 [$f]: atteso motivo di log 'missing'.");
+    // M4b '{}' firmato: con H-UI-3 i claim obbligatori sono verificati prima del sub -> rifiuto, mai [].
+    $res = $run($idPayload($SUB), ub_body($f, '{}'));
+    ub_check($isCode($res, 'oidc_userinfo_claims_invalid') && !is_array($res), "M4b [$f]: UserInfo '{}' firmata va rifiutata (claim obbligatori), non trattata come 'non ottenuta'.");
+}
+
+// M5 formati non piu' ammessi (H-UI-3): rifiutati PRIMA del controllo del sub, anche con sub identico.
+foreach ($REJECTED_FORMATS as $f => $reason) {
+    $res = $run($idPayload($SUB), ub_body($f, ub_json(['sub' => $SUB] + $SELF)));
+    ub_check($isCode($res, 'oidc_userinfo_format_invalid'), "M5 [$f]: formato non ammesso -> atteso WP_Error oidc_userinfo_format_invalid.");
+    ub_check(!is_array($res), "M5 [$f]: nessun claim UserInfo utilizzabile deve uscire da handleCallback.");
+    ub_check($lastReason() === $reason, "M5 [$f]: atteso motivo di log '$reason'.");
+    $noLeak("M5 [$f]");
 }
 
 // ===================== I. sub dell'ID Token non valido =====================
@@ -244,6 +286,11 @@ foreach ($FORMATS as $f) {
     ub_check(!is_array($res), "X1 [$f]: nessun codice fiscale/anagrafica/email dell'altro soggetto deve essere restituito.");
     $noLeak("X1 [$f]");
 }
+foreach ($REJECTED_FORMATS as $f => $reason) {
+    $res = $run($idPayload($SUB), ub_body($f, ub_json(['sub' => $OTHER_SUB] + $OTHER)));
+    ub_check($isCode($res, 'oidc_userinfo_format_invalid') && !is_array($res), "X1 [$f]: formato non ammesso: nessun dato dell'altro soggetto deve essere restituito.");
+    $noLeak("X1 [$f]");
+}
 
 // ===================== E. Comportamento esistente invariato (UserInfo non ottenuta -> []) =====================
 $res = $run($idPayload($SUB), ub_body('json', ub_json(['sub' => $SUB] + $SELF)), false, '');
@@ -253,21 +300,22 @@ $res = $run($idPayload($SUB), '', true);
 ub_check(is_array($res) && !isset($res['claims']['given_name']), 'E2: errore di rete UserInfo -> [] come oggi (rischio residuo: gestito da validateMandatoryClaims).');
 $res = $run($idPayload($SUB), 'aaaa.bbbb.cccc.FAIL.eeee');
 ub_check(is_array($res) && !isset($res['claims']['given_name']), 'E3: decrittazione fallita -> [] come oggi.');
+// E4 (cambiato da H-UI-3): un corpo 2xx ottenuto ma non riconosciuto non e' piu' [] ma un rifiuto di formato.
 $res = $run($idPayload($SUB), 'non-json');
-ub_check(is_array($res) && !isset($res['claims']['given_name']), 'E4: body non deserializzabile -> [] come oggi.');
+ub_check($isCode($res, 'oidc_userinfo_format_invalid') && $lastReason() === 'unknown_format', 'E4: body 2xx non riconosciuto -> oidc_userinfo_format_invalid / unknown_format.');
 
 $fetch = new ReflectionMethod($oidc, 'fetchUserInfo');
 $fetch->setAccessible(true);
 $GLOBALS['ub_userinfo_calls'] = 0;
 $GLOBALS['ub_userinfo_net_error'] = false;
-$GLOBALS['ub_userinfo_body'] = ub_json(['sub' => $SUB] + $SELF);
+$GLOBALS['ub_userinfo_body'] = ub_body('jwe_jws', ub_json(['sub' => $SUB] + $SELF));
 $r = $fetch->invoke($oidc, '', $providerConfig, 'corr-ub', $UB_DECRYPTER, $SUB);
 ub_check($r === [] && $GLOBALS['ub_userinfo_calls'] === 0, 'E5: fetchUserInfo con access token vuoto -> [] senza richiesta (invariato).');
 $r = $fetch->invoke($oidc, UB_ACCESS_TOKEN, ['userinfo_endpoint' => ''] + $providerConfig, 'corr-ub', $UB_DECRYPTER, $SUB);
 ub_check($r === [] && $GLOBALS['ub_userinfo_calls'] === 0, 'E6: fetchUserInfo con endpoint vuoto -> [] senza richiesta (invariato).');
 $r = $fetch->invoke($oidc, UB_ACCESS_TOKEN, $providerConfig, 'corr-ub', $UB_DECRYPTER, $SUB);
 ub_check(is_array($r) && ($r['sub'] ?? null) === $SUB && ($r['given_name'] ?? null) === 'Ugo', 'E7: fetchUserInfo con sub identico restituisce i claim.');
-$GLOBALS['ub_userinfo_body'] = ub_json(['sub' => $OTHER_SUB] + $OTHER);
+$GLOBALS['ub_userinfo_body'] = ub_body('jwe_jws', ub_json(['sub' => $OTHER_SUB] + $OTHER));
 $r = $fetch->invoke($oidc, UB_ACCESS_TOKEN, $providerConfig, 'corr-ub', $UB_DECRYPTER, $SUB);
 ub_check($isCode($r, 'oidc_userinfo_subject_invalid'), 'E8: fetchUserInfo con sub diverso restituisce WP_Error, non un array silenzioso.');
 

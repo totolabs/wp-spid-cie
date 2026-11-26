@@ -12,6 +12,7 @@ $tests = [
     'cie-key-autogeneration-guard',
     'cie-key-resolution-integrity',
     'cie-key-runtime-failclosed',
+    'cie-userinfo-signature',
     'cie-userinfo-subject-binding',
     'disclaimer-defaults',
     'spid-certificates-integration',

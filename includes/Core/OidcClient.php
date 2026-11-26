@@ -223,17 +223,20 @@ class WP_SPID_CIE_OIDC_OidcClient {
     }
 
     /**
-     * Recupera i claim utente dal /userinfo endpoint. Gestisce JSON, JWS e JWE.
-     * Per JWE invoca il decrypter del SP (RSA-OAEP + A256CBC-HS512), poi estrae
-     * il payload del JWS interno. Firma JWS non verificata (TLS + Bearer + JWE
-     * gia' garantiscono autenticita'; verifica con jwks CIE OP da aggiungere come
-     * defense in depth in futuro).
+     * Recupera i claim utente dal /userinfo endpoint.
      *
-     * Una UserInfo effettivamente ottenuta e deserializzata viene accettata solo se il suo sub
-     * coincide esattamente con $expectedSub (sub dell'ID Token validato); altrimenti WP_Error.
-     * I rami in cui la UserInfo non e' ottenuta restituiscono [] come in precedenza.
+     * Regole tecniche SPID/CIE OIDC: la UserInfo e' un Nested JWT, JWS firmato dall'OP e cifrato in
+     * JWE verso la chiave pubblica del RP. E' l'unica forma accettata: JSON in chiaro, JWE con JSON
+     * non firmato e JWS non cifrato vengono rifiutati (la JWE da sola non autentica l'OP). Il JWE e'
+     * aperto dal decrypter del SP; il JWS interno e' verificato da TokenValidator::validateUserInfoJws
+     * (firma con la chiave del jwks_uri configurato, iss/aud/exp/iat/nbf). Solo dopo, il sub deve
+     * coincidere esattamente con $expectedSub (sub dell'ID Token validato).
      *
-     * @return array|WP_Error Claim UserInfo, [] se non ottenuta, WP_Error se il sub non e' valido.
+     * Limite preesistente, invariato: i rami in cui la UserInfo non e' ottenuta (token o endpoint
+     * vuoti, errore HTTP, stato non 2xx, corpo vuoto, nessun decrypter, decifratura fallita)
+     * restituiscono [] e non un WP_Error; il rifiuto resta affidato ai claim obbligatori a valle.
+     *
+     * @return array|WP_Error Claim UserInfo verificati, [] se non ottenuta, WP_Error se rifiutata.
      */
     private function fetchUserInfo(string $accessToken, array $providerConfig, string $correlationId, ?callable $userInfoJweDecrypter, string $expectedSub) {
         if ($accessToken === '') {
@@ -268,48 +271,46 @@ class WP_SPID_CIE_OIDC_OidcClient {
             return [];
         }
 
-        $payloadJson = '';
-
-        if ($body !== '' && $body[0] === '{') {
-            $payloadJson = $body;
-        } else {
-            $parts = explode('.', $body);
-            if (count($parts) === 5) {
-                if ($userInfoJweDecrypter === null) {
-                    $this->logger->error('OIDC userinfo received JWE but no decrypter configured', [
-                        'correlation_id' => $correlationId,
-                    ]);
-                    return [];
-                }
-                try {
-                    $inner = (string) $userInfoJweDecrypter($body);
-                } catch (\Throwable $e) {
-                    $this->logger->error('OIDC userinfo JWE decrypt failed', [
-                        'correlation_id' => $correlationId,
-                        'error'          => $e->getMessage(),
-                    ]);
-                    return [];
-                }
-                $innerParts = explode('.', trim($inner));
-                if (count($innerParts) === 3) {
-                    $payloadJson = (string) $this->base64urlDecode($innerParts[1]);
-                } else {
-                    $payloadJson = $inner;
-                }
-            } elseif (count($parts) === 3) {
-                $payloadJson = (string) $this->base64urlDecode($parts[1]);
-            }
+        // Solo JWE -> JWS: ogni altra forma ottenuta e' rifiutata, senza fallback.
+        if ($body[0] === '{') {
+            return $this->rejectUserInfoFormat('plain_json', $correlationId);
+        }
+        $parts = explode('.', $body);
+        if (count($parts) === 3) {
+            return $this->rejectUserInfoFormat('unencrypted_jws', $correlationId);
+        }
+        if (count($parts) !== 5) {
+            return $this->rejectUserInfoFormat('unknown_format', $correlationId);
         }
 
-        if ($payloadJson === '') {
+        if ($userInfoJweDecrypter === null) {
+            $this->logger->error('OIDC userinfo received JWE but no decrypter configured', [
+                'correlation_id' => $correlationId,
+            ]);
             return [];
         }
-        $json = json_decode($payloadJson, true);
-        if (!is_array($json)) {
+        try {
+            $inner = (string) $userInfoJweDecrypter($body);
+        } catch (\Throwable $e) {
+            $this->logger->error('OIDC userinfo JWE decrypt failed', [
+                'correlation_id' => $correlationId,
+                'error'          => $e->getMessage(),
+            ]);
             return [];
         }
 
-        // Unico punto di convergenza di JSON, JWS e JWE dopo una deserializzazione riuscita:
+        // JSON cifrato ma non firmato: chiunque conosca la chiave pubblica del RP puo' produrlo.
+        $inner = trim($inner);
+        if ($inner !== '' && $inner[0] === '{') {
+            return $this->rejectUserInfoFormat('unsigned_payload', $correlationId);
+        }
+
+        $json = $this->tokenValidator->validateUserInfoJws($inner, $providerConfig, $correlationId);
+        if (is_wp_error($json)) {
+            return $json;
+        }
+
+        // Raggiunto solo con JWS interno verificato (firma e claim):
         // confronto esatto (===) sul valore originale, senza trim/sanitize/normalizzazioni.
         $subjectIssue = $this->getSubjectIssue($json);
         if ($subjectIssue === null && $json['sub'] !== $expectedSub) {
@@ -345,13 +346,13 @@ class WP_SPID_CIE_OIDC_OidcClient {
         return null;
     }
 
-    private function base64urlDecode(string $data) {
-        $data = strtr($data, '-_', '+/');
-        $padding = strlen($data) % 4;
-        if ($padding > 0) {
-            $data .= str_repeat('=', 4 - $padding);
-        }
-        return base64_decode($data, true);
+    private function rejectUserInfoFormat(string $reason, string $correlationId): WP_Error {
+        // Nessun token, JWS, claim o contenuto della UserInfo nel log: solo correlazione e motivo.
+        $this->logger->error('OIDC userinfo format rejected', [
+            'correlation_id' => $correlationId,
+            'reason'         => $reason,
+        ]);
+        return new WP_Error('oidc_userinfo_format_invalid', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
     }
 
     private function exchangeCodeForTokens(string $code, string $codeVerifier, array $providerConfig, string $correlationId, ?callable $clientAssertionSigner = null) {
