@@ -187,11 +187,27 @@ class WP_SPID_CIE_OIDC_OidcClient {
             return $payload;
         }
 
+        // OIDC Core 1.0 par. 5.3.2 e regole tecniche SPID/CIE OIDC: il sub della UserInfo DEVE
+        // coincidere con quello dell'ID Token validato. Serve quindi un sub dell'ID Token valido
+        // (valore originale, stringa non vuota) PRIMA di richiedere la UserInfo.
+        $idTokenSubIssue = $this->getSubjectIssue($payload);
+        if ($idTokenSubIssue !== null) {
+            $this->logger->error('OIDC id_token subject invalid', [
+                'correlation_id' => $correlationId,
+                'reason'         => $idTokenSubIssue,
+            ]);
+            return new WP_Error('oidc_id_token_sub_invalid', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
+        }
+
         // L'id_token CIE contiene solo sub + claim JWT standard. Gli attributi utente
         // (given_name, family_name, fiscal_number, email, phone_number) sono nella
         // userinfo, che CIE restituisce come JWE cifrato con la chiave pubblica del SP.
         $accessToken    = (string) ($tokenResponse['access_token'] ?? '');
-        $userInfoClaims = $this->fetchUserInfo($accessToken, $providerConfig, $correlationId, $userInfoJweDecrypter);
+        $userInfoClaims = $this->fetchUserInfo($accessToken, $providerConfig, $correlationId, $userInfoJweDecrypter, $payload['sub']);
+        if (is_wp_error($userInfoClaims)) {
+            // UserInfo ottenuta ma di un soggetto diverso o senza sub valido: nessun claim va usato.
+            return $userInfoClaims;
+        }
 
         $claims = array_merge($payload, $userInfoClaims);
         if (!empty($payload['sub'])) {
@@ -212,8 +228,14 @@ class WP_SPID_CIE_OIDC_OidcClient {
      * il payload del JWS interno. Firma JWS non verificata (TLS + Bearer + JWE
      * gia' garantiscono autenticita'; verifica con jwks CIE OP da aggiungere come
      * defense in depth in futuro).
+     *
+     * Una UserInfo effettivamente ottenuta e deserializzata viene accettata solo se il suo sub
+     * coincide esattamente con $expectedSub (sub dell'ID Token validato); altrimenti WP_Error.
+     * I rami in cui la UserInfo non e' ottenuta restituiscono [] come in precedenza.
+     *
+     * @return array|WP_Error Claim UserInfo, [] se non ottenuta, WP_Error se il sub non e' valido.
      */
-    private function fetchUserInfo(string $accessToken, array $providerConfig, string $correlationId, ?callable $userInfoJweDecrypter): array {
+    private function fetchUserInfo(string $accessToken, array $providerConfig, string $correlationId, ?callable $userInfoJweDecrypter, string $expectedSub) {
         if ($accessToken === '') {
             return [];
         }
@@ -287,7 +309,40 @@ class WP_SPID_CIE_OIDC_OidcClient {
             return [];
         }
 
+        // Unico punto di convergenza di JSON, JWS e JWE dopo una deserializzazione riuscita:
+        // confronto esatto (===) sul valore originale, senza trim/sanitize/normalizzazioni.
+        $subjectIssue = $this->getSubjectIssue($json);
+        if ($subjectIssue === null && $json['sub'] !== $expectedSub) {
+            $subjectIssue = 'mismatch';
+        }
+        if ($subjectIssue !== null) {
+            // Nessun sub, claim, codice fiscale, token o contenuto della UserInfo nel log.
+            $this->logger->error('OIDC userinfo subject rejected', [
+                'correlation_id' => $correlationId,
+                'reason'         => $subjectIssue,
+            ]);
+            return new WP_Error('oidc_userinfo_subject_invalid', __('Autenticazione SPID/CIE non completata.', 'wp-spid-cie'));
+        }
+
         return $json;
+    }
+
+    /**
+     * Motivo per cui il claim sub non e' utilizzabile, oppure null se e' una stringa non vuota.
+     *
+     * @return string|null 'missing', 'invalid_type', 'empty' oppure null.
+     */
+    private function getSubjectIssue(array $claims): ?string {
+        if (!array_key_exists('sub', $claims)) {
+            return 'missing';
+        }
+        if (!is_string($claims['sub'])) {
+            return 'invalid_type';
+        }
+        if ($claims['sub'] === '') {
+            return 'empty';
+        }
+        return null;
     }
 
     private function base64urlDecode(string $data) {

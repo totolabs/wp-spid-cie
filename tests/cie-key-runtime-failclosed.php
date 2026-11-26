@@ -292,7 +292,7 @@ foreach (['no_private', 'mismatch'] as $state) {
     $GLOBALS['fc_remote_get_body'] = 'aaaa.bbbb.cccc.dddd.eeee';
     $fetch = new ReflectionMethod($oidc, 'fetchUserInfo');
     $fetch->setAccessible(true);
-    $claims = $fetch->invoke($oidc, 'ACCESS-TOKEN', $providerConfig, 'corr-3', static function (string $jwe) use ($wrapper) { return $wrapper->decryptUserInfoJwe($jwe); });
+    $claims = $fetch->invoke($oidc, 'ACCESS-TOKEN', $providerConfig, 'corr-3', static function (string $jwe) use ($wrapper) { return $wrapper->decryptUserInfoJwe($jwe); }, 'SUB-ATTESO');
     assert_true($claims === [], "D11 ($state): JWE con chiave non disponibile -> path controllato, nessun claim, nessun fatal.");
     foreach ($logger->lines as $line) { $noLeakLog($line, "D11 ($state) log"); }
     $cls = fc_throws(static function () use ($wrapper) { $wrapper->decryptUserInfoJwe('aaaa.bbbb.cccc.dddd.eeee'); });
